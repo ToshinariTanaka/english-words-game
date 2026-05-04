@@ -113,7 +113,7 @@ function updateStatus() {
 }
 
 function nextQuestion() {
-  current = words[Math.floor(Math.random() * words.length)];
+  current = chooseNextWord();
   el.encounter.textContent = `${current.word} が現れた！`;
   el.targetWord.textContent = current.word;
   el.choices.innerHTML = "";
@@ -139,7 +139,7 @@ function judgeAnswer(choice) {
     el.resultMessage.textContent = `${current.word} を倒した！ +${current.level} gold`;
     el.answerMessage.textContent = "";
   } else {
-    hp -= current.level;
+    hp = Math.max(0, hp - current.level);
     el.resultMessage.textContent = `${current.word} の攻撃！ -${current.level} HP`;
     el.answerMessage.textContent = `正解: ${current.meaning}`;
   }
