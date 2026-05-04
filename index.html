@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>英単語RPG MVP</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section id="home-screen" class="screen active">
+        <h1>英単語RPG</h1>
+        <p>英単語モンスターを倒して gold を稼ごう！</p>
+        <div class="panel">
+          <label for="csv-file">単語CSVを読み込む</label>
+          <input id="csv-file" type="file" accept=".csv" />
+          <p class="hint">形式: word,meaning,level</p>
+          <button id="use-sample-btn" type="button">サンプルデータを使う</button>
+          <button id="start-btn" type="button" disabled>ゲーム開始</button>
+          <p id="home-message" class="message"></p>
+        </div>
+      </section>
+
+      <section id="battle-screen" class="screen">
+        <header class="status-bar">
+          <span>HP: <strong id="hp">100</strong></span>
+          <span>Gold: <strong id="gold">0</strong></span>
+          <span>討伐数: <strong id="kills">0</strong></span>
+        </header>
+
+        <div class="panel battle-panel">
+          <p id="encounter" class="encounter"></p>
+          <h2 id="target-word" class="word"></h2>
+          <button id="speak-btn" type="button">🔊 発音を聞く</button>
+          <div id="choices" class="choices"></div>
+        </div>
+      </section>
+
+      <section id="result-screen" class="screen">
+        <div class="panel">
+          <h2>結果</h2>
+          <p id="result-message" class="message"></p>
+          <p id="answer-message" class="answer"></p>
+          <button id="next-btn" type="button">次のバトルへ</button>
+        </div>
+      </section>
+
+      <section id="gameover-screen" class="screen">
+        <div class="panel">
+          <h2>ゲームオーバー</h2>
+          <p id="final-score"></p>
+          <button id="retry-btn" type="button">ホームに戻る</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
