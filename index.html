@@ -16,14 +16,11 @@
           <label for="csv-file">単語CSVを読み込む</label>
           <input id="csv-file" type="file" accept=".csv" />
           <p class="hint">形式: word,meaning,level</p>
-
-          <label for="wordbook-select">内蔵単語帳を選ぶ</label>
-          <select id="wordbook-select">
-            <option value="builtin100">英単語100語</option>
-            <option value="sample">サンプル10語</option>
-          </select>
+          <label for="wordbook-category">カテゴリを選ぶ</label>
+          <select id="wordbook-category"></select>
+          <label for="wordbook-select">単語帳を選ぶ</label>
+          <select id="wordbook-select"></select>
           <button id="load-wordbook-btn" type="button">選択した単語帳を読み込む</button>
-
           <label for="question-count">出題数を選ぶ</label>
           <select id="question-count">
             <option value="10">10問</option>
@@ -32,26 +29,22 @@
             <option value="50">50問</option>
             <option value="all">全問</option>
           </select>
-
           <button id="start-btn" type="button" disabled>ゲーム開始</button>
           <p id="home-message" class="message"></p>
         </div>
       </section>
-
       <section id="battle-screen" class="screen">
         <header class="status-bar">
           <span>HP: <strong id="hp">100</strong></span>
           <span>Gold: <strong id="gold">0</strong></span>
           <span>討伐数: <strong id="kills">0</strong></span>
         </header>
-
         <div class="panel battle-panel">
           <p id="encounter" class="encounter"></p>
           <h2 id="target-word" class="word"></h2>
           <div id="choices" class="choices"></div>
         </div>
       </section>
-
       <section id="result-screen" class="screen">
         <div class="panel">
           <h2>結果</h2>
@@ -60,7 +53,6 @@
           <button id="next-btn" type="button">次のバトルへ</button>
         </div>
       </section>
-
       <section id="gameclear-screen" class="screen">
         <div class="panel">
           <h2>ゲームクリア！</h2>
@@ -69,7 +61,6 @@
           <button id="clear-retry-btn" type="button">ホームに戻る</button>
         </div>
       </section>
-
       <section id="gameover-screen" class="screen">
         <div class="panel">
           <h2>病院送り</h2>
@@ -78,7 +69,6 @@
         </div>
       </section>
     </main>
-
     <script src="script.js"></script>
   </body>
 </html>
