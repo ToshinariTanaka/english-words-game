@@ -16,6 +16,16 @@
           <label for="csv-file">単語CSVを読み込む</label>
           <input id="csv-file" type="file" accept=".csv" />
           <p class="hint">形式: word,meaning,level</p>
+
+          <label for="question-count">出題数を選ぶ</label>
+          <select id="question-count">
+            <option value="10">10問</option>
+            <option value="20">20問</option>
+            <option value="30">30問</option>
+            <option value="50">50問</option>
+            <option value="all">全問</option>
+          </select>
+
           <button id="use-sample-btn" type="button">サンプルデータを使う</button>
           <button id="start-btn" type="button" disabled>ゲーム開始</button>
           <p id="home-message" class="message"></p>
