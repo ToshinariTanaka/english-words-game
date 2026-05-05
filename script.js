@@ -1,4 +1,7 @@
 const INITIAL_HP = 100;
+const HOSPITAL_GOLD_PENALTY = 200;
+const GAME_VERSION = "v0.4.0";
+const GOLD_STORAGE_KEY = "englishWordsGameGold";
 
 const screens = {
   home: document.getElementById("home-screen"),
@@ -13,6 +16,7 @@ const el = {
   useSampleBtn: document.getElementById("use-sample-btn"),
   startBtn: document.getElementById("start-btn"),
   homeMessage: document.getElementById("home-message"),
+  versionLabel: document.getElementById("version-label"),
   hp: document.getElementById("hp"),
   gold: document.getElementById("gold"),
   kills: document.getElementById("kills"),
@@ -32,7 +36,7 @@ const el = {
 let words = [];
 let current = null;
 let hp = INITIAL_HP;
-let gold = 0;
+let gold = loadStoredGold();
 let kills = 0;
 let answeredCount = 0;
 let previousWord = null;
@@ -44,6 +48,15 @@ const sampleCsv = `word,meaning,level\ndog,犬,1\ncat,猫,1\nrecommend,勧める
 function showScreen(name) {
   Object.values(screens).forEach((screen) => screen.classList.remove("active"));
   screens[name].classList.add("active");
+}
+
+function loadStoredGold() {
+  const stored = Number(localStorage.getItem(GOLD_STORAGE_KEY));
+  return Number.isFinite(stored) && stored >= 0 ? stored : 0;
+}
+
+function saveGold() {
+  localStorage.setItem(GOLD_STORAGE_KEY, String(gold));
 }
 
 function parseCsv(text) {
@@ -116,6 +129,12 @@ function updateStatus() {
   el.kills.textContent = kills;
 }
 
+function updateVersionLabel() {
+  if (el.versionLabel) {
+    el.versionLabel.textContent = GAME_VERSION;
+  }
+}
+
 function getAudioContext() {
   if (!window.AudioContext && !window.webkitAudioContext) return null;
   if (!audioContext) {
@@ -125,7 +144,7 @@ function getAudioContext() {
   return audioContext;
 }
 
-function playTone(frequency, startTime, duration, type = "sine", volume = 0.08) {
+function playTone(frequency, startTime, duration, type = "sine", volume = 0.24) {
   const ctx = getAudioContext();
   if (!ctx) return;
 
@@ -147,17 +166,17 @@ function playCorrectSound() {
   const ctx = getAudioContext();
   if (!ctx) return;
   const now = ctx.currentTime;
-  playTone(523.25, now, 0.12, "sine", 0.08);
-  playTone(659.25, now + 0.1, 0.12, "sine", 0.08);
-  playTone(783.99, now + 0.2, 0.16, "sine", 0.08);
+  playTone(523.25, now, 0.12, "sine", 0.24);
+  playTone(659.25, now + 0.1, 0.12, "sine", 0.24);
+  playTone(783.99, now + 0.2, 0.16, "sine", 0.24);
 }
 
 function playWrongSound() {
   const ctx = getAudioContext();
   if (!ctx) return;
   const now = ctx.currentTime;
-  playTone(220, now, 0.15, "sawtooth", 0.06);
-  playTone(146.83, now + 0.12, 0.2, "sawtooth", 0.06);
+  playTone(220, now, 0.15, "sawtooth", 0.18);
+  playTone(146.83, now + 0.12, 0.2, "sawtooth", 0.18);
 }
 
 function speakWord(word) {
@@ -202,8 +221,22 @@ function chooseNextWord() {
 
 function showGameClear() {
   el.clearMessage.textContent = "すべての英単語モンスターを討伐しました！";
-  el.clearScore.textContent = `討伐数: ${kills} / 出題数: ${answeredCount} / 獲得Gold: ${gold} / 残りHP: ${hp}`;
+  el.clearScore.textContent = `討伐数: ${kills} / 出題数: ${answeredCount} / 現在Gold: ${gold} / 残りHP: ${hp}`;
   showScreen("gameclear");
+}
+
+function sendToHospital() {
+  const goldBeforePenalty = gold;
+  gold = Math.max(0, gold - HOSPITAL_GOLD_PENALTY);
+  saveGold();
+  updateStatus();
+
+  el.finalScore.textContent =
+    `HPが0になったため病院送りです。\n` +
+    `治療費として ${HOSPITAL_GOLD_PENALTY} gold を失いました。\n` +
+    `Gold: ${goldBeforePenalty} → ${gold}\n` +
+    `討伐数: ${kills} / 出題数: ${answeredCount}`;
+  showScreen("gameover");
 }
 
 function nextQuestion() {
@@ -245,6 +278,7 @@ function judgeAnswer(choice) {
   if (choice.isCorrect) {
     playCorrectSound();
     gold += current.level;
+    saveGold();
     kills += 1;
     el.resultMessage.textContent = `${current.word} を倒した！ +${current.level} gold`;
     el.answerMessage.textContent = "";
@@ -258,8 +292,7 @@ function judgeAnswer(choice) {
   updateStatus();
 
   if (hp <= 0) {
-    el.finalScore.textContent = `討伐数: ${kills} / 出題数: ${answeredCount} / 獲得Gold: ${gold}`;
-    showScreen("gameover");
+    sendToHospital();
     return;
   }
 
@@ -273,7 +306,6 @@ function judgeAnswer(choice) {
 
 function startGame() {
   hp = INITIAL_HP;
-  gold = 0;
   kills = 0;
   answeredCount = 0;
   previousWord = null;
@@ -294,7 +326,7 @@ function loadWordsFromCsv(csvText) {
   gameDeck = [];
   previousWord = null;
   answeredCount = 0;
-  el.homeMessage.textContent = `${words.length}語を読み込みました。`;
+  el.homeMessage.textContent = `${words.length}語を読み込みました。現在Gold: ${gold}`;
   el.startBtn.disabled = false;
 }
 
@@ -310,3 +342,6 @@ el.startBtn.addEventListener("click", startGame);
 el.nextBtn.addEventListener("click", nextQuestion);
 el.retryBtn.addEventListener("click", () => showScreen("home"));
 el.clearRetryBtn.addEventListener("click", () => showScreen("home"));
+
+updateVersionLabel();
+updateStatus();
