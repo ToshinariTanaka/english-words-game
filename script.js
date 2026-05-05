@@ -17,7 +17,6 @@ const el = {
   kills: document.getElementById("kills"),
   encounter: document.getElementById("encounter"),
   targetWord: document.getElementById("target-word"),
-  speakBtn: document.getElementById("speak-btn"),
   choices: document.getElementById("choices"),
   resultMessage: document.getElementById("result-message"),
   answerMessage: document.getElementById("answer-message"),
@@ -32,6 +31,7 @@ let hp = INITIAL_HP;
 let gold = 0;
 let kills = 0;
 let previousWord = null;
+let gameDeck = [];
 
 const sampleCsv = `word,meaning,level\ndog,犬,1\ncat,猫,1\nrecommend,勧める・推薦する,12\npurchase,購入する,12\nwrite,書く,5\nsummarize,要約する,20\nconservation,保護・保存,80\nconsumption,消費,75\ncivilization,文明,85\nconversation,会話,70`;
 
@@ -113,16 +113,49 @@ function updateStatus() {
   el.kills.textContent = kills;
 }
 
+function speakWord(word) {
+  if (!word || !("speechSynthesis" in window)) return;
+
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(word);
+    utterance.lang = "en-US";
+    utterance.rate = 0.85;
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    console.warn("Speech synthesis failed:", error);
+  }
+}
+
+function refillDeck() {
+  gameDeck = shuffle(words);
+
+  if (
+    previousWord &&
+    gameDeck.length > 1 &&
+    gameDeck[0].word === previousWord
+  ) {
+    const swapIndex = gameDeck.findIndex((w) => w.word !== previousWord);
+    if (swapIndex > 0) {
+      [gameDeck[0], gameDeck[swapIndex]] = [gameDeck[swapIndex], gameDeck[0]];
+    }
+  }
+}
+
 function chooseNextWord() {
   if (!words || words.length === 0) return null;
+
   if (words.length === 1) {
     previousWord = words[0].word;
     return words[0];
   }
 
-  const candidates = words.filter((w) => w.word !== previousWord);
-  const pool = candidates.length > 0 ? candidates : words;
-  const selected = pool[Math.floor(Math.random() * pool.length)];
+  if (gameDeck.length === 0) {
+    refillDeck();
+  }
+
+  const selected = gameDeck.shift();
+  if (!selected) return null;
 
   previousWord = selected.word;
   return selected;
@@ -139,6 +172,7 @@ function nextQuestion() {
 
   el.encounter.textContent = `${current.word} が現れた！`;
   el.targetWord.textContent = current.word;
+  speakWord(current.word);
   el.choices.innerHTML = "";
 
   const choices = generateChoices(current);
@@ -183,6 +217,7 @@ function startGame() {
   gold = 0;
   kills = 0;
   previousWord = null;
+  gameDeck = [];
   updateStatus();
   nextQuestion();
 }
@@ -196,6 +231,8 @@ function loadWordsFromCsv(csvText) {
   }
 
   words = parsed;
+  gameDeck = [];
+  previousWord = null;
   el.homeMessage.textContent = `${words.length}語を読み込みました。`;
   el.startBtn.disabled = false;
 }
@@ -211,11 +248,3 @@ el.useSampleBtn.addEventListener("click", () => loadWordsFromCsv(sampleCsv));
 el.startBtn.addEventListener("click", startGame);
 el.nextBtn.addEventListener("click", nextQuestion);
 el.retryBtn.addEventListener("click", () => showScreen("home"));
-
-el.speakBtn.addEventListener("click", () => {
-  if (!current) return;
-  const utterance = new SpeechSynthesisUtterance(current.word);
-  utterance.lang = "en-US";
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
-});
