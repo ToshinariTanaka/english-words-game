@@ -1,15 +1,52 @@
 const INITIAL_HP = 100;
 const HOSPITAL_GOLD_PENALTY = 200;
-const GAME_VERSION = "v0.7.0";
+const GAME_VERSION = "v0.8.0";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 
 const BUILTIN_WORDBOOKS = {
-  builtin100: {
+  important100: {
     label: "英単語100語",
+    category: "standard",
     path: "data/english_words_game_100.csv",
   },
-  sample: {
+  important12000: {
+    label: "重要英単語12000",
+    category: "standard",
+    disabled: true,
+  },
+  kai1: {
+    label: "開隆堂 中1",
+    category: "schoolTest",
+    disabled: true,
+  },
+  kai2: {
+    label: "開隆堂 中2",
+    category: "schoolTest",
+    disabled: true,
+  },
+  kai3: {
+    label: "開隆堂 中3",
+    category: "schoolTest",
+    disabled: true,
+  },
+  eiken3: {
+    label: "英検3級",
+    category: "eiken",
+    disabled: true,
+  },
+  eikenPre2: {
+    label: "英検準2級",
+    category: "eiken",
+    disabled: true,
+  },
+  eiken2: {
+    label: "英検2級",
+    category: "eiken",
+    disabled: true,
+  },
+  sample10: {
     label: "サンプル10語",
+    category: "sample",
     csv: `word,meaning,level\ndog,犬,1\ncat,猫,1\nrecommend,勧める・推薦する,12\npurchase,購入する,12\nwrite,書く,5\nsummarize,要約する,20\nconservation,保護・保存,80\nconsumption,消費,75\ncivilization,文明,85\nconversation,会話,70`,
   },
 };
@@ -60,6 +97,21 @@ let audioContext = null;
 function showScreen(name) {
   Object.values(screens).forEach((screen) => screen.classList.remove("active"));
   screens[name].classList.add("active");
+}
+
+function populateWordbookSelect() {
+  if (!el.wordbookSelect) return;
+
+  el.wordbookSelect.innerHTML = "";
+  Object.entries(BUILTIN_WORDBOOKS).forEach(([key, wordbook]) => {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = wordbook.label;
+    option.disabled = Boolean(wordbook.disabled);
+    el.wordbookSelect.appendChild(option);
+  });
+
+  el.wordbookSelect.value = "important100";
 }
 
 function loadStoredGold() {
@@ -203,7 +255,7 @@ function playWrongSound() {
 }
 
 function speakWord(word) {
-  if (!word || !("speechSynthesis" in window)) return;
+  if (!word || !('speechSynthesis' in window)) return;
 
   try {
     window.speechSynthesis.cancel();
@@ -213,21 +265,6 @@ function speakWord(word) {
     window.speechSynthesis.speak(utterance);
   } catch (error) {
     console.warn("Speech synthesis failed:", error);
-  }
-}
-
-function refillDeck() {
-  gameDeck = shuffle(words).slice(0, targetQuestionCount);
-
-  if (
-    previousWord &&
-    gameDeck.length > 1 &&
-    gameDeck[0].word === previousWord
-  ) {
-    const swapIndex = gameDeck.findIndex((w) => w.word !== previousWord);
-    if (swapIndex > 0) {
-      [gameDeck[0], gameDeck[swapIndex]] = [gameDeck[swapIndex], gameDeck[0]];
-    }
   }
 }
 
@@ -259,6 +296,7 @@ function sendToHospital() {
     `治療費として ${HOSPITAL_GOLD_PENALTY} gold を失いました。\n` +
     `Gold: ${goldBeforePenalty} → ${gold}\n` +
     `討伐数: ${kills} / 出題数: ${answeredCount}`;
+
   showScreen("gameover");
 }
 
@@ -334,16 +372,24 @@ function startGame() {
   previousWord = null;
   targetQuestionCount = getSelectedQuestionCount();
   gameDeck = shuffle(words).slice(0, targetQuestionCount);
+
+  if (previousWord && gameDeck.length > 1 && gameDeck[0].word === previousWord) {
+    const swapIndex = gameDeck.findIndex((w) => w.word !== previousWord);
+    if (swapIndex > 0) {
+      [gameDeck[0], gameDeck[swapIndex]] = [gameDeck[swapIndex], gameDeck[0]];
+    }
+  }
+
   updateStatus();
   nextQuestion();
 }
 
 async function loadBuiltinWordBook() {
-  const selectedKey = el.wordbookSelect?.value || "builtin100";
+  const selectedKey = el.wordbookSelect?.value || "important100";
   const wordbook = BUILTIN_WORDBOOKS[selectedKey];
 
-  if (!wordbook) {
-    el.homeMessage.textContent = "単語帳を選択してください。";
+  if (!wordbook || wordbook.disabled) {
+    el.homeMessage.textContent = "この単語帳はまだ利用できません。";
     el.startBtn.disabled = true;
     return;
   }
@@ -395,5 +441,6 @@ el.nextBtn.addEventListener("click", nextQuestion);
 el.retryBtn.addEventListener("click", () => showScreen("home"));
 el.clearRetryBtn.addEventListener("click", () => showScreen("home"));
 
+populateWordbookSelect();
 updateVersionLabel();
 updateStatus();
