@@ -17,6 +17,13 @@
           <input id="csv-file" type="file" accept=".csv" />
           <p class="hint">形式: word,meaning,level</p>
 
+          <label for="wordbook-select">内蔵単語帳を選ぶ</label>
+          <select id="wordbook-select">
+            <option value="builtin100">英単語100語</option>
+            <option value="sample">サンプル10語</option>
+          </select>
+          <button id="load-wordbook-btn" type="button">選択した単語帳を読み込む</button>
+
           <label for="question-count">出題数を選ぶ</label>
           <select id="question-count">
             <option value="10">10問</option>
@@ -26,8 +33,6 @@
             <option value="all">全問</option>
           </select>
 
-          <button id="use-builtin-btn" type="button">英単語100語を使う</button>
-          <button id="use-sample-btn" type="button">サンプルデータを使う</button>
           <button id="start-btn" type="button" disabled>ゲーム開始</button>
           <p id="home-message" class="message"></p>
         </div>
