@@ -1,6 +1,6 @@
 const INITIAL_HP = 100;
 const HOSPITAL_GOLD_PENALTY = 200;
-const GAME_VERSION = "v0.8.0";
+const GAME_VERSION = "v0.9.0";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 
 const WORDBOOK_CATEGORIES = {
@@ -120,11 +120,45 @@ function saveGold() {
 function parseCsv(text) {
   const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) return [];
-  const [, ...rows] = lines;
+
+  const [headerLine, ...rows] = lines;
+  const headers = headerLine.split(",").map((v) => v.trim());
+  const headerIndexMap = new Map(headers.map((name, index) => [name, index]));
+
+  const getValue = (values, columnName) => {
+    const index = headerIndexMap.get(columnName);
+    if (index === undefined) return "";
+    return (values[index] || "").trim();
+  };
+
+  const parseChunks = (values) => {
+    const chunks = [];
+
+    const legacyChunk = getValue(values, "chunk");
+    const legacyChunkMeaning = getValue(values, "chunk_meaning");
+    if (legacyChunk && legacyChunkMeaning) {
+      chunks.push({ text: legacyChunk, meaning: legacyChunkMeaning });
+    }
+
+    for (let i = 1; i <= 4; i += 1) {
+      const chunk = getValue(values, `chunk_${i}`);
+      const chunkMeaning = getValue(values, `chunk_meaning_${i}`);
+      if (chunk && chunkMeaning) {
+        chunks.push({ text: chunk, meaning: chunkMeaning });
+      }
+    }
+
+    return chunks;
+  };
 
   return rows
     .map((line) => line.split(",").map((v) => v.trim()))
-    .map(([word, meaning, level]) => ({ word, meaning, level: Number(level) }))
+    .map((values) => ({
+      word: getValue(values, "word"),
+      meaning: getValue(values, "meaning"),
+      level: Number(getValue(values, "level")),
+      chunks: parseChunks(values),
+    }))
     .filter((r) => r.word && r.meaning && Number.isFinite(r.level));
 }
 
