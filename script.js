@@ -31,6 +31,7 @@ let current = null;
 let hp = INITIAL_HP;
 let gold = 0;
 let kills = 0;
+let previousWord = null;
 
 const sampleCsv = `word,meaning,level\ndog,犬,1\ncat,猫,1\nrecommend,勧める・推薦する,12\npurchase,購入する,12\nwrite,書く,5\nsummarize,要約する,20\nconservation,保護・保存,80\nconsumption,消費,75\ncivilization,文明,85\nconversation,会話,70`;
 
@@ -112,8 +113,30 @@ function updateStatus() {
   el.kills.textContent = kills;
 }
 
+function chooseNextWord() {
+  if (!words || words.length === 0) return null;
+  if (words.length === 1) {
+    previousWord = words[0].word;
+    return words[0];
+  }
+
+  const candidates = words.filter((w) => w.word !== previousWord);
+  const pool = candidates.length > 0 ? candidates : words;
+  const selected = pool[Math.floor(Math.random() * pool.length)];
+
+  previousWord = selected.word;
+  return selected;
+}
+
 function nextQuestion() {
   current = chooseNextWord();
+
+  if (!current) {
+    el.homeMessage.textContent = "単語データが読み込まれていません。";
+    showScreen("home");
+    return;
+  }
+
   el.encounter.textContent = `${current.word} が現れた！`;
   el.targetWord.textContent = current.word;
   el.choices.innerHTML = "";
@@ -159,6 +182,7 @@ function startGame() {
   hp = INITIAL_HP;
   gold = 0;
   kills = 0;
+  previousWord = null;
   updateStatus();
   nextQuestion();
 }
