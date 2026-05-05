@@ -1,6 +1,6 @@
 const INITIAL_HP = 100;
 const HOSPITAL_GOLD_PENALTY = 200;
-const GAME_VERSION = "v0.5.0";
+const GAME_VERSION = "v0.6.0";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 
 const screens = {
@@ -13,6 +13,7 @@ const screens = {
 
 const el = {
   csvFile: document.getElementById("csv-file"),
+  useBuiltinBtn: document.getElementById("use-builtin-btn"),
   useSampleBtn: document.getElementById("use-sample-btn"),
   startBtn: document.getElementById("start-btn"),
   questionCount: document.getElementById("question-count"),
@@ -328,6 +329,20 @@ function startGame() {
   nextQuestion();
 }
 
+
+async function loadBuiltinWordBook() {
+  try {
+    const response = await fetch("data/english_words_game_100.csv");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const csvText = await response.text();
+    loadWordsFromCsv(csvText);
+  } catch (error) {
+    console.error("Failed to load built-in word book:", error);
+    el.homeMessage.textContent = "内蔵単語帳の読み込みに失敗しました。";
+    el.startBtn.disabled = true;
+  }
+}
+
 function loadWordsFromCsv(csvText) {
   const parsed = parseCsv(csvText);
   if (parsed.length < 4) {
@@ -352,6 +367,7 @@ el.csvFile.addEventListener("change", async (event) => {
   loadWordsFromCsv(text);
 });
 
+el.useBuiltinBtn.addEventListener("click", loadBuiltinWordBook);
 el.useSampleBtn.addEventListener("click", () => loadWordsFromCsv(sampleCsv));
 el.startBtn.addEventListener("click", startGame);
 el.nextBtn.addEventListener("click", nextQuestion);
