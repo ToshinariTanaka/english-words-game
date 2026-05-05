@@ -1,7 +1,18 @@
 const INITIAL_HP = 100;
 const HOSPITAL_GOLD_PENALTY = 200;
-const GAME_VERSION = "v0.6.0";
+const GAME_VERSION = "v0.7.0";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
+
+const BUILTIN_WORDBOOKS = {
+  builtin100: {
+    label: "英単語100語",
+    path: "data/english_words_game_100.csv",
+  },
+  sample: {
+    label: "サンプル10語",
+    csv: `word,meaning,level\ndog,犬,1\ncat,猫,1\nrecommend,勧める・推薦する,12\npurchase,購入する,12\nwrite,書く,5\nsummarize,要約する,20\nconservation,保護・保存,80\nconsumption,消費,75\ncivilization,文明,85\nconversation,会話,70`,
+  },
+};
 
 const screens = {
   home: document.getElementById("home-screen"),
@@ -13,8 +24,8 @@ const screens = {
 
 const el = {
   csvFile: document.getElementById("csv-file"),
-  useBuiltinBtn: document.getElementById("use-builtin-btn"),
-  useSampleBtn: document.getElementById("use-sample-btn"),
+  loadWordbookBtn: document.getElementById("load-wordbook-btn"),
+  wordbookSelect: document.getElementById("wordbook-select"),
   startBtn: document.getElementById("start-btn"),
   questionCount: document.getElementById("question-count"),
   homeMessage: document.getElementById("home-message"),
@@ -45,8 +56,6 @@ let targetQuestionCount = 0;
 let previousWord = null;
 let gameDeck = [];
 let audioContext = null;
-
-const sampleCsv = `word,meaning,level\ndog,犬,1\ncat,猫,1\nrecommend,勧める・推薦する,12\npurchase,購入する,12\nwrite,書く,5\nsummarize,要約する,20\nconservation,保護・保存,80\nconsumption,消費,75\ncivilization,文明,85\nconversation,会話,70`;
 
 function showScreen(name) {
   Object.values(screens).forEach((screen) => screen.classList.remove("active"));
@@ -329,10 +338,23 @@ function startGame() {
   nextQuestion();
 }
 
-
 async function loadBuiltinWordBook() {
+  const selectedKey = el.wordbookSelect?.value || "builtin100";
+  const wordbook = BUILTIN_WORDBOOKS[selectedKey];
+
+  if (!wordbook) {
+    el.homeMessage.textContent = "単語帳を選択してください。";
+    el.startBtn.disabled = true;
+    return;
+  }
+
+  if (wordbook.csv) {
+    loadWordsFromCsv(wordbook.csv);
+    return;
+  }
+
   try {
-    const response = await fetch("data/english_words_game_100.csv");
+    const response = await fetch(wordbook.path);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const csvText = await response.text();
     loadWordsFromCsv(csvText);
@@ -367,8 +389,7 @@ el.csvFile.addEventListener("change", async (event) => {
   loadWordsFromCsv(text);
 });
 
-el.useBuiltinBtn.addEventListener("click", loadBuiltinWordBook);
-el.useSampleBtn.addEventListener("click", () => loadWordsFromCsv(sampleCsv));
+el.loadWordbookBtn.addEventListener("click", loadBuiltinWordBook);
 el.startBtn.addEventListener("click", startGame);
 el.nextBtn.addEventListener("click", nextQuestion);
 el.retryBtn.addEventListener("click", () => showScreen("home"));
