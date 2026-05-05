@@ -6,13 +6,26 @@ const GOLD_STORAGE_KEY = "englishWordsGameGold";
 const BUILTIN_WORDBOOKS = {
   builtin100: {
     label: "英単語100語",
+    category: "builtin",
     path: "data/english_words_game_100.csv",
   },
   sample: {
     label: "サンプル10語",
+    category: "builtin",
     csv: `word,meaning,level\ndog,犬,1\ncat,猫,1\nrecommend,勧める・推薦する,12\npurchase,購入する,12\nwrite,書く,5\nsummarize,要約する,20\nconservation,保護・保存,80\nconsumption,消費,75\ncivilization,文明,85\nconversation,会話,70`,
   },
+  toeic700: {
+    label: "TOEIC 700 重要語",
+    category: "toeic",
+    disabled: true,
+  },
 };
+
+const WORDBOOK_CATEGORIES = [
+  { value: "builtin", label: "標準" },
+  { value: "toeic", label: "TOEIC" },
+  { value: "user", label: "保存済み" },
+];
 
 const screens = {
   home: document.getElementById("home-screen"),
@@ -25,6 +38,7 @@ const screens = {
 const el = {
   csvFile: document.getElementById("csv-file"),
   loadWordbookBtn: document.getElementById("load-wordbook-btn"),
+  wordbookCategory: document.getElementById("wordbook-category"),
   wordbookSelect: document.getElementById("wordbook-select"),
   startBtn: document.getElementById("start-btn"),
   questionCount: document.getElementById("question-count"),
@@ -338,11 +352,64 @@ function startGame() {
   nextQuestion();
 }
 
+
+function populateCategorySelect() {
+  if (!el.wordbookCategory) return;
+
+  el.wordbookCategory.innerHTML = "";
+  WORDBOOK_CATEGORIES.forEach((category) => {
+    const option = document.createElement("option");
+    option.value = category.value;
+    option.textContent = category.label;
+    el.wordbookCategory.appendChild(option);
+  });
+}
+
+function populateWordbookSelect(category) {
+  if (!el.wordbookSelect) return;
+
+  el.wordbookSelect.innerHTML = "";
+
+  if (category === "user") {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "保存済み単語帳はまだありません。";
+    option.disabled = true;
+    option.selected = true;
+    el.wordbookSelect.appendChild(option);
+    el.loadWordbookBtn.disabled = true;
+    return;
+  }
+
+  const entries = Object.entries(BUILTIN_WORDBOOKS).filter(([, wordbook]) => wordbook.category === category);
+
+  entries.forEach(([key, wordbook]) => {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = wordbook.disabled ? `${wordbook.label}（準備中）` : wordbook.label;
+    option.disabled = Boolean(wordbook.disabled);
+    el.wordbookSelect.appendChild(option);
+  });
+
+  if (entries.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "このカテゴリの単語帳はまだありません。";
+    option.disabled = true;
+    option.selected = true;
+    el.wordbookSelect.appendChild(option);
+    el.loadWordbookBtn.disabled = true;
+    return;
+  }
+
+  el.loadWordbookBtn.disabled = el.wordbookSelect.selectedOptions[0]?.disabled ?? true;
+}
+
 async function loadBuiltinWordBook() {
   const selectedKey = el.wordbookSelect?.value || "builtin100";
   const wordbook = BUILTIN_WORDBOOKS[selectedKey];
 
-  if (!wordbook) {
+  if (!wordbook || wordbook.disabled) {
     el.homeMessage.textContent = "単語帳を選択してください。";
     el.startBtn.disabled = true;
     return;
@@ -389,11 +456,21 @@ el.csvFile.addEventListener("change", async (event) => {
   loadWordsFromCsv(text);
 });
 
+el.wordbookCategory.addEventListener("change", (event) => {
+  populateWordbookSelect(event.target.value);
+});
+
+el.wordbookSelect.addEventListener("change", () => {
+  el.loadWordbookBtn.disabled = el.wordbookSelect.selectedOptions[0]?.disabled ?? true;
+});
+
 el.loadWordbookBtn.addEventListener("click", loadBuiltinWordBook);
 el.startBtn.addEventListener("click", startGame);
 el.nextBtn.addEventListener("click", nextQuestion);
 el.retryBtn.addEventListener("click", () => showScreen("home"));
 el.clearRetryBtn.addEventListener("click", () => showScreen("home"));
 
+populateCategorySelect();
+populateWordbookSelect(el.wordbookCategory.value || WORDBOOK_CATEGORIES[0].value);
 updateVersionLabel();
 updateStatus();
