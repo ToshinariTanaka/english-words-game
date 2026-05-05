@@ -66,6 +66,17 @@ function shuffle(arr) {
   return copied;
 }
 
+function chooseRandomItems(pool, count) {
+  return shuffle(pool).slice(0, count);
+}
+
+function addUniqueMeanings(picks, items, limit) {
+  for (const item of items) {
+    if (picks.length >= limit) break;
+    if (item.meaning && !picks.includes(item.meaning)) picks.push(item.meaning);
+  }
+}
+
 function generateChoices(target) {
   const basePool = words.filter(
     (w) => w.word !== target.word && w.meaning && w.meaning !== target.meaning
@@ -77,35 +88,21 @@ function generateChoices(target) {
   }
   const uniquePool = [...uniqueMap.values()];
 
-  const prioritized = uniquePool
-    .map((item) => ({ ...item, diff: Math.abs(item.level - target.level) }))
-    .sort((a, b) => a.diff - b.diff);
+  const nearPool = uniquePool.filter(
+    (item) => Math.abs(item.level - target.level) <= 10
+  );
+  const mediumPool = uniquePool.filter(
+    (item) => Math.abs(item.level - target.level) > 10 && Math.abs(item.level - target.level) <= 30
+  );
+  const farPool = uniquePool.filter(
+    (item) => Math.abs(item.level - target.level) > 30
+  );
 
-  const near = prioritized.filter((item) => item.diff <= 10);
   const picks = [];
-
-  for (const item of near) {
-    if (picks.length === 3) break;
-    picks.push(item.meaning);
-  }
-
-  for (const item of prioritized) {
-    if (picks.length === 3) break;
-    if (!picks.includes(item.meaning)) picks.push(item.meaning);
-  }
-
-  if (picks.length < 3) {
-    const fallbackMeanings = shuffle(
-      words
-        .map((w) => w.meaning)
-        .filter((m) => m && m !== target.meaning && !picks.includes(m))
-    );
-
-    for (const meaning of fallbackMeanings) {
-      if (picks.length === 3) break;
-      picks.push(meaning);
-    }
-  }
+  addUniqueMeanings(picks, chooseRandomItems(nearPool, 3), 3);
+  addUniqueMeanings(picks, chooseRandomItems(mediumPool, 3), 3);
+  addUniqueMeanings(picks, chooseRandomItems(farPool, 3), 3);
+  addUniqueMeanings(picks, chooseRandomItems(uniquePool, uniquePool.length), 3);
 
   return shuffle([target.meaning, ...picks]).map((meaning) => ({
     meaning,
