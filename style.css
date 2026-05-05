@@ -50,6 +50,26 @@ body {
   padding: 12px;
 }
 
+label {
+  display: inline-block;
+  margin-top: 12px;
+  margin-right: 6px;
+  font-weight: 700;
+}
+
+select,
+input[type="file"] {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+select {
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 1rem;
+}
+
 button {
   margin-top: 10px;
   border: 0;
@@ -67,17 +87,12 @@ button:disabled {
 #start-btn,
 #next-btn,
 #retry-btn,
-#use-builtin-btn,
-#use-sample-btn {
+#load-wordbook-btn,
+#clear-retry-btn {
   background: var(--accent);
   color: #041022;
   font-weight: 700;
   margin-right: 8px;
-}
-
-#speak-btn {
-  background: #2f3d62;
-  color: var(--text);
 }
 
 .choices {
@@ -120,15 +135,16 @@ button:disabled {
   color: #fcf2b5;
 }
 
-
-#home-screen .panel button {
+#home-screen .panel button,
+#home-screen .panel select {
   margin-top: 12px;
   margin-right: 0;
   width: 100%;
 }
 
 @media (min-width: 640px) {
-  #home-screen .panel button {
+  #home-screen .panel button,
+  #home-screen .panel select {
     width: auto;
     margin-right: 10px;
   }
