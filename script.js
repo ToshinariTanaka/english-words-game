@@ -4,6 +4,7 @@ const screens = {
   home: document.getElementById("home-screen"),
   battle: document.getElementById("battle-screen"),
   result: document.getElementById("result-screen"),
+  gameclear: document.getElementById("gameclear-screen"),
   gameover: document.getElementById("gameover-screen"),
 };
 
@@ -21,6 +22,9 @@ const el = {
   resultMessage: document.getElementById("result-message"),
   answerMessage: document.getElementById("answer-message"),
   nextBtn: document.getElementById("next-btn"),
+  clearMessage: document.getElementById("clear-message"),
+  clearScore: document.getElementById("clear-score"),
+  clearRetryBtn: document.getElementById("clear-retry-btn"),
   finalScore: document.getElementById("final-score"),
   retryBtn: document.getElementById("retry-btn"),
 };
@@ -30,8 +34,10 @@ let current = null;
 let hp = INITIAL_HP;
 let gold = 0;
 let kills = 0;
+let answeredCount = 0;
 let previousWord = null;
 let gameDeck = [];
+let audioContext = null;
 
 const sampleCsv = `word,meaning,level\ndog,犬,1\ncat,猫,1\nrecommend,勧める・推薦する,12\npurchase,購入する,12\nwrite,書く,5\nsummarize,要約する,20\nconservation,保護・保存,80\nconsumption,消費,75\ncivilization,文明,85\nconversation,会話,70`;
 
@@ -113,6 +119,50 @@ function updateStatus() {
   el.kills.textContent = kills;
 }
 
+function getAudioContext() {
+  if (!window.AudioContext && !window.webkitAudioContext) return null;
+  if (!audioContext) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioContext = new AudioContextClass();
+  }
+  return audioContext;
+}
+
+function playTone(frequency, startTime, duration, type = "sine", volume = 0.08) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+  gain.gain.setValueAtTime(volume, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+  oscillator.connect(gain);
+  gain.connect(ctx.destination);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration);
+}
+
+function playCorrectSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  playTone(523.25, now, 0.12, "sine", 0.08);
+  playTone(659.25, now + 0.1, 0.12, "sine", 0.08);
+  playTone(783.99, now + 0.2, 0.16, "sine", 0.08);
+}
+
+function playWrongSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  playTone(220, now, 0.15, "sawtooth", 0.06);
+  playTone(146.83, now + 0.12, 0.2, "sawtooth", 0.06);
+}
+
 function speakWord(word) {
   if (!word || !("speechSynthesis" in window)) return;
 
@@ -144,15 +194,7 @@ function refillDeck() {
 
 function chooseNextWord() {
   if (!words || words.length === 0) return null;
-
-  if (words.length === 1) {
-    previousWord = words[0].word;
-    return words[0];
-  }
-
-  if (gameDeck.length === 0) {
-    refillDeck();
-  }
+  if (gameDeck.length === 0) return null;
 
   const selected = gameDeck.shift();
   if (!selected) return null;
@@ -161,7 +203,18 @@ function chooseNextWord() {
   return selected;
 }
 
+function showGameClear() {
+  el.clearMessage.textContent = "すべての英単語モンスターを討伐しました！";
+  el.clearScore.textContent = `討伐数: ${kills} / 出題数: ${answeredCount} / 獲得Gold: ${gold} / 残りHP: ${hp}`;
+  showScreen("gameclear");
+}
+
 function nextQuestion() {
+  if (answeredCount >= words.length || gameDeck.length === 0) {
+    showGameClear();
+    return;
+  }
+
   current = chooseNextWord();
 
   if (!current) {
@@ -190,12 +243,16 @@ function nextQuestion() {
 }
 
 function judgeAnswer(choice) {
+  answeredCount += 1;
+
   if (choice.isCorrect) {
+    playCorrectSound();
     gold += current.level;
     kills += 1;
     el.resultMessage.textContent = `${current.word} を倒した！ +${current.level} gold`;
     el.answerMessage.textContent = "";
   } else {
+    playWrongSound();
     hp = Math.max(0, hp - current.level);
     el.resultMessage.textContent = `${current.word} の攻撃！ -${current.level} HP`;
     el.answerMessage.textContent = `正解: ${current.meaning}`;
@@ -204,8 +261,13 @@ function judgeAnswer(choice) {
   updateStatus();
 
   if (hp <= 0) {
-    el.finalScore.textContent = `討伐数: ${kills} / 獲得Gold: ${gold}`;
+    el.finalScore.textContent = `討伐数: ${kills} / 出題数: ${answeredCount} / 獲得Gold: ${gold}`;
     showScreen("gameover");
+    return;
+  }
+
+  if (answeredCount >= words.length) {
+    showGameClear();
     return;
   }
 
@@ -216,8 +278,9 @@ function startGame() {
   hp = INITIAL_HP;
   gold = 0;
   kills = 0;
+  answeredCount = 0;
   previousWord = null;
-  gameDeck = [];
+  gameDeck = shuffle(words);
   updateStatus();
   nextQuestion();
 }
@@ -233,6 +296,7 @@ function loadWordsFromCsv(csvText) {
   words = parsed;
   gameDeck = [];
   previousWord = null;
+  answeredCount = 0;
   el.homeMessage.textContent = `${words.length}語を読み込みました。`;
   el.startBtn.disabled = false;
 }
@@ -248,3 +312,4 @@ el.useSampleBtn.addEventListener("click", () => loadWordsFromCsv(sampleCsv));
 el.startBtn.addEventListener("click", startGame);
 el.nextBtn.addEventListener("click", nextQuestion);
 el.retryBtn.addEventListener("click", () => showScreen("home"));
+el.clearRetryBtn.addEventListener("click", () => showScreen("home"));
