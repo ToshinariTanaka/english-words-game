@@ -3,6 +3,14 @@ const HOSPITAL_GOLD_PENALTY = 200;
 const GAME_VERSION = "v0.8.0";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 
+const WORDBOOK_CATEGORIES = {
+  standard: "重要英単語",
+  schoolTest: "定期試験対策",
+  eiken: "英検対策",
+  sample: "サンプル",
+  user: "ユーザー単語帳",
+};
+
 const BUILTIN_WORDBOOKS = {
   important100: {
     label: "英単語100語",
@@ -62,6 +70,7 @@ const screens = {
 const el = {
   csvFile: document.getElementById("csv-file"),
   loadWordbookBtn: document.getElementById("load-wordbook-btn"),
+  wordbookCategory: document.getElementById("wordbook-category"),
   wordbookSelect: document.getElementById("wordbook-select"),
   startBtn: document.getElementById("start-btn"),
   questionCount: document.getElementById("question-count"),
@@ -97,21 +106,6 @@ let audioContext = null;
 function showScreen(name) {
   Object.values(screens).forEach((screen) => screen.classList.remove("active"));
   screens[name].classList.add("active");
-}
-
-function populateWordbookSelect() {
-  if (!el.wordbookSelect) return;
-
-  el.wordbookSelect.innerHTML = "";
-  Object.entries(BUILTIN_WORDBOOKS).forEach(([key, wordbook]) => {
-    const option = document.createElement("option");
-    option.value = key;
-    option.textContent = wordbook.label;
-    option.disabled = Boolean(wordbook.disabled);
-    el.wordbookSelect.appendChild(option);
-  });
-
-  el.wordbookSelect.value = "important100";
 }
 
 function loadStoredGold() {
@@ -194,17 +188,13 @@ function updateStatus() {
 }
 
 function updateVersionLabel() {
-  if (el.versionLabel) {
-    el.versionLabel.textContent = GAME_VERSION;
-  }
+  if (el.versionLabel) el.versionLabel.textContent = GAME_VERSION;
 }
 
 function getSelectedQuestionCount() {
   if (!el.questionCount || el.questionCount.value === "all") return words.length;
-
   const selected = Number(el.questionCount.value);
   if (!Number.isFinite(selected) || selected <= 0) return words.length;
-
   return Math.min(selected, words.length);
 }
 
@@ -220,15 +210,12 @@ function getAudioContext() {
 function playTone(frequency, startTime, duration, type = "sine", volume = 0.24) {
   const ctx = getAudioContext();
   if (!ctx) return;
-
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
-
   oscillator.type = type;
   oscillator.frequency.setValueAtTime(frequency, startTime);
   gain.gain.setValueAtTime(volume, startTime);
   gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-
   oscillator.connect(gain);
   gain.connect(ctx.destination);
   oscillator.start(startTime);
@@ -239,7 +226,6 @@ function playCorrectSound() {
   const ctx = getAudioContext();
   if (!ctx) return;
   const now = ctx.currentTime;
-
   playTone(523.25, now, 0.18, "sine", 0.28);
   playTone(659.25, now + 0.08, 0.2, "triangle", 0.24);
   playTone(783.99, now + 0.16, 0.24, "sine", 0.28);
@@ -255,8 +241,7 @@ function playWrongSound() {
 }
 
 function speakWord(word) {
-  if (!word || !('speechSynthesis' in window)) return;
-
+  if (!word || !("speechSynthesis" in window)) return;
   try {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(word);
@@ -271,10 +256,8 @@ function speakWord(word) {
 function chooseNextWord() {
   if (!words || words.length === 0) return null;
   if (gameDeck.length === 0) return null;
-
   const selected = gameDeck.shift();
   if (!selected) return null;
-
   previousWord = selected.word;
   return selected;
 }
@@ -290,13 +273,11 @@ function sendToHospital() {
   gold = Math.max(0, gold - HOSPITAL_GOLD_PENALTY);
   saveGold();
   updateStatus();
-
   el.finalScore.textContent =
     `HPが0になったため病院送りです。\n` +
     `治療費として ${HOSPITAL_GOLD_PENALTY} gold を失いました。\n` +
     `Gold: ${goldBeforePenalty} → ${gold}\n` +
     `討伐数: ${kills} / 出題数: ${answeredCount}`;
-
   showScreen("gameover");
 }
 
@@ -305,22 +286,17 @@ function nextQuestion() {
     showGameClear();
     return;
   }
-
   current = chooseNextWord();
-
   if (!current) {
     el.homeMessage.textContent = "単語データが読み込まれていません。";
     showScreen("home");
     return;
   }
-
   el.encounter.textContent = `${current.word} が現れた！`;
   el.targetWord.textContent = current.word;
   speakWord(current.word);
   el.choices.innerHTML = "";
-
   const choices = generateChoices(current);
-
   choices.forEach((choice, idx) => {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -329,13 +305,11 @@ function nextQuestion() {
     btn.addEventListener("click", () => judgeAnswer(choice));
     el.choices.appendChild(btn);
   });
-
   showScreen("battle");
 }
 
 function judgeAnswer(choice) {
   answeredCount += 1;
-
   if (choice.isCorrect) {
     playCorrectSound();
     gold += current.level;
@@ -349,19 +323,15 @@ function judgeAnswer(choice) {
     el.resultMessage.textContent = `${current.word} の攻撃！ -${current.level} HP`;
     el.answerMessage.textContent = `正解: ${current.meaning}`;
   }
-
   updateStatus();
-
   if (hp <= 0) {
     sendToHospital();
     return;
   }
-
   if (answeredCount >= targetQuestionCount) {
     showGameClear();
     return;
   }
-
   showScreen("result");
 }
 
@@ -372,33 +342,78 @@ function startGame() {
   previousWord = null;
   targetQuestionCount = getSelectedQuestionCount();
   gameDeck = shuffle(words).slice(0, targetQuestionCount);
-
-  if (previousWord && gameDeck.length > 1 && gameDeck[0].word === previousWord) {
-    const swapIndex = gameDeck.findIndex((w) => w.word !== previousWord);
-    if (swapIndex > 0) {
-      [gameDeck[0], gameDeck[swapIndex]] = [gameDeck[swapIndex], gameDeck[0]];
-    }
-  }
-
   updateStatus();
   nextQuestion();
 }
 
-async function loadBuiltinWordBook() {
-  const selectedKey = el.wordbookSelect?.value || "important100";
-  const wordbook = BUILTIN_WORDBOOKS[selectedKey];
+function populateCategorySelect() {
+  if (!el.wordbookCategory) return;
+  el.wordbookCategory.innerHTML = "";
+  Object.entries(WORDBOOK_CATEGORIES).forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    el.wordbookCategory.appendChild(option);
+  });
+}
 
-  if (!wordbook || wordbook.disabled) {
-    el.homeMessage.textContent = "この単語帳はまだ利用できません。";
-    el.startBtn.disabled = true;
+function populateWordbookSelect(category) {
+  if (!el.wordbookSelect) return;
+  el.wordbookSelect.innerHTML = "";
+
+  if (category === "user") {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "保存済み単語帳はまだありません。";
+    option.disabled = true;
+    option.selected = true;
+    el.wordbookSelect.appendChild(option);
+    el.homeMessage.textContent = "保存済み単語帳はまだありません。";
+    el.loadWordbookBtn.disabled = true;
     return;
   }
 
+  const entries = Object.entries(BUILTIN_WORDBOOKS).filter(
+    ([, wordbook]) => wordbook.category === category
+  );
+
+  if (entries.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "このカテゴリの単語帳はまだありません。";
+    option.disabled = true;
+    option.selected = true;
+    el.wordbookSelect.appendChild(option);
+    el.loadWordbookBtn.disabled = true;
+    return;
+  }
+
+  entries.forEach(([key, wordbook]) => {
+    const option = document.createElement("option");
+    option.value = key;
+    option.textContent = wordbook.disabled ? `${wordbook.label}（準備中）` : wordbook.label;
+    el.wordbookSelect.appendChild(option);
+  });
+  el.loadWordbookBtn.disabled = false;
+}
+
+async function loadBuiltinWordBook() {
+  const selectedKey = el.wordbookSelect?.value;
+  const wordbook = BUILTIN_WORDBOOKS[selectedKey];
+  if (!wordbook) {
+    el.homeMessage.textContent = "単語帳を選択してください。";
+    el.startBtn.disabled = true;
+    return;
+  }
+  if (wordbook.disabled) {
+    el.homeMessage.textContent = "この単語帳は現在準備中です。";
+    el.startBtn.disabled = true;
+    return;
+  }
   if (wordbook.csv) {
     loadWordsFromCsv(wordbook.csv);
     return;
   }
-
   try {
     const response = await fetch(wordbook.path);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -418,7 +433,6 @@ function loadWordsFromCsv(csvText) {
     el.startBtn.disabled = true;
     return;
   }
-
   words = parsed;
   gameDeck = [];
   previousWord = null;
@@ -435,12 +449,19 @@ el.csvFile.addEventListener("change", async (event) => {
   loadWordsFromCsv(text);
 });
 
+el.wordbookCategory.addEventListener("change", (event) => {
+  el.homeMessage.textContent = "";
+  populateWordbookSelect(event.target.value);
+});
+
 el.loadWordbookBtn.addEventListener("click", loadBuiltinWordBook);
 el.startBtn.addEventListener("click", startGame);
 el.nextBtn.addEventListener("click", nextQuestion);
 el.retryBtn.addEventListener("click", () => showScreen("home"));
 el.clearRetryBtn.addEventListener("click", () => showScreen("home"));
 
-populateWordbookSelect();
+populateCategorySelect();
+el.wordbookCategory.value = "standard";
+populateWordbookSelect("standard");
 updateVersionLabel();
 updateStatus();
