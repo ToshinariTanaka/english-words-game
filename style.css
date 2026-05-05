@@ -67,6 +67,7 @@ button:disabled {
 #start-btn,
 #next-btn,
 #retry-btn,
+#use-builtin-btn,
 #use-sample-btn {
   background: var(--accent);
   color: #041022;
@@ -117,4 +118,18 @@ button:disabled {
 
 .answer {
   color: #fcf2b5;
+}
+
+
+#home-screen .panel button {
+  margin-top: 12px;
+  margin-right: 0;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  #home-screen .panel button {
+    width: auto;
+    margin-right: 10px;
+  }
 }
