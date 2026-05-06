@@ -15,7 +15,7 @@
         <div class="panel">
           <label for="csv-file">単語CSVを読み込む</label>
           <input id="csv-file" type="file" accept=".csv" />
-          <p class="hint">対応列: word/英単語, meaning/和訳, level, definition。その他の列は無視します。</p>
+          <p class="hint">対応列: word/meaning/level/chunk/chunk_meaning/definition/definition_meaning（日本語見出しも可）。その他の列は無視します。</p>
           <label for="wordbook-category">カテゴリを選ぶ</label>
           <select id="wordbook-category"></select>
           <label for="wordbook-select">単語帳を選ぶ</label>
@@ -33,6 +33,7 @@
           <select id="question-mode">
             <option value="meaning">日本語訳モード</option>
             <option value="definition">英英辞典モード</option>
+            <option value="chunk">チャンクモード</option>
           </select>
           <button id="start-btn" type="button" disabled>ゲーム開始</button>
           <p id="home-message" class="message"></p>
