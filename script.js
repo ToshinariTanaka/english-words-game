@@ -3,8 +3,18 @@ const HOSPITAL_GOLD_PENALTY = 200;
 const AUTO_NEXT_MIN_MS = 100;
 const AUTO_NEXT_MAX_MS = 3000;
 const REVIEW_START_DELAY_MS = 3000;
-const GAME_VERSION = "v0.9.3";
+const GAME_VERSION = "v0.9.4";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
+const QUESTION_MODES = {
+  meaning: {
+    label: "日本語訳モード",
+    answerKey: "meaning",
+  },
+  definition: {
+    label: "英英辞典モード",
+    answerKey: "definition",
+  },
+};
 
 const WORDBOOK_CATEGORIES = {
   standard: "重要英単語",
@@ -63,7 +73,7 @@ const BUILTIN_WORDBOOKS = {
   sample10: {
     label: "サンプル10語",
     category: "sample",
-    csv: `word,meaning,level\ndog,犬,1\ncat,猫,1\nrecommend,勧める・推薦する,12\npurchase,購入する,12\nwrite,書く,5\nsummarize,要約する,20\nconservation,保護・保存,80\nconsumption,消費,75\ncivilization,文明,85\nconversation,会話,70`,
+    csv: `word,meaning,level,definition\ndog,犬,1,a common animal that people often keep as a pet\ncat,猫,1,a small animal with soft fur that people often keep as a pet\nrecommend,勧める・推薦する,12,to tell someone that something is good or useful\npurchase,購入する,12,to buy something\nwrite,書く,5,to make words or letters on paper or a screen\nsummarize,要約する,20,to explain the main points in a short way\nconservation,保護・保存,80,the protection of nature, resources, or old things\nconsumption,消費,75,the act of using goods, energy, or resources\ncivilization,文明,85,a society with developed culture, government, and technology\nconversation,会話,70,a talk between two or more people`,
   },
 };
 
@@ -82,6 +92,7 @@ const el = {
   wordbookSelect: document.getElementById("wordbook-select"),
   startBtn: document.getElementById("start-btn"),
   questionCount: document.getElementById("question-count"),
+  questionMode: document.getElementById("question-mode"),
   homeMessage: document.getElementById("home-message"),
   versionLabel: document.getElementById("version-label"),
   hp: document.getElementById("hp"),
@@ -112,6 +123,7 @@ let gameDeck = [];
 let reviewDeck = [];
 let wrongWordMap = new Map();
 let isReviewMode = false;
+let currentQuestionMode = "meaning";
 let normalAnsweredCount = 0;
 let normalCorrectCount = 0;
 let normalWrongCount = 0;
@@ -239,6 +251,7 @@ function parseCsv(text) {
   const wordIndex = getFirstIndex(["word", "英単語", "単語", "english", "vocabulary"], 0);
   const meaningIndex = getFirstIndex(["meaning", "和訳", "意味", "日本語訳", "japanese"], 1);
   const levelIndex = getFirstIndex(["level", "レベル", "難度", "難易度"], 2);
+  const definitionIndex = getFirstIndex(["definition", "english_definition", "英英", "英英定義", "英語定義"], undefined);
 
   const collectPairIndexes = () => {
     const pairs = [];
@@ -291,6 +304,7 @@ function parseCsv(text) {
       word: getValue(values, wordIndex),
       meaning: getValue(values, meaningIndex),
       level: parseLevel(getValue(values, levelIndex)),
+      definition: getValue(values, definitionIndex),
       chunks: parseChunks(values),
     }))
     .filter((item) => item.word && item.meaning && item.word !== "#VALUE!");
@@ -309,21 +323,38 @@ function chooseRandomItems(pool, count) {
   return shuffle(pool).slice(0, count);
 }
 
-function addUniqueMeanings(picks, items, limit) {
+function getModeConfig() {
+  return QUESTION_MODES[currentQuestionMode] || QUESTION_MODES.meaning;
+}
+
+function getAnswerValue(item) {
+  return (item?.[getModeConfig().answerKey] || "").trim();
+}
+
+function getPlayableWords(mode = currentQuestionMode) {
+  const answerKey = (QUESTION_MODES[mode] || QUESTION_MODES.meaning).answerKey;
+  return words.filter((item) => item.word && item.meaning && (item[answerKey] || "").trim());
+}
+
+function addUniqueAnswers(picks, items, limit) {
   for (const item of items) {
     if (picks.length >= limit) break;
-    if (item.meaning && !picks.includes(item.meaning)) picks.push(item.meaning);
+    const answer = getAnswerValue(item);
+    if (answer && !picks.includes(answer)) picks.push(answer);
   }
 }
 
 function generateChoices(target) {
-  const basePool = words.filter(
-    (w) => w.word !== target.word && w.meaning && w.meaning !== target.meaning
-  );
+  const targetAnswer = getAnswerValue(target);
+  const basePool = words.filter((w) => {
+    const answer = getAnswerValue(w);
+    return w.word !== target.word && answer && answer !== targetAnswer;
+  });
 
   const uniqueMap = new Map();
   for (const item of basePool) {
-    if (!uniqueMap.has(item.meaning)) uniqueMap.set(item.meaning, item);
+    const answer = getAnswerValue(item);
+    if (!uniqueMap.has(answer)) uniqueMap.set(answer, item);
   }
   const uniquePool = [...uniqueMap.values()];
 
@@ -338,14 +369,14 @@ function generateChoices(target) {
   );
 
   const picks = [];
-  addUniqueMeanings(picks, chooseRandomItems(nearPool, 3), 3);
-  addUniqueMeanings(picks, chooseRandomItems(mediumPool, 3), 3);
-  addUniqueMeanings(picks, chooseRandomItems(farPool, 3), 3);
-  addUniqueMeanings(picks, chooseRandomItems(uniquePool, uniquePool.length), 3);
+  addUniqueAnswers(picks, chooseRandomItems(nearPool, 3), 3);
+  addUniqueAnswers(picks, chooseRandomItems(mediumPool, 3), 3);
+  addUniqueAnswers(picks, chooseRandomItems(farPool, 3), 3);
+  addUniqueAnswers(picks, chooseRandomItems(uniquePool, uniquePool.length), 3);
 
-  return shuffle([target.meaning, ...picks]).map((meaning) => ({
-    meaning,
-    isCorrect: meaning === target.meaning,
+  return shuffle([targetAnswer, ...picks]).map((answer) => ({
+    answer,
+    isCorrect: answer === targetAnswer,
   }));
 }
 
@@ -360,10 +391,16 @@ function updateVersionLabel() {
 }
 
 function getSelectedQuestionCount() {
-  if (!el.questionCount || el.questionCount.value === "all") return words.length;
+  const playableWords = getPlayableWords();
+  if (!el.questionCount || el.questionCount.value === "all") return playableWords.length;
   const selected = Number(el.questionCount.value);
-  if (!Number.isFinite(selected) || selected <= 0) return words.length;
-  return Math.min(selected, words.length);
+  if (!Number.isFinite(selected) || selected <= 0) return playableWords.length;
+  return Math.min(selected, playableWords.length);
+}
+
+function getSelectedQuestionMode() {
+  const selected = el.questionMode?.value || "meaning";
+  return QUESTION_MODES[selected] ? selected : "meaning";
 }
 
 function getAudioContext() {
@@ -431,11 +468,13 @@ function chooseNextWord() {
 }
 
 function showRoundSummary() {
+  const modeLabel = getModeConfig().label;
   showScreen("gameclear");
   el.clearMessage.textContent = wrongWordMap.size > 0
-    ? "1周目が終わりました。これから間違えた問題を復習します。"
-    : "今回の英単語モンスターをすべて討伐しました！";
+    ? `1周目が終わりました。${modeLabel}で間違えた問題を復習します。`
+    : `今回の英単語モンスターをすべて討伐しました！（${modeLabel}）`;
   el.clearScore.textContent =
+    `モード: ${modeLabel}\n` +
     `1周目: ${normalCorrectCount}問正解 / ${normalAnsweredCount}問中 / 誤答 ${normalWrongCount}問\n` +
     `現在Gold: ${gold} / 残りHP: ${hp}`;
 
@@ -452,12 +491,14 @@ function startReviewMode() {
 }
 
 function showFinalClear() {
+  const modeLabel = getModeConfig().label;
   showScreen("gameclear");
   const reviewText = normalWrongCount > 0
     ? `復習: ${reviewCorrectCount}問正解 / ${reviewAnsweredCount}回解答 / 復習中の誤答 ${reviewWrongCount}回\n`
     : "復習: 誤答なし\n";
   el.clearMessage.textContent = "ゲームクリア！間違えた問題もすべて正解しました。";
   el.clearScore.textContent =
+    `モード: ${modeLabel}\n` +
     `1周目: ${normalCorrectCount}問正解 / ${normalAnsweredCount}問中 / 誤答 ${normalWrongCount}問\n` +
     reviewText +
     `現在Gold: ${gold} / 残りHP: ${hp}`;
@@ -498,7 +539,7 @@ function nextQuestion() {
   }
 
   const reviewPrefix = isReviewMode ? "復習: " : "";
-  el.encounter.textContent = `${reviewPrefix}${current.word} が現れた！`;
+  el.encounter.textContent = `${reviewPrefix}${current.word} が現れた！（${getModeConfig().label}）`;
   el.targetWord.textContent = current.word;
   speakWord(current.word);
   el.choices.innerHTML = "";
@@ -507,7 +548,7 @@ function nextQuestion() {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "choice-btn";
-    btn.textContent = `${idx + 1}. ${choice.meaning}`;
+    btn.textContent = `${idx + 1}. ${choice.answer}`;
     btn.addEventListener("click", () => judgeAnswer(choice));
     el.choices.appendChild(btn);
   });
@@ -546,7 +587,7 @@ function judgeAnswer(choice) {
       wrongWordMap.set(current.word, current);
       el.resultMessage.textContent = `${current.word} の攻撃！ -${current.level} HP`;
     }
-    el.answerMessage.textContent = `正解: ${current.meaning}`;
+    el.answerMessage.textContent = `正解: ${getAnswerValue(current)}`;
   }
 
   updateStatus();
@@ -562,6 +603,15 @@ function judgeAnswer(choice) {
 
 function startGame() {
   clearAutoNextTimer();
+  currentQuestionMode = getSelectedQuestionMode();
+  const playableWords = getPlayableWords(currentQuestionMode);
+  if (playableWords.length < 4) {
+    const modeLabel = getModeConfig().label;
+    el.homeMessage.textContent = `${modeLabel}では4語以上の有効なデータが必要です。definition列などを確認してください。`;
+    el.startBtn.disabled = true;
+    return;
+  }
+
   hp = INITIAL_HP;
   kills = 0;
   answeredCount = 0;
@@ -576,7 +626,7 @@ function startGame() {
   isReviewMode = false;
   previousWord = null;
   targetQuestionCount = getSelectedQuestionCount();
-  gameDeck = shuffle(words).slice(0, targetQuestionCount);
+  gameDeck = shuffle(playableWords).slice(0, targetQuestionCount);
   updateStatus();
   nextQuestion();
 }
@@ -667,7 +717,7 @@ function loadWordsFromCsv(csvText) {
   const parsed = parseCsv(csvText);
   if (parsed.length < 4) {
     el.homeMessage.textContent =
-      "4語以上の有効なデータが必要です。対応列名: word/英単語, meaning/和訳, level。使わない列は無視します。";
+      "4語以上の有効なデータが必要です。対応列名: word/英単語, meaning/和訳, level, definition。使わない列は無視します。";
     el.startBtn.disabled = true;
     return;
   }
@@ -685,7 +735,11 @@ function loadWordsFromCsv(csvText) {
   reviewAnsweredCount = 0;
   reviewCorrectCount = 0;
   reviewWrongCount = 0;
-  el.homeMessage.textContent = `${words.length}語を読み込みました。現在Gold: ${gold}`;
+  const definitionCount = getPlayableWords("definition").length;
+  const definitionText = definitionCount >= 4
+    ? ` / 英英辞典モード: ${definitionCount}語対応`
+    : " / 英英辞典モード: definition列が4語未満";
+  el.homeMessage.textContent = `${words.length}語を読み込みました。現在Gold: ${gold}${definitionText}`;
   el.startBtn.disabled = false;
 }
 
