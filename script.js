@@ -3,16 +3,28 @@ const HOSPITAL_GOLD_PENALTY = 200;
 const AUTO_NEXT_MIN_MS = 100;
 const AUTO_NEXT_MAX_MS = 3000;
 const REVIEW_START_DELAY_MS = 3000;
-const GAME_VERSION = "v0.9.4";
+const GAME_VERSION = "v0.9.5";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 const QUESTION_MODES = {
   meaning: {
     label: "日本語訳モード",
+    promptKey: "word",
     answerKey: "meaning",
+    goldMultiplier: 1,
   },
   definition: {
     label: "英英辞典モード",
+    promptKey: "word",
     answerKey: "definition",
+    goldMultiplier: 2,
+    minRequiredMessage: "英英辞典モードでは4語以上の definition が必要です。",
+  },
+  chunk: {
+    label: "チャンクモード",
+    promptKey: "chunk",
+    answerKey: "chunk_meaning",
+    goldMultiplier: 1.5,
+    minRequiredMessage: "チャンクモードでは4件以上の chunk と chunk_meaning が必要です。",
   },
 };
 
@@ -252,52 +264,14 @@ function parseCsv(text) {
   const meaningIndex = getFirstIndex(["meaning", "和訳", "意味", "日本語訳", "japanese"], 1);
   const levelIndex = getFirstIndex(["level", "レベル", "難度", "難易度"], 2);
   const definitionIndex = getFirstIndex(["definition", "english_definition", "英英", "英英定義", "英語定義"], undefined);
-
-  const collectPairIndexes = () => {
-    const pairs = [];
-    const chunkNames = ["chunk", "チャンク", "例文チャンク"];
-    const meaningNames = ["chunk_meaning", "chunkmeaning", "チャンク和訳", "チャンク訳"];
-
-    const chunkIndexes = chunkNames.flatMap((name) => indexesByName.get(normalizeHeader(name)) || []);
-    const meaningIndexes = meaningNames.flatMap((name) => indexesByName.get(normalizeHeader(name)) || []);
-
-    const pairCount = Math.min(chunkIndexes.length, meaningIndexes.length);
-    for (let i = 0; i < pairCount; i += 1) {
-      pairs.push([chunkIndexes[i], meaningIndexes[i]]);
-    }
-
-    for (let i = 1; i <= 8; i += 1) {
-      const chunkIndex =
-        getFirstIndex([`chunk_${i}`, `chunk${i}`, `チャンク${i}`], undefined);
-      const chunkMeaningIndex =
-        getFirstIndex([`chunk_meaning_${i}`, `chunkmeaning${i}`, `チャンク和訳${i}`], undefined);
-      if (chunkIndex !== undefined && chunkMeaningIndex !== undefined) {
-        pairs.push([chunkIndex, chunkMeaningIndex]);
-      }
-    }
-
-    return pairs.filter(
-      ([chunkIndex, chunkMeaningIndex], index, array) =>
-        array.findIndex(
-          ([a, b]) => a === chunkIndex && b === chunkMeaningIndex
-        ) === index
-    );
-  };
-
-  const chunkPairs = collectPairIndexes();
+  const chunkIndex = getFirstIndex(["chunk", "チャンク", "例文チャンク"], undefined);
+  const chunkMeaningIndex = getFirstIndex(["chunk_meaning", "chunkmeaning", "チャンク和訳", "チャンク訳"], undefined);
+  const definitionMeaningIndex = getFirstIndex(["definition_meaning", "definitionmeaning", "英英和訳", "英英意味"], undefined);
 
   const getValue = (values, index) => {
     if (index === undefined || index === null) return "";
     return (values[index] || "").trim();
   };
-
-  const parseChunks = (values) =>
-    chunkPairs
-      .map(([chunkIndex, chunkMeaningIndex]) => ({
-        text: getValue(values, chunkIndex),
-        meaning: getValue(values, chunkMeaningIndex),
-      }))
-      .filter((chunk) => chunk.text && chunk.meaning);
 
   return dataRows
     .map((values) => ({
@@ -305,9 +279,11 @@ function parseCsv(text) {
       meaning: getValue(values, meaningIndex),
       level: parseLevel(getValue(values, levelIndex)),
       definition: getValue(values, definitionIndex),
-      chunks: parseChunks(values),
+      chunk: getValue(values, chunkIndex),
+      chunk_meaning: getValue(values, chunkMeaningIndex),
+      definition_meaning: getValue(values, definitionMeaningIndex),
     }))
-    .filter((item) => item.word && item.meaning && item.word !== "#VALUE!");
+    .filter((item) => item.word && item.word !== "#VALUE!");
 }
 
 function shuffle(arr) {
@@ -327,13 +303,22 @@ function getModeConfig() {
   return QUESTION_MODES[currentQuestionMode] || QUESTION_MODES.meaning;
 }
 
+function getPromptValue(item) {
+  return (item?.[getModeConfig().promptKey] || "").trim();
+}
+
 function getAnswerValue(item) {
   return (item?.[getModeConfig().answerKey] || "").trim();
 }
 
 function getPlayableWords(mode = currentQuestionMode) {
-  const answerKey = (QUESTION_MODES[mode] || QUESTION_MODES.meaning).answerKey;
-  return words.filter((item) => item.word && item.meaning && (item[answerKey] || "").trim());
+  const config = QUESTION_MODES[mode] || QUESTION_MODES.meaning;
+  return words.filter((item) => (item?.[config.promptKey] || "").trim() && (item?.[config.answerKey] || "").trim());
+}
+
+function getEarnedGold(level) {
+  const multiplier = getModeConfig().goldMultiplier || 1;
+  return Math.floor(level * multiplier);
 }
 
 function addUniqueAnswers(picks, items, limit) {
@@ -539,9 +524,10 @@ function nextQuestion() {
   }
 
   const reviewPrefix = isReviewMode ? "復習: " : "";
-  el.encounter.textContent = `${reviewPrefix}${current.word} が現れた！（${getModeConfig().label}）`;
-  el.targetWord.textContent = current.word;
-  speakWord(current.word);
+  const currentPrompt = getPromptValue(current);
+  el.encounter.textContent = `${reviewPrefix}${currentPrompt} が現れた！（${getModeConfig().label}）`;
+  el.targetWord.textContent = currentPrompt;
+  if (getModeConfig().promptKey === "word") speakWord(currentPrompt);
   el.choices.innerHTML = "";
   const choices = generateChoices(current);
   choices.forEach((choice, idx) => {
@@ -563,16 +549,17 @@ function judgeAnswer(choice) {
 
   if (choice.isCorrect) {
     playCorrectSound();
-    gold += current.level;
+    const earnedGold = getEarnedGold(current.level);
+    gold += earnedGold;
     saveGold();
     kills += 1;
     if (isReviewMode) {
       reviewCorrectCount += 1;
       wrongWordMap.delete(current.word);
-      el.resultMessage.textContent = `復習成功！ ${current.word} を倒した！ +${current.level} gold`;
+      el.resultMessage.textContent = `復習成功！ ${getPromptValue(current)} を倒した！ +${earnedGold} gold`;
     } else {
       normalCorrectCount += 1;
-      el.resultMessage.textContent = `${current.word} を倒した！ +${current.level} gold`;
+      el.resultMessage.textContent = `${getPromptValue(current)} を倒した！ +${earnedGold} gold`;
     }
     el.answerMessage.textContent = "";
   } else {
@@ -606,8 +593,7 @@ function startGame() {
   currentQuestionMode = getSelectedQuestionMode();
   const playableWords = getPlayableWords(currentQuestionMode);
   if (playableWords.length < 4) {
-    const modeLabel = getModeConfig().label;
-    el.homeMessage.textContent = `${modeLabel}では4語以上の有効なデータが必要です。definition列などを確認してください。`;
+    el.homeMessage.textContent = getModeConfig().minRequiredMessage || "このモードでは4語以上の有効なデータが必要です。";
     el.startBtn.disabled = true;
     return;
   }
@@ -717,7 +703,7 @@ function loadWordsFromCsv(csvText) {
   const parsed = parseCsv(csvText);
   if (parsed.length < 4) {
     el.homeMessage.textContent =
-      "4語以上の有効なデータが必要です。対応列名: word/英単語, meaning/和訳, level, definition。使わない列は無視します。";
+      "4語以上の有効なデータが必要です。対応列名: word/meaning/level/chunk/chunk_meaning/definition/definition_meaning。使わない列は無視します。";
     el.startBtn.disabled = true;
     return;
   }
@@ -736,10 +722,14 @@ function loadWordsFromCsv(csvText) {
   reviewCorrectCount = 0;
   reviewWrongCount = 0;
   const definitionCount = getPlayableWords("definition").length;
+  const chunkCount = getPlayableWords("chunk").length;
   const definitionText = definitionCount >= 4
     ? ` / 英英辞典モード: ${definitionCount}語対応`
     : " / 英英辞典モード: definition列が4語未満";
-  el.homeMessage.textContent = `${words.length}語を読み込みました。現在Gold: ${gold}${definitionText}`;
+  const chunkText = chunkCount >= 4
+    ? ` / チャンクモード: ${chunkCount}件対応`
+    : " / チャンクモード: chunk と chunk_meaning が4件未満";
+  el.homeMessage.textContent = `${words.length}語を読み込みました。現在Gold: ${gold}${definitionText}${chunkText}`;
   el.startBtn.disabled = false;
 }
 
