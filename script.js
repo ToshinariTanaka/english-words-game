@@ -3,7 +3,7 @@ const HOSPITAL_GOLD_PENALTY = 200;
 const AUTO_NEXT_MIN_MS = 100;
 const AUTO_NEXT_MAX_MS = 3000;
 const REVIEW_START_DELAY_MS = 3000;
-const GAME_VERSION = "v0.9.5";
+const GAME_VERSION = "v0.9.6";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 const QUESTION_MODES = {
   meaning: {
@@ -112,6 +112,8 @@ const el = {
   kills: document.getElementById("kills"),
   encounter: document.getElementById("encounter"),
   targetWord: document.getElementById("target-word"),
+  hintBtn: document.getElementById("hint-btn"),
+  hintMessage: document.getElementById("hint-message"),
   choices: document.getElementById("choices"),
   resultMessage: document.getElementById("result-message"),
   answerMessage: document.getElementById("answer-message"),
@@ -144,6 +146,7 @@ let reviewCorrectCount = 0;
 let reviewWrongCount = 0;
 let autoNextTimer = null;
 let audioContext = null;
+let currentHintUsed = false;
 
 function showScreen(name) {
   Object.values(screens).forEach((screen) => screen.classList.remove("active"));
@@ -318,7 +321,28 @@ function getPlayableWords(mode = currentQuestionMode) {
 
 function getEarnedGold(level) {
   const multiplier = getModeConfig().goldMultiplier || 1;
-  return Math.floor(level * multiplier);
+  const baseGold = level * multiplier;
+  return Math.floor(currentHintUsed ? baseGold / 2 : baseGold);
+}
+
+function shouldShowHintButton() {
+  return currentQuestionMode === "definition";
+}
+
+function resetHintState() {
+  currentHintUsed = false;
+  if (el.hintMessage) el.hintMessage.textContent = "";
+  if (!el.hintBtn) return;
+  const visible = shouldShowHintButton();
+  el.hintBtn.hidden = !visible;
+  el.hintBtn.disabled = !visible;
+}
+
+function useHint() {
+  if (!current || !shouldShowHintButton() || !el.hintBtn || !el.hintMessage) return;
+  currentHintUsed = true;
+  el.hintMessage.textContent = `ヒント：${current.meaning || "（日本語訳なし）"}`;
+  el.hintBtn.disabled = true;
 }
 
 function addUniqueAnswers(picks, items, limit) {
@@ -524,6 +548,7 @@ function nextQuestion() {
   }
 
   const reviewPrefix = isReviewMode ? "復習: " : "";
+  resetHintState();
   const currentPrompt = getPromptValue(current);
   el.encounter.textContent = `${reviewPrefix}${currentPrompt} が現れた！（${getModeConfig().label}）`;
   el.targetWord.textContent = currentPrompt;
@@ -556,10 +581,14 @@ function judgeAnswer(choice) {
     if (isReviewMode) {
       reviewCorrectCount += 1;
       wrongWordMap.delete(current.word);
-      el.resultMessage.textContent = `復習成功！ ${getPromptValue(current)} を倒した！ +${earnedGold} gold`;
+      el.resultMessage.textContent = currentHintUsed
+        ? `復習成功！ ${getPromptValue(current)} を倒した！ ヒント使用のため +${earnedGold} gold`
+        : `復習成功！ ${getPromptValue(current)} を倒した！ +${earnedGold} gold`;
     } else {
       normalCorrectCount += 1;
-      el.resultMessage.textContent = `${getPromptValue(current)} を倒した！ +${earnedGold} gold`;
+      el.resultMessage.textContent = currentHintUsed
+        ? `${getPromptValue(current)} を倒した！ ヒント使用のため +${earnedGold} gold`
+        : `${getPromptValue(current)} を倒した！ +${earnedGold} gold`;
     }
     el.answerMessage.textContent = "";
   } else {
@@ -611,6 +640,7 @@ function startGame() {
   reviewDeck = [];
   isReviewMode = false;
   previousWord = null;
+  resetHintState();
   targetQuestionCount = getSelectedQuestionCount();
   gameDeck = shuffle(playableWords).slice(0, targetQuestionCount);
   updateStatus();
@@ -721,6 +751,7 @@ function loadWordsFromCsv(csvText) {
   reviewAnsweredCount = 0;
   reviewCorrectCount = 0;
   reviewWrongCount = 0;
+  resetHintState();
   const definitionCount = getPlayableWords("definition").length;
   const chunkCount = getPlayableWords("chunk").length;
   const definitionText = definitionCount >= 4
@@ -748,21 +779,25 @@ el.wordbookCategory.addEventListener("change", (event) => {
 
 el.loadWordbookBtn.addEventListener("click", loadBuiltinWordBook);
 el.startBtn.addEventListener("click", startGame);
+el.hintBtn.addEventListener("click", useHint);
 el.nextBtn.addEventListener("click", () => {
   clearAutoNextTimer();
   nextQuestion();
 });
 el.retryBtn.addEventListener("click", () => {
   clearAutoNextTimer();
+  resetHintState();
   showScreen("home");
 });
 el.clearRetryBtn.addEventListener("click", () => {
   clearAutoNextTimer();
+  resetHintState();
   showScreen("home");
 });
 
 populateCategorySelect();
 el.wordbookCategory.value = "standard";
 populateWordbookSelect("standard");
+resetHintState();
 updateVersionLabel();
 updateStatus();
