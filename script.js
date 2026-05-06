@@ -322,6 +322,7 @@ function getPlayableWords(mode = currentQuestionMode) {
 function getEarnedGold(level) {
   const multiplier = getModeConfig().goldMultiplier || 1;
   const baseGold = level * multiplier;
+  // ヒント使用時は獲得Goldを半分にする。
   return Math.floor(currentHintUsed ? baseGold / 2 : baseGold);
 }
 
