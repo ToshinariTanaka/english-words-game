@@ -1,6 +1,6 @@
 const INITIAL_HP = 100;
 const HOSPITAL_GOLD_PENALTY = 200;
-const GAME_VERSION = "v0.9.1";
+const GAME_VERSION = "v0.9.2";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 
 const WORDBOOK_CATEGORIES = {
@@ -16,6 +16,11 @@ const BUILTIN_WORDBOOKS = {
     label: "英単語100語",
     category: "standard",
     path: "data/english_words_game_100.csv",
+  },
+  important5000: {
+    label: "重要英単語5000",
+    category: "standard",
+    path: "data/important_5000.csv",
   },
   important12000: {
     label: "重要英単語12000",
