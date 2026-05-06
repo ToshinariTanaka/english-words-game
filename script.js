@@ -1,6 +1,9 @@
 const INITIAL_HP = 100;
 const HOSPITAL_GOLD_PENALTY = 200;
-const GAME_VERSION = "v0.9.2";
+const AUTO_NEXT_MIN_MS = 100;
+const AUTO_NEXT_MAX_MS = 3000;
+const REVIEW_START_DELAY_MS = 3000;
+const GAME_VERSION = "v0.9.3";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 
 const WORDBOOK_CATEGORIES = {
@@ -106,11 +109,41 @@ let answeredCount = 0;
 let targetQuestionCount = 0;
 let previousWord = null;
 let gameDeck = [];
+let reviewDeck = [];
+let wrongWordMap = new Map();
+let isReviewMode = false;
+let normalAnsweredCount = 0;
+let normalCorrectCount = 0;
+let normalWrongCount = 0;
+let reviewAnsweredCount = 0;
+let reviewCorrectCount = 0;
+let reviewWrongCount = 0;
+let autoNextTimer = null;
 let audioContext = null;
 
 function showScreen(name) {
   Object.values(screens).forEach((screen) => screen.classList.remove("active"));
   screens[name].classList.add("active");
+}
+
+function clearAutoNextTimer() {
+  if (autoNextTimer) {
+    clearTimeout(autoNextTimer);
+    autoNextTimer = null;
+  }
+}
+
+function getAutoNextDelay() {
+  const span = AUTO_NEXT_MAX_MS - AUTO_NEXT_MIN_MS;
+  return AUTO_NEXT_MIN_MS + Math.floor(Math.random() * (span + 1));
+}
+
+function scheduleAutoNext(callback = nextQuestion, delay = getAutoNextDelay()) {
+  clearAutoNextTimer();
+  autoNextTimer = setTimeout(() => {
+    autoNextTimer = null;
+    callback();
+  }, delay);
 }
 
 function loadStoredGold() {
@@ -389,21 +422,49 @@ function speakWord(word) {
 }
 
 function chooseNextWord() {
-  if (!words || words.length === 0) return null;
-  if (gameDeck.length === 0) return null;
-  const selected = gameDeck.shift();
+  const deck = isReviewMode ? reviewDeck : gameDeck;
+  if (!deck || deck.length === 0) return null;
+  const selected = deck.shift();
   if (!selected) return null;
   previousWord = selected.word;
   return selected;
 }
 
-function showGameClear() {
-  el.clearMessage.textContent = "今回の英単語モンスターをすべて討伐しました！";
-  el.clearScore.textContent = `討伐数: ${kills} / 出題数: ${answeredCount} / 現在Gold: ${gold} / 残りHP: ${hp}`;
+function showRoundSummary() {
   showScreen("gameclear");
+  el.clearMessage.textContent = wrongWordMap.size > 0
+    ? "1周目が終わりました。これから間違えた問題を復習します。"
+    : "今回の英単語モンスターをすべて討伐しました！";
+  el.clearScore.textContent =
+    `1周目: ${normalCorrectCount}問正解 / ${normalAnsweredCount}問中 / 誤答 ${normalWrongCount}問\n` +
+    `現在Gold: ${gold} / 残りHP: ${hp}`;
+
+  if (wrongWordMap.size > 0) {
+    reviewDeck = shuffle([...wrongWordMap.values()]);
+    scheduleAutoNext(startReviewMode, REVIEW_START_DELAY_MS);
+  }
+}
+
+function startReviewMode() {
+  isReviewMode = true;
+  current = null;
+  nextQuestion();
+}
+
+function showFinalClear() {
+  showScreen("gameclear");
+  const reviewText = normalWrongCount > 0
+    ? `復習: ${reviewCorrectCount}問正解 / ${reviewAnsweredCount}回解答 / 復習中の誤答 ${reviewWrongCount}回\n`
+    : "復習: 誤答なし\n";
+  el.clearMessage.textContent = "ゲームクリア！間違えた問題もすべて正解しました。";
+  el.clearScore.textContent =
+    `1周目: ${normalCorrectCount}問正解 / ${normalAnsweredCount}問中 / 誤答 ${normalWrongCount}問\n` +
+    reviewText +
+    `現在Gold: ${gold} / 残りHP: ${hp}`;
 }
 
 function sendToHospital() {
+  clearAutoNextTimer();
   const goldBeforePenalty = gold;
   gold = Math.max(0, gold - HOSPITAL_GOLD_PENALTY);
   saveGold();
@@ -412,22 +473,32 @@ function sendToHospital() {
     `HPが0になったため病院送りです。\n` +
     `治療費として ${HOSPITAL_GOLD_PENALTY} gold を失いました。\n` +
     `Gold: ${goldBeforePenalty} → ${gold}\n` +
-    `討伐数: ${kills} / 出題数: ${answeredCount}`;
+    `討伐数: ${kills} / 解答数: ${answeredCount}`;
   showScreen("gameover");
 }
 
 function nextQuestion() {
-  if (answeredCount >= targetQuestionCount || gameDeck.length === 0) {
-    showGameClear();
+  clearAutoNextTimer();
+
+  if (isReviewMode) {
+    if (reviewDeck.length === 0) {
+      showFinalClear();
+      return;
+    }
+  } else if (normalAnsweredCount >= targetQuestionCount || gameDeck.length === 0) {
+    showRoundSummary();
     return;
   }
+
   current = chooseNextWord();
   if (!current) {
-    el.homeMessage.textContent = "単語データが読み込まれていません。";
-    showScreen("home");
+    if (isReviewMode) showFinalClear();
+    else showRoundSummary();
     return;
   }
-  el.encounter.textContent = `${current.word} が現れた！`;
+
+  const reviewPrefix = isReviewMode ? "復習: " : "";
+  el.encounter.textContent = `${reviewPrefix}${current.word} が現れた！`;
   el.targetWord.textContent = current.word;
   speakWord(current.word);
   el.choices.innerHTML = "";
@@ -445,35 +516,64 @@ function nextQuestion() {
 
 function judgeAnswer(choice) {
   answeredCount += 1;
+
+  if (isReviewMode) reviewAnsweredCount += 1;
+  else normalAnsweredCount += 1;
+
   if (choice.isCorrect) {
     playCorrectSound();
     gold += current.level;
     saveGold();
     kills += 1;
-    el.resultMessage.textContent = `${current.word} を倒した！ +${current.level} gold`;
+    if (isReviewMode) {
+      reviewCorrectCount += 1;
+      wrongWordMap.delete(current.word);
+      el.resultMessage.textContent = `復習成功！ ${current.word} を倒した！ +${current.level} gold`;
+    } else {
+      normalCorrectCount += 1;
+      el.resultMessage.textContent = `${current.word} を倒した！ +${current.level} gold`;
+    }
     el.answerMessage.textContent = "";
   } else {
     playWrongSound();
     hp = Math.max(0, hp - current.level);
-    el.resultMessage.textContent = `${current.word} の攻撃！ -${current.level} HP`;
+    if (isReviewMode) {
+      reviewWrongCount += 1;
+      reviewDeck.push(current);
+      el.resultMessage.textContent = `復習: ${current.word} の攻撃！ -${current.level} HP`;
+    } else {
+      normalWrongCount += 1;
+      wrongWordMap.set(current.word, current);
+      el.resultMessage.textContent = `${current.word} の攻撃！ -${current.level} HP`;
+    }
     el.answerMessage.textContent = `正解: ${current.meaning}`;
   }
+
   updateStatus();
+
   if (hp <= 0) {
     sendToHospital();
     return;
   }
-  if (answeredCount >= targetQuestionCount) {
-    showGameClear();
-    return;
-  }
+
   showScreen("result");
+  scheduleAutoNext();
 }
 
 function startGame() {
+  clearAutoNextTimer();
   hp = INITIAL_HP;
   kills = 0;
   answeredCount = 0;
+  normalAnsweredCount = 0;
+  normalCorrectCount = 0;
+  normalWrongCount = 0;
+  reviewAnsweredCount = 0;
+  reviewCorrectCount = 0;
+  reviewWrongCount = 0;
+  wrongWordMap = new Map();
+  reviewDeck = [];
+  isReviewMode = false;
   previousWord = null;
   targetQuestionCount = getSelectedQuestionCount();
   gameDeck = shuffle(words).slice(0, targetQuestionCount);
@@ -533,6 +633,7 @@ function populateWordbookSelect(category) {
 }
 
 async function loadBuiltinWordBook() {
+  clearAutoNextTimer();
   const selectedKey = el.wordbookSelect?.value;
   const wordbook = BUILTIN_WORDBOOKS[selectedKey];
   if (!wordbook) {
@@ -562,6 +663,7 @@ async function loadBuiltinWordBook() {
 }
 
 function loadWordsFromCsv(csvText) {
+  clearAutoNextTimer();
   const parsed = parseCsv(csvText);
   if (parsed.length < 4) {
     el.homeMessage.textContent =
@@ -571,9 +673,18 @@ function loadWordsFromCsv(csvText) {
   }
   words = parsed;
   gameDeck = [];
+  reviewDeck = [];
+  wrongWordMap = new Map();
+  isReviewMode = false;
   previousWord = null;
   answeredCount = 0;
   targetQuestionCount = 0;
+  normalAnsweredCount = 0;
+  normalCorrectCount = 0;
+  normalWrongCount = 0;
+  reviewAnsweredCount = 0;
+  reviewCorrectCount = 0;
+  reviewWrongCount = 0;
   el.homeMessage.textContent = `${words.length}語を読み込みました。現在Gold: ${gold}`;
   el.startBtn.disabled = false;
 }
@@ -586,15 +697,25 @@ el.csvFile.addEventListener("change", async (event) => {
 });
 
 el.wordbookCategory.addEventListener("change", (event) => {
+  clearAutoNextTimer();
   el.homeMessage.textContent = "";
   populateWordbookSelect(event.target.value);
 });
 
 el.loadWordbookBtn.addEventListener("click", loadBuiltinWordBook);
 el.startBtn.addEventListener("click", startGame);
-el.nextBtn.addEventListener("click", nextQuestion);
-el.retryBtn.addEventListener("click", () => showScreen("home"));
-el.clearRetryBtn.addEventListener("click", () => showScreen("home"));
+el.nextBtn.addEventListener("click", () => {
+  clearAutoNextTimer();
+  nextQuestion();
+});
+el.retryBtn.addEventListener("click", () => {
+  clearAutoNextTimer();
+  showScreen("home");
+});
+el.clearRetryBtn.addEventListener("click", () => {
+  clearAutoNextTimer();
+  showScreen("home");
+});
 
 populateCategorySelect();
 el.wordbookCategory.value = "standard";
