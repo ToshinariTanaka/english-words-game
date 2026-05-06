@@ -1,6 +1,6 @@
 const INITIAL_HP = 100;
 const HOSPITAL_GOLD_PENALTY = 200;
-const GAME_VERSION = "v0.9.0";
+const GAME_VERSION = "v0.9.1";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 
 const WORDBOOK_CATEGORIES = {
@@ -117,49 +117,145 @@ function saveGold() {
   localStorage.setItem(GOLD_STORAGE_KEY, String(gold));
 }
 
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return [];
+function normalizeHeader(value) {
+  return String(value || "")
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+}
 
-  const [headerLine, ...rows] = lines;
-  const headers = headerLine.split(",").map((v) => v.trim());
-  const headerIndexMap = new Map(headers.map((name, index) => [name, index]));
+function parseCsvRows(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let inQuotes = false;
 
-  const getValue = (values, columnName) => {
-    const index = headerIndexMap.get(columnName);
-    if (index === undefined) return "";
-    return (values[index] || "").trim();
-  };
+  const source = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 
-  const parseChunks = (values) => {
-    const chunks = [];
+  for (let i = 0; i < source.length; i += 1) {
+    const char = source[i];
+    const next = source[i + 1];
 
-    const legacyChunk = getValue(values, "chunk");
-    const legacyChunkMeaning = getValue(values, "chunk_meaning");
-    if (legacyChunk && legacyChunkMeaning) {
-      chunks.push({ text: legacyChunk, meaning: legacyChunkMeaning });
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        cell += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
     }
 
-    for (let i = 1; i <= 4; i += 1) {
-      const chunk = getValue(values, `chunk_${i}`);
-      const chunkMeaning = getValue(values, `chunk_meaning_${i}`);
-      if (chunk && chunkMeaning) {
-        chunks.push({ text: chunk, meaning: chunkMeaning });
+    if (char === "," && !inQuotes) {
+      row.push(cell.trim());
+      cell = "";
+      continue;
+    }
+
+    if (char === "\n" && !inQuotes) {
+      row.push(cell.trim());
+      if (row.some((value) => value !== "")) rows.push(row);
+      row = [];
+      cell = "";
+      continue;
+    }
+
+    cell += char;
+  }
+
+  row.push(cell.trim());
+  if (row.some((value) => value !== "")) rows.push(row);
+
+  return rows;
+}
+
+function parseLevel(value) {
+  const parsed = Number(String(value || "").replace(/[^\d.-]/g, ""));
+  if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+  return parsed;
+}
+
+function parseCsv(text) {
+  const rows = parseCsvRows(text);
+  if (rows.length < 2) return [];
+
+  const [rawHeaders, ...dataRows] = rows;
+  const headers = rawHeaders.map(normalizeHeader);
+
+  const indexesByName = headers.reduce((map, header, index) => {
+    if (!header) return map;
+    if (!map.has(header)) map.set(header, []);
+    map.get(header).push(index);
+    return map;
+  }, new Map());
+
+  const getFirstIndex = (aliases, fallbackIndex) => {
+    for (const alias of aliases.map(normalizeHeader)) {
+      const indexes = indexesByName.get(alias);
+      if (indexes && indexes.length > 0) return indexes[0];
+    }
+    return fallbackIndex;
+  };
+
+  const wordIndex = getFirstIndex(["word", "英単語", "単語", "english", "vocabulary"], 0);
+  const meaningIndex = getFirstIndex(["meaning", "和訳", "意味", "日本語訳", "japanese"], 1);
+  const levelIndex = getFirstIndex(["level", "レベル", "難度", "難易度"], 2);
+
+  const collectPairIndexes = () => {
+    const pairs = [];
+    const chunkNames = ["chunk", "チャンク", "例文チャンク"];
+    const meaningNames = ["chunk_meaning", "chunkmeaning", "チャンク和訳", "チャンク訳"];
+
+    const chunkIndexes = chunkNames.flatMap((name) => indexesByName.get(normalizeHeader(name)) || []);
+    const meaningIndexes = meaningNames.flatMap((name) => indexesByName.get(normalizeHeader(name)) || []);
+
+    const pairCount = Math.min(chunkIndexes.length, meaningIndexes.length);
+    for (let i = 0; i < pairCount; i += 1) {
+      pairs.push([chunkIndexes[i], meaningIndexes[i]]);
+    }
+
+    for (let i = 1; i <= 8; i += 1) {
+      const chunkIndex =
+        getFirstIndex([`chunk_${i}`, `chunk${i}`, `チャンク${i}`], undefined);
+      const chunkMeaningIndex =
+        getFirstIndex([`chunk_meaning_${i}`, `chunkmeaning${i}`, `チャンク和訳${i}`], undefined);
+      if (chunkIndex !== undefined && chunkMeaningIndex !== undefined) {
+        pairs.push([chunkIndex, chunkMeaningIndex]);
       }
     }
 
-    return chunks;
+    return pairs.filter(
+      ([chunkIndex, chunkMeaningIndex], index, array) =>
+        array.findIndex(
+          ([a, b]) => a === chunkIndex && b === chunkMeaningIndex
+        ) === index
+    );
   };
 
-  return rows
-    .map((line) => line.split(",").map((v) => v.trim()))
+  const chunkPairs = collectPairIndexes();
+
+  const getValue = (values, index) => {
+    if (index === undefined || index === null) return "";
+    return (values[index] || "").trim();
+  };
+
+  const parseChunks = (values) =>
+    chunkPairs
+      .map(([chunkIndex, chunkMeaningIndex]) => ({
+        text: getValue(values, chunkIndex),
+        meaning: getValue(values, chunkMeaningIndex),
+      }))
+      .filter((chunk) => chunk.text && chunk.meaning);
+
+  return dataRows
     .map((values) => ({
-      word: getValue(values, "word"),
-      meaning: getValue(values, "meaning"),
-      level: Number(getValue(values, "level")),
+      word: getValue(values, wordIndex),
+      meaning: getValue(values, meaningIndex),
+      level: parseLevel(getValue(values, levelIndex)),
       chunks: parseChunks(values),
     }))
-    .filter((r) => r.word && r.meaning && Number.isFinite(r.level));
+    .filter((item) => item.word && item.meaning && item.word !== "#VALUE!");
 }
 
 function shuffle(arr) {
@@ -463,7 +559,8 @@ async function loadBuiltinWordBook() {
 function loadWordsFromCsv(csvText) {
   const parsed = parseCsv(csvText);
   if (parsed.length < 4) {
-    el.homeMessage.textContent = "4語以上の有効なデータが必要です。";
+    el.homeMessage.textContent =
+      "4語以上の有効なデータが必要です。対応列名: word/英単語, meaning/和訳, level。使わない列は無視します。";
     el.startBtn.disabled = true;
     return;
   }
