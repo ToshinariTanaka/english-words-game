@@ -63,7 +63,7 @@ function hydrateRows(matrix) {
   const out = [];
   for (let i = 1; i < matrix.length; i++) {
     const src = matrix[i];
-    const obj = { row_number: i };
+    const obj = { row_number: i + 1 };
     for (const c of REQUIRED_MASTER_COLUMNS) {
       const idx = findKey(headerMap, c);
       obj[c] = idx >= 0 ? (src[idx] ?? "") : "";
@@ -145,8 +145,9 @@ function mergePasted(text) {
   for (let i = 1; i < matrix.length; i++) {
     const r = matrix[i];
     const rn = Number(r[idx.row_number]);
-    if (!Number.isInteger(rn) || rn < 1 || rn > STATE.rows.length) continue;
-    const target = STATE.rows[rn - 1];
+    if (!Number.isInteger(rn) || rn < 2) continue;
+    const target = STATE.rows.find(row => row.row_number === rn);
+    if (!target) continue;
     for (const c of ["chunk","chunk_meaning","definition","definition_meaning","status","note"]) {
       const newVal = idx[c] >= 0 ? (r[idx[c]] ?? "") : "";
       if (cleanValue(newVal)) target[c] = newVal;
@@ -154,6 +155,18 @@ function mergePasted(text) {
     applied++;
   }
   return applied;
+}
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\$&");
+}
+
+function definitionContainsWord(word, definition) {
+  const w = cleanValue(word);
+  const d = cleanValue(definition);
+  if (w.length < 3 || !d) return false;
+  const regex = new RegExp(`\\b${escapeRegex(w)}\\b`, "i");
+  return regex.test(d);
 }
 
 function appendNote(row, msg) {
@@ -173,7 +186,7 @@ function checkRows() {
     if (!cleanValue(r.definition)) issues.push("definition空欄");
     if (!cleanValue(r.definition_meaning)) issues.push("definition_meaning空欄");
     if (cleanValue(r.chunk).toLowerCase() === cleanValue(r.word).toLowerCase()) issues.push("chunkがwordのみ");
-    if (cleanValue(r.word) && cleanValue(r.definition).toLowerCase().includes(cleanValue(r.word).toLowerCase())) issues.push("definitionにword含む");
+    if (definitionContainsWord(r.word, r.definition)) issues.push("definitionにword含む");
     const wc = cleanValue(r.definition) ? cleanValue(r.definition).split(/\s+/).length : 0;
     if (wc && (wc < 8 || wc > 14)) issues.push(`definition語数${wc}`);
     if (!cleanValue(r.status)) issues.push("status空欄");
