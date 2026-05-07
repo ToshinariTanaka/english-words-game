@@ -235,10 +235,21 @@ function parseCsvRows(text) {
   return rows;
 }
 
-function parseLevel(value) {
-  const parsed = Number(String(value || "").replace(/[^\d.-]/g, ""));
-  if (!Number.isFinite(parsed) || parsed <= 0) return 1;
-  return parsed;
+const LEVEL_TO_GOLD = { A1: 1, A2: 2, B1: 4, B2: 8, C1: 16, C2: 32 };
+
+function normalizeLevel(value) {
+  const key = String(value || "").trim().toUpperCase();
+  return LEVEL_TO_GOLD[key] ? key : "A1";
+}
+
+function safeGold(value, level) {
+  const n = Number(value);
+  if (Number.isFinite(n) && n > 0) return n;
+  return LEVEL_TO_GOLD[normalizeLevel(level)] || 1;
+}
+
+function getBaseGold(word) {
+  return safeGold(word?.gold, word?.level);
 }
 
 function parseCsv(text) {
@@ -247,46 +258,65 @@ function parseCsv(text) {
 
   const [rawHeaders, ...dataRows] = rows;
   const headers = rawHeaders.map(normalizeHeader);
+  const has = (name) => headers.includes(normalizeHeader(name));
 
-  const indexesByName = headers.reduce((map, header, index) => {
-    if (!header) return map;
-    if (!map.has(header)) map.set(header, []);
-    map.get(header).push(index);
-    return map;
-  }, new Map());
+  const format = has("word") && has("gold") && has("chunk1")
+    ? "new"
+    : has("word") && has("chunk")
+      ? "old"
+      : has("英単語") && has("和訳")
+        ? "ja_special"
+        : "old";
 
-  const getFirstIndex = (aliases, fallbackIndex) => {
-    for (const alias of aliases.map(normalizeHeader)) {
-      const indexes = indexesByName.get(alias);
-      if (indexes && indexes.length > 0) return indexes[0];
+  const toWord = (values) => {
+    let word = ""; let meaning = ""; let goldRaw = ""; let levelRaw = "";
+    let chunk1 = ""; let chunk1Meaning = ""; let chunk2 = ""; let chunk2Meaning = ""; let chunk3 = ""; let chunk3Meaning = "";
+    let definition = ""; let definitionMeaning = ""; let status = ""; let note = ""; let checkedAt = "";
+
+    const get = (i) => (values[i] || "").trim();
+
+    if (format === "new") {
+      const idx = Object.fromEntries(headers.map((h, i) => [h, i]));
+      word = get(idx.word); meaning = get(idx.meaning); goldRaw = get(idx.gold); levelRaw = get(idx.level);
+      chunk1 = get(idx.chunk1); chunk1Meaning = get(idx.chunk1_meaning); chunk2 = get(idx.chunk2); chunk2Meaning = get(idx.chunk2_meaning);
+      chunk3 = get(idx.chunk3); chunk3Meaning = get(idx.chunk3_meaning);
+      definition = get(idx.definition); definitionMeaning = get(idx.definition_meaning);
+      status = get(idx.status); note = get(idx.note); checkedAt = get(idx.checked_at);
+    } else if (format === "old") {
+      const idx = Object.fromEntries(headers.map((h, i) => [h, i]));
+      word = get(idx.word ?? 0); meaning = get(idx.meaning ?? 1); levelRaw = get(idx.level ?? 2);
+      chunk1 = get(idx.chunk); chunk1Meaning = get(idx.chunk_meaning);
+      definition = get(idx.definition); definitionMeaning = get(idx.definition_meaning);
+      status = get(idx.status); note = get(idx.note); checkedAt = get(idx.checked_at);
+    } else {
+      word = get(0); meaning = get(1); goldRaw = get(2);
+      chunk1 = get(3); chunk1Meaning = get(4); chunk2 = get(5); chunk2Meaning = get(6); chunk3 = get(7); chunk3Meaning = get(8);
+      levelRaw = get(10); definition = get(11); definitionMeaning = get(12);
     }
-    return fallbackIndex;
+
+    const level = normalizeLevel(levelRaw);
+    const gold = safeGold(goldRaw, level);
+    const chunks = [
+      { text: chunk1, meaning: chunk1Meaning },
+      { text: chunk2, meaning: chunk2Meaning },
+      { text: chunk3, meaning: chunk3Meaning },
+    ].filter((c) => c.text);
+
+    return {
+      word, meaning, gold, level,
+      chunk: chunk1,
+      chunk_meaning: chunk1Meaning,
+      chunks,
+      definition,
+      definition_meaning: definitionMeaning,
+      definitionMeaning,
+      status,
+      note,
+      checkedAt,
+    };
   };
 
-  const wordIndex = getFirstIndex(["word", "英単語", "単語", "english", "vocabulary"], 0);
-  const meaningIndex = getFirstIndex(["meaning", "和訳", "意味", "日本語訳", "japanese"], 1);
-  const levelIndex = getFirstIndex(["level", "レベル", "難度", "難易度"], 2);
-  const definitionIndex = getFirstIndex(["definition", "english_definition", "英英", "英英定義", "英語定義"], undefined);
-  const chunkIndex = getFirstIndex(["chunk", "チャンク", "例文チャンク"], undefined);
-  const chunkMeaningIndex = getFirstIndex(["chunk_meaning", "chunkmeaning", "チャンク和訳", "チャンク訳"], undefined);
-  const definitionMeaningIndex = getFirstIndex(["definition_meaning", "definitionmeaning", "英英和訳", "英英意味"], undefined);
-
-  const getValue = (values, index) => {
-    if (index === undefined || index === null) return "";
-    return (values[index] || "").trim();
-  };
-
-  return dataRows
-    .map((values) => ({
-      word: getValue(values, wordIndex),
-      meaning: getValue(values, meaningIndex),
-      level: parseLevel(getValue(values, levelIndex)),
-      definition: getValue(values, definitionIndex),
-      chunk: getValue(values, chunkIndex),
-      chunk_meaning: getValue(values, chunkMeaningIndex),
-      definition_meaning: getValue(values, definitionMeaningIndex),
-    }))
-    .filter((item) => item.word && item.word !== "#VALUE!");
+  return dataRows.map(toWord).filter((item) => item.word && item.word !== "#VALUE!");
 }
 
 function shuffle(arr) {
@@ -319,11 +349,13 @@ function getPlayableWords(mode = currentQuestionMode) {
   return words.filter((item) => (item?.[config.promptKey] || "").trim() && (item?.[config.answerKey] || "").trim());
 }
 
-function getEarnedGold(level) {
-  const multiplier = getModeConfig().goldMultiplier || 1;
-  const baseGold = level * multiplier;
-  // ヒント使用時は獲得Goldを半分にする。
-  return Math.floor(currentHintUsed ? baseGold / 2 : baseGold);
+function getEarnedGold(word) {
+  const baseGold = getBaseGold(word);
+  let earnedGold = baseGold;
+  if (currentQuestionMode === "definition") earnedGold = baseGold * 2;
+  else if (currentQuestionMode === "chunk") earnedGold = Math.floor(baseGold * 1.5);
+  if (currentQuestionMode === "definition" && currentHintUsed) earnedGold = Math.floor(earnedGold / 2);
+  return Math.floor(earnedGold);
 }
 
 function shouldShowHintButton() {
@@ -369,13 +401,13 @@ function generateChoices(target) {
   const uniquePool = [...uniqueMap.values()];
 
   const nearPool = uniquePool.filter(
-    (item) => Math.abs(item.level - target.level) <= 10
+    (item) => Math.abs(getBaseGold(item) - getBaseGold(target)) <= 2
   );
   const mediumPool = uniquePool.filter(
-    (item) => Math.abs(item.level - target.level) > 10 && Math.abs(item.level - target.level) <= 30
+    (item) => Math.abs(getBaseGold(item) - getBaseGold(target)) > 2 && Math.abs(getBaseGold(item) - getBaseGold(target)) <= 8
   );
   const farPool = uniquePool.filter(
-    (item) => Math.abs(item.level - target.level) > 30
+    (item) => Math.abs(getBaseGold(item) - getBaseGold(target)) > 8
   );
 
   const picks = [];
@@ -575,7 +607,7 @@ function judgeAnswer(choice) {
 
   if (choice.isCorrect) {
     playCorrectSound();
-    const earnedGold = getEarnedGold(current.level);
+    const earnedGold = getEarnedGold(current);
     gold += earnedGold;
     saveGold();
     kills += 1;
@@ -594,15 +626,16 @@ function judgeAnswer(choice) {
     el.answerMessage.textContent = "";
   } else {
     playWrongSound();
-    hp = Math.max(0, hp - current.level);
+    const damage = getBaseGold(current);
+    hp = Math.max(0, hp - damage);
     if (isReviewMode) {
       reviewWrongCount += 1;
       reviewDeck.push(current);
-      el.resultMessage.textContent = `復習: ${current.word} の攻撃！ -${current.level} HP`;
+      el.resultMessage.textContent = `復習: ${current.word} の攻撃！ -${damage} HP`;
     } else {
       normalWrongCount += 1;
       wrongWordMap.set(current.word, current);
-      el.resultMessage.textContent = `${current.word} の攻撃！ -${current.level} HP`;
+      el.resultMessage.textContent = `${current.word} の攻撃！ -${damage} HP`;
     }
     el.answerMessage.textContent = `正解: ${getAnswerValue(current)}`;
   }
