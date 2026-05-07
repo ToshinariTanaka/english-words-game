@@ -1,0 +1,44 @@
+:root {
+  color-scheme: light;
+  --bg: #f3f6fb;
+  --card: #ffffff;
+  --line: #d6deea;
+  --title: #12263a;
+  --accent: #1b66c9;
+}
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  background: var(--bg);
+  color: #1a1a1a;
+}
+header, main { max-width: 1300px; margin: 0 auto; padding: 16px 24px; }
+header h1 { margin: 0; color: var(--title); }
+.subtitle { margin: 8px 0; font-weight: 600; color: #a23c00; }
+#toolVersion { font-size: 0.9rem; color: #4a5568; }
+section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+h2 { margin-top: 0; color: var(--title); }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button:hover { opacity: 0.9; }
+input[type="number"], textarea { border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, monospace; }
+.tableWrap { overflow-x: auto; border: 1px solid var(--line); }
+table { border-collapse: collapse; min-width: 1200px; width: 100%; }
+th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; font-size: 0.9rem; }
+th { background: #eef3fb; position: sticky; top: 0; }
+.status-ok { color: #166534; font-weight: 700; }
+.status-ng { color: #9a3412; font-weight: 700; }

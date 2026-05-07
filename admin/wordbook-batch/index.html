@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>重要英単語CSV 50行バッチ編集ツール</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>重要英単語CSV 50行バッチ編集ツール</h1>
+    <p class="subtitle">管理者・教材作成者向け（生徒用アプリとは別ツール）</p>
+    <p id="toolVersion">TOOL_VERSION: wordbook-batch-v0.1.0</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. CSV読み込み</h2>
+      <input type="file" id="csvFile" accept=".csv,text/csv" />
+      <p id="loadStatus">CSV未読み込み</p>
+    </section>
+
+    <section>
+      <h2>2. 抽出</h2>
+      <div class="controls">
+        <button id="extractNext50">次の未処理50行を抽出</button>
+        <label>開始行 <input type="number" id="rangeStart" min="1" /></label>
+        <label>終了行 <input type="number" id="rangeEnd" min="1" /></label>
+        <button id="extractRange">指定範囲を抽出</button>
+      </div>
+      <p id="extractStatus">未抽出</p>
+      <div class="tableWrap">
+        <table id="batchTable">
+          <thead>
+            <tr>
+              <th>row_number</th><th>word</th><th>meaning</th><th>level</th><th>chunk</th><th>chunk_meaning</th><th>definition</th><th>definition_meaning</th><th>status</th><th>note</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <h2>3. チャッピー用プロンプト</h2>
+      <button id="buildPrompt">チャッピー用プロンプトを作成</button>
+      <button id="copyPrompt">コピー</button>
+      <textarea id="promptArea" rows="14" placeholder="ここにプロンプトが生成されます"></textarea>
+    </section>
+
+    <section>
+      <h2>4. チャッピー出力貼り戻し</h2>
+      <textarea id="pasteArea" rows="10" placeholder="チャッピーのCSV出力を貼り付け"></textarea>
+      <button id="applyPaste">貼り戻しを反映</button>
+      <p id="pasteStatus">未反映</p>
+    </section>
+
+    <section>
+      <h2>5. チェック</h2>
+      <button id="runCheck">チェック実行</button>
+      <p id="checkStatus">未チェック</p>
+    </section>
+
+    <section>
+      <h2>6. 書き出し</h2>
+      <button id="exportApp">アプリ用CSVを書き出し</button>
+      <button id="exportMaster">マスターCSVを書き出し</button>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
