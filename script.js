@@ -45,7 +45,7 @@ const BUILTIN_WORDBOOKS = {
   important5000: {
     label: "重要英単語5000",
     category: "standard",
-    path: "data/important_5000.csv",
+    path: "data/important_5000_master.csv",
   },
   important12000: {
     label: "重要英単語12000",
