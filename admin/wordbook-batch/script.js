@@ -174,13 +174,24 @@ function appendNote(row, msg) {
   if (!current.includes(msg)) row.note = current ? `${current} / ${msg}` : msg;
 }
 
+function isValidLevel(level) {
+  const v = cleanValue(level);
+  if (!v) return false;
+  if (!Number.isNaN(Number(v))) return true;
+  return ["A1", "A2", "B1", "B2", "C1", "C2"].includes(v.toUpperCase());
+}
+
 function checkRows(targetRows) {
   let ok = 0, need = 0, unprocessed = 0;
   for (const r of targetRows) {
     const issues = [];
     if (!cleanValue(r.word)) issues.push("word空欄");
     if (!cleanValue(r.meaning)) issues.push("meaning空欄");
-    if (Number.isNaN(Number(cleanValue(r.level)))) issues.push("level非数値");
+    if (!cleanValue(r.level)) {
+      issues.push("level空欄");
+    } else if (!isValidLevel(r.level)) {
+      issues.push("level不正");
+    }
     if (!cleanValue(r.chunk)) issues.push("chunk空欄");
     if (!cleanValue(r.chunk_meaning)) issues.push("chunk_meaning空欄");
     if (!cleanValue(r.definition)) issues.push("definition空欄");
