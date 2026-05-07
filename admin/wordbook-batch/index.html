@@ -64,8 +64,11 @@
 
     <section>
       <h2>6. 書き出し</h2>
-      <button id="exportApp">アプリ用CSVを書き出し</button>
-      <button id="exportMaster">マスターCSVを書き出し</button>
+      <p class="exportHelp">英単語RPG本体は status / note / checked_at などの管理列を無視するため、通常はマスターCSVをそのまま使えます。</p>
+      <div class="controls">
+        <button id="exportMaster" class="primaryAction">マスターCSVを書き出し</button>
+        <button id="exportApp" class="secondaryAction">アプリ用CSVを書き出し（補助）</button>
+      </div>
     </section>
   </main>
 
