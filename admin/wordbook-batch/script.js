@@ -1,19 +1,13 @@
 const TOOL_VERSION = "wordbook-batch-v0.2.0";
 
 const MASTER_COLUMNS = [
+  "row_number",
   "word","meaning","gold","level",
   "chunk1","chunk1_meaning",
   "chunk2","chunk2_meaning",
   "chunk3","chunk3_meaning",
   "definition","definition_meaning",
   "status","note","checked_at"
-];
-const APP_COLUMNS = [
-  "word","meaning","gold","level",
-  "chunk1","chunk1_meaning",
-  "chunk2","chunk2_meaning",
-  "chunk3","chunk3_meaning",
-  "definition","definition_meaning"
 ];
 const CHAPPY_COLUMNS = ["row_number","word","meaning","gold","level","chunk1","chunk1_meaning","chunk2","chunk2_meaning","chunk3","chunk3_meaning","definition","definition_meaning","status","note"];
 const LEVEL_TO_GOLD = { A1: 1, A2: 2, B1: 4, B2: 8, C1: 16, C2: 32 };
@@ -54,6 +48,7 @@ function hydrateRows(matrix) {
     if (format === "new") {
       const map = Object.fromEntries(headers.map((h, idx) => [h, idx]));
       MASTER_COLUMNS.forEach((c) => { row[c] = g(map[c]); });
+      row.row_number = Number(g(map.row_number)) || i + 1;
     } else if (format === "old") {
       const map = Object.fromEntries(headers.map((h, idx) => [h, idx]));
       row.word = g(map.word ?? 0); row.meaning = g(map.meaning ?? 1); row.level = normalizeLevel(g(map.level ?? 2));
@@ -64,6 +59,7 @@ function hydrateRows(matrix) {
       row.chunk1 = g(3); row.chunk1_meaning = g(4); row.chunk2 = g(5); row.chunk2_meaning = g(6); row.chunk3 = g(7); row.chunk3_meaning = g(8);
       row.definition = g(11); row.definition_meaning = g(12);
     }
+    row.row_number = Number(row.row_number) || i + 1;
     row.level = normalizeLevel(row.level);
     row.gold = safeGold(row.gold, row.level);
     if (!row.status) row.status = "";
@@ -130,7 +126,6 @@ function bind() {
   document.getElementById("buildPrompt").addEventListener("click", () => { document.getElementById("promptArea").value = buildPrompt(STATE.currentBatch); });
   document.getElementById("copyPrompt").addEventListener("click", async () => { await navigator.clipboard.writeText(document.getElementById("promptArea").value || ""); });
   document.getElementById("applyPaste").addEventListener("click", () => { const result = mergePasted(document.getElementById("pasteArea").value || ""); renderBatch(STATE.currentBatch); document.getElementById("pasteStatus").textContent = result.applied > 0 ? `反映件数: ${result.applied}` : `反映件数: 0（${result.reason}）`; });
-  document.getElementById("exportApp").addEventListener("click", () => downloadCSV("important_5000_for_app.csv", APP_COLUMNS));
   document.getElementById("exportMaster").addEventListener("click", () => downloadCSV("important_5000_master.csv", MASTER_COLUMNS));
 }
 bind();
