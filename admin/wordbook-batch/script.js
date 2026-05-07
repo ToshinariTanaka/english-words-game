@@ -174,9 +174,9 @@ function appendNote(row, msg) {
   if (!current.includes(msg)) row.note = current ? `${current} / ${msg}` : msg;
 }
 
-function checkRows() {
+function checkRows(targetRows) {
   let ok = 0, need = 0, unprocessed = 0;
-  for (const r of STATE.rows) {
+  for (const r of targetRows) {
     const issues = [];
     if (!cleanValue(r.word)) issues.push("word空欄");
     if (!cleanValue(r.meaning)) issues.push("meaning空欄");
@@ -259,9 +259,15 @@ function bind() {
   });
 
   document.getElementById("runCheck").addEventListener("click", () => {
-    const r = checkRows();
+    const r = checkRows(STATE.currentBatch);
     renderBatch(STATE.currentBatch);
-    document.getElementById("checkStatus").textContent = `OK件数: ${r.ok} / 要確認件数: ${r.need} / 未処理件数: ${r.unprocessed}`;
+    document.getElementById("checkStatus").textContent = `（現在バッチ）OK件数: ${r.ok} / 要確認件数: ${r.need} / 未処理件数: ${r.unprocessed}`;
+  });
+
+  document.getElementById("runCheckAll").addEventListener("click", () => {
+    const r = checkRows(STATE.rows);
+    renderBatch(STATE.currentBatch);
+    document.getElementById("checkStatus").textContent = `（全体）OK件数: ${r.ok} / 要確認件数: ${r.need} / 未処理件数: ${r.unprocessed}`;
   });
 
   document.getElementById("exportApp").addEventListener("click", () => {
