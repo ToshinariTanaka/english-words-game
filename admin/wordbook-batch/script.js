@@ -67,6 +67,18 @@ function hydrateRows(matrix) {
   }
   return out;
 }
+
+function renderTableHeader() {
+  const tr = document.querySelector("#batchTable thead tr");
+  if (!tr) return;
+  tr.innerHTML = "";
+  CHAPPY_COLUMNS.forEach((c) => {
+    const th = document.createElement("th");
+    th.textContent = c;
+    tr.appendChild(th);
+  });
+}
+
 function renderBatch(rows) {
   const tbody = document.querySelector("#batchTable tbody"); tbody.innerHTML = "";
   for (const r of rows) { const tr = document.createElement("tr"); CHAPPY_COLUMNS.forEach(c => { const td = document.createElement("td"); td.textContent = r[c] || ""; tr.appendChild(td); }); tbody.appendChild(tr); }
@@ -119,6 +131,7 @@ function downloadCSV(filename, cols) {
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href);
 }
 function bind() {
+  renderTableHeader();
   document.getElementById("toolVersion").textContent = `TOOL_VERSION: ${TOOL_VERSION}`;
   document.getElementById("csvFile").addEventListener("change", async (e) => { const file = e.target.files[0]; if (!file) return; const matrix = parseCSV((await file.text()).replace(/^\uFEFF/,"")); STATE.rows = hydrateRows(matrix); STATE.currentBatch = []; renderBatch([]); document.getElementById("loadStatus").textContent = `読込完了: ${STATE.rows.length}件`; });
   document.getElementById("extractNext50").addEventListener("click", () => { STATE.currentBatch = STATE.rows.filter(unresolved).slice(0, 50); renderBatch(STATE.currentBatch); document.getElementById("extractStatus").textContent = `抽出件数: ${STATE.currentBatch.length}`; });
