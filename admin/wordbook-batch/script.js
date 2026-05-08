@@ -42,13 +42,13 @@ function hydrateRows(matrix) {
   const out = [];
   for (let i = 1; i < matrix.length; i++) {
     const src = matrix[i];
-    const row = { row_number: i + 1 };
+    const row = { row_number: i };
     MASTER_COLUMNS.forEach((c) => { row[c] = ""; });
     const g = (idx) => cleanValue(src[idx]);
     if (format === "new") {
       const map = Object.fromEntries(headers.map((h, idx) => [h, idx]));
       MASTER_COLUMNS.forEach((c) => { row[c] = g(map[c]); });
-      row.row_number = Number(g(map.row_number)) || i + 1;
+      row.row_number = Number(g(map.row_number)) || i;
     } else if (format === "old") {
       const map = Object.fromEntries(headers.map((h, idx) => [h, idx]));
       row.word = g(map.word ?? 0); row.meaning = g(map.meaning ?? 1); row.level = normalizeLevel(g(map.level ?? 2));
@@ -59,7 +59,7 @@ function hydrateRows(matrix) {
       row.chunk1 = g(3); row.chunk1_meaning = g(4); row.chunk2 = g(5); row.chunk2_meaning = g(6); row.chunk3 = g(7); row.chunk3_meaning = g(8);
       row.definition = g(11); row.definition_meaning = g(12);
     }
-    row.row_number = Number(row.row_number) || i + 1;
+    row.row_number = Number(row.row_number) || i;
     row.level = normalizeLevel(row.level);
     row.gold = safeGold(row.gold, row.level);
     if (!row.status) row.status = "";
