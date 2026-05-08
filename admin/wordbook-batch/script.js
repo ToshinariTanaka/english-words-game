@@ -125,6 +125,51 @@ function mergePasted(text) {
   if (noBlankTarget > 0) return { applied, reason: "反映対象の空欄がありませんでした" };
   return { applied, reason: "反映できる行がありませんでした" };
 }
+
+function checkRows(rows) {
+  const targetRows = Array.isArray(rows) ? rows : [];
+  const result = { total: targetRows.length, ok: 0, review: 0, pending: 0, errors: [] };
+  if (!targetRows.length) return result;
+
+  const allowedStatus = new Set(["OK", "要確認", "PENDING"]);
+  const requiredColumns = [
+    "row_number", "word", "meaning", "gold", "level",
+    "chunk1", "chunk1_meaning", "definition", "definition_meaning", "status"
+  ];
+
+  for (const row of targetRows) {
+    for (const col of requiredColumns) {
+      const val = cleanValue(row[col]);
+      if (!val) result.errors.push(`row_number ${row.row_number} ${col} が空欄です`);
+    }
+
+    const statusRaw = cleanValue(row.status);
+    const statusUpper = statusRaw.toUpperCase();
+    if (!allowedStatus.has(statusUpper)) {
+      result.errors.push(`row_number ${row.row_number} status が不正です (${statusRaw || "空欄"})`);
+      continue;
+    }
+
+    if (statusUpper === "OK") result.ok += 1;
+    else if (statusUpper === "要確認") result.review += 1;
+    else result.pending += 1;
+  }
+
+  return result;
+}
+
+function renderCheckResult(result, label) {
+  const statusEl = document.getElementById("checkStatus");
+  if (!statusEl) return;
+  if (!result || result.total === 0) {
+    statusEl.textContent = "チェック対象がありません。先に抽出してください。";
+    return;
+  }
+
+  const base = `チェック完了：${label}${result.total}件中 OK ${result.ok}件、要確認 ${result.review}件、pending ${result.pending}件、エラー ${result.errors.length}件`;
+  statusEl.textContent = result.errors.length ? `${base} / ${result.errors[0]}` : base;
+}
+
 function downloadCSV(filename, cols) {
   const rows = [cols, ...STATE.rows.map(r => cols.map(c => r[c] ?? ""))];
   const blob = new Blob(["\uFEFF" + toCSV(rows)], { type: "text/csv;charset=utf-8;" });
@@ -139,6 +184,21 @@ function bind() {
   document.getElementById("buildPrompt").addEventListener("click", () => { document.getElementById("promptArea").value = buildPrompt(STATE.currentBatch); });
   document.getElementById("copyPrompt").addEventListener("click", async () => { await navigator.clipboard.writeText(document.getElementById("promptArea").value || ""); });
   document.getElementById("applyPaste").addEventListener("click", () => { const result = mergePasted(document.getElementById("pasteArea").value || ""); renderBatch(STATE.currentBatch); document.getElementById("pasteStatus").textContent = result.applied > 0 ? `反映件数: ${result.applied}` : `反映件数: 0（${result.reason}）`; });
+  const runCheckButton = document.getElementById("runCheck");
+  if (runCheckButton) {
+    runCheckButton.addEventListener("click", () => {
+      const target = STATE.currentBatch.length ? STATE.currentBatch : [];
+      const result = checkRows(target);
+      renderCheckResult(result, "抽出範囲 ");
+    });
+  }
+  const runCheckAllButton = document.getElementById("runCheckAll");
+  if (runCheckAllButton) {
+    runCheckAllButton.addEventListener("click", () => {
+      const result = checkRows(STATE.rows);
+      renderCheckResult(result, "全体 ");
+    });
+  }
   document.getElementById("exportMaster").addEventListener("click", () => downloadCSV("important_5000_master.csv", MASTER_COLUMNS));
 }
 bind();
