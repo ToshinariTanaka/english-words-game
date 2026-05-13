@@ -117,6 +117,13 @@ const el = {
   choices: document.getElementById("choices"),
   resultMessage: document.getElementById("result-message"),
   answerMessage: document.getElementById("answer-message"),
+  feedbackOverlay: document.getElementById("feedback-overlay"),
+  feedbackCard: document.getElementById("feedback-card"),
+  feedbackIcon: document.getElementById("feedback-icon"),
+  feedbackTitle: document.getElementById("feedback-title"),
+  feedbackSubText: document.getElementById("feedback-subtext"),
+  feedbackGold: document.getElementById("feedback-gold"),
+  feedbackAnswer: document.getElementById("feedback-answer"),
   nextBtn: document.getElementById("next-btn"),
   clearMessage: document.getElementById("clear-message"),
   clearScore: document.getElementById("clear-score"),
@@ -624,6 +631,13 @@ function judgeAnswer(choice) {
         : `${getPromptValue(current)} を倒した！ +${earnedGold} gold`;
     }
     el.answerMessage.textContent = "";
+    updateFeedbackOverlay({
+      isCorrect: true,
+      title: "✅ 正解！",
+      subText: isReviewMode ? "復習バトル勝利！" : "モンスター討伐成功！",
+      goldText: `+${earnedGold} Gold`,
+      answerText: "",
+    });
   } else {
     playWrongSound();
     const damage = getBaseGold(current);
@@ -638,6 +652,13 @@ function judgeAnswer(choice) {
       el.resultMessage.textContent = `${current.word} の攻撃！ -${damage} HP`;
     }
     el.answerMessage.textContent = `正解: ${getAnswerValue(current)}`;
+    updateFeedbackOverlay({
+      isCorrect: false,
+      title: "❌ 不正解！",
+      subText: `しまった！ ライフ -${damage}`,
+      goldText: "",
+      answerText: `正解：${getAnswerValue(current)}`,
+    });
   }
 
   updateStatus();
@@ -649,6 +670,19 @@ function judgeAnswer(choice) {
 
   showScreen("result");
   scheduleAutoNext();
+}
+
+function updateFeedbackOverlay({ isCorrect, title, subText, goldText, answerText }) {
+  if (!el.feedbackOverlay) return;
+  el.feedbackOverlay.classList.remove("correct", "incorrect", "feedbackPop", "feedbackShake");
+  void el.feedbackOverlay.offsetWidth;
+  el.feedbackOverlay.classList.add(isCorrect ? "correct" : "incorrect");
+  el.feedbackOverlay.classList.add(isCorrect ? "feedbackPop" : "feedbackShake");
+  el.feedbackIcon.textContent = isCorrect ? "✅" : "❌";
+  el.feedbackTitle.textContent = title;
+  el.feedbackSubText.textContent = subText || "";
+  el.feedbackGold.textContent = goldText || "";
+  el.feedbackAnswer.textContent = answerText || "";
 }
 
 function startGame() {
