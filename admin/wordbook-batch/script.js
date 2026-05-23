@@ -34,6 +34,10 @@ function parseCSV(text) {
   }
   row.push(cell.trim()); if (row.some(Boolean)) rows.push(row); return rows;
 }
+
+function parseCsvText(text) {
+  return parseCSV(text);
+}
 function toCSV(rows) { return rows.map(r => r.map(v => { const s = (v ?? "").toString(); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n"); }
 
 function hydrateRows(matrix) {
@@ -83,46 +87,56 @@ function renderBatch(rows) {
   const tbody = document.querySelector("#batchTable tbody"); tbody.innerHTML = "";
   for (const r of rows) { const tr = document.createElement("tr"); CHAPPY_COLUMNS.forEach(c => { const td = document.createElement("td"); td.textContent = r[c] || ""; tr.appendChild(td); }); tbody.appendChild(tr); }
 }
-function unresolved(r) { return ["chunk1","chunk1_meaning","definition","definition_meaning"].some(c => !cleanValue(r[c])) || cleanValue(r.status).toUpperCase() !== "OK"; }
+function isCompletedStatus(status) { return cleanValue(status).toLowerCase() === "completed"; }
+function unresolved(r) { return !isCompletedStatus(r.status); }
 function buildPrompt(rows) {
   const csvRows = [CHAPPY_COLUMNS]; rows.forEach(r => csvRows.push(CHAPPY_COLUMNS.map(k => r[k] ?? "")));
   return `以下の50行について空欄補完してください。既存値は原則上書きしないでください。\n\n出力列:\n${CHAPPY_COLUMNS.join(",")}\n\n対象データCSV:\n${toCSV(csvRows)}`;
 }
 function stripCodeBlock(text) {
-  return String(text || "").replace(/^\s*```csv(?:\s+id="[^"]*")?\s*/i, "").replace(/^\s*```\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  return String(text || "")
+    .replace(/^\s*```csv(?:\s+id="[^"]*")?\s*/i, "")
+    .replace(/^\s*```\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim();
 }
 function mergePasted(text) {
   const cleaned = stripCodeBlock(text);
-  const matrix = parseCSV(cleaned);
+  const matrix = parseCsvText(cleaned);
   if (!matrix.length) return { applied: 0, reason: "CSVヘッダーが認識できません" };
+  const targetColumns = CHAPPY_COLUMNS;
   const headers = (matrix[0] || []).map(normalizeHeader);
-  const withHeader = headers.includes("row_number");
-  const idx = withHeader ? Object.fromEntries(["row_number","chunk1","chunk1_meaning","definition","definition_meaning","status","note"].map(k => [k, headers.indexOf(k)])) : null;
+  const withHeader = targetColumns.every((col) => headers.includes(col));
+  const indexByColumn = withHeader ? Object.fromEntries(targetColumns.map((col) => [col, headers.indexOf(col)])) : Object.fromEntries(targetColumns.map((col, idx) => [col, idx]));
   const dataRows = withHeader ? matrix.slice(1) : matrix;
-  if (!withHeader && dataRows.some(r => r.length < 7)) return { applied: 0, reason: "列数が不足しています" };
-  if (withHeader && idx.row_number < 0) return { applied: 0, reason: "CSVヘッダーが認識できません" };
 
-  let applied = 0; let rowMissing = 0; let hasValueSkipped = 0; let noBlankTarget = 0;
-  for (const r of dataRows) {
-    const rn = Number(withHeader ? r[idx.row_number] : r[0]);
-    const target = STATE.rows.find(row => row.row_number === rn);
-    if (!Number.isInteger(rn) || !target || !STATE.currentBatch.find((b) => b.row_number === rn)) { rowMissing++; continue; }
-    let rowApplied = 0;
-    const cols = ["chunk1","chunk1_meaning","definition","definition_meaning","status","note"];
-    cols.forEach((c, i) => {
-      const val = cleanValue(withHeader ? r[idx[c]] : r[i + 1]);
-      if (!val) return;
-      if (c === "status" && !cleanValue(target.status)) { target.status = val || "OK"; rowApplied++; return; }
-      if (!cleanValue(target[c])) { target[c] = val; rowApplied++; } else { hasValueSkipped++; }
-    });
-    if (!cleanValue(target.status)) target.status = "OK";
-    if (rowApplied === 0) noBlankTarget++;
-    if (rowApplied > 0) applied++;
+  for (let i = 0; i < dataRows.length; i++) {
+    const parsedColumns = dataRows[i].length;
+    if (parsedColumns < targetColumns.length) {
+      return { applied: 0, reason: `貼り戻しデータ${i + 1}行目: 列数不足（解析列数 ${parsedColumns}、必要 ${targetColumns.length}）` };
+    }
   }
+
+  let applied = 0;
+  let rowMissing = 0;
+  for (let i = 0; i < dataRows.length; i++) {
+    const srcRow = dataRows[i];
+    const rn = Number(cleanValue(srcRow[indexByColumn.row_number]));
+    if (!Number.isInteger(rn)) {
+      return { applied, reason: `貼り戻しデータ${i + 1}行目: row_number が不正です（${srcRow[indexByColumn.row_number] || "空欄"}）` };
+    }
+    const target = STATE.rows.find((row) => row.row_number === rn);
+    if (!target || !STATE.currentBatch.find((b) => b.row_number === rn)) { rowMissing++; continue; }
+    targetColumns.forEach((col) => {
+      if (col === "row_number") return;
+      target[col] = cleanValue(srcRow[indexByColumn[col]]);
+    });
+    target.status = "completed";
+    applied++;
+  }
+
   if (applied > 0) return { applied, reason: "" };
   if (rowMissing > 0) return { applied, reason: "row_number が現在の50行に存在しません" };
-  if (hasValueSkipped > 0) return { applied, reason: "既存値があるため上書きされませんでした" };
-  if (noBlankTarget > 0) return { applied, reason: "反映対象の空欄がありませんでした" };
   return { applied, reason: "反映できる行がありませんでした" };
 }
 
