@@ -1,31 +1,22 @@
 ## 今回やったこと
-- 生徒用アプリの解答結果画面に、正解/不正解を瞬時に区別できるフィードバックオーバーレイを追加。
-- 正解時は緑グロー + ポップ演出 + キラキラ + 大きな✅ + `+○ Gold`表示を実装。
-- 不正解時は赤グロー + 軽いシェイク + 赤フラッシュ + 大きな❌ + 正解表示 + ライフ減少表示を実装。
-- 既存の判定・Gold計算・復習モード・自動遷移ロジックは維持し、表示層中心で改修。
+- `admin/wordbook-batch/script.js` の `checkRows()` 内で、許容ステータスに `COMPLETED` を追加。
+- 貼り戻し成功後に `status=completed` が入る運用変更に追従し、チェック機能で不正扱いされないよう調整。
 
 ## 変更ファイル
-- `index.html`
-- `style.css`
-- `script.js`
+- `admin/wordbook-batch/script.js`
 - `docs/codex_report.md`
-- `docs/architecture.md`（新規）
-- `docs/next_tasks.md`（新規）
-- `docs/project_status.md`（新規）
-- `README.md`
 
 ## テスト結果
-- `node tests_parseCsv.js` : PASS
-- `node --check script.js` : PASS
+- `node --check admin/wordbook-batch/script.js` : PASS
 
 ## 注意点
-- UI演出はCSS中心のため、旧端末ではアニメーションが控えめに見える可能性あり。
-- 紙吹雪はDOM追加なしで軽量化するため、今回はキラキラ演出（疑似要素）で代替。
+- `checkRows()` の集計表示は `OK` / `要確認` 以外を `pending` カウントに寄せる実装のため、`COMPLETED` も件数上は `pending` 側に加算される。
+- 厳密に `COMPLETED` 件数を別表示したい場合は、`result` 構造体と `renderCheckResult()` の文言拡張が別途必要。
 
 ## 次にやるべきこと
-- 必要に応じて`prefers-reduced-motion`対応を追加し、動きに弱いユーザー向けに演出を抑制。
-- 実機（iPhone SE幅）で表示時間・可読性の最終調整。
+- 必要ならチェック結果サマリに `COMPLETED` 件数を独立表示する。
+- `status` 値の正規化方針（`completed` 入力時の表示・保存）を仕様として明文化する。
 
 ## チャッピーに相談すべき点
-- 不正解時の揺れ強度（学習体験上、強すぎないか）の最適値。
-- 結果画面の自動遷移時間（現状ランダム）と派手演出のバランス。
+- `COMPLETED` を `OK` 同等に集計するか、別カテゴリで見せるかの運用判断。
+- 管理画面上のステータス表示文言を英語統一（`PENDING/COMPLETED`）するか日本語混在を維持するか。

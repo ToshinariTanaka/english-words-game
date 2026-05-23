@@ -131,7 +131,7 @@ function checkRows(rows) {
   const result = { total: targetRows.length, ok: 0, review: 0, pending: 0, errors: [] };
   if (!targetRows.length) return result;
 
-  const allowedStatus = new Set(["OK", "要確認", "PENDING"]);
+  const allowedStatus = new Set(["OK", "要確認", "PENDING", "COMPLETED"]);
   const requiredColumns = [
     "row_number", "word", "meaning", "gold", "level",
     "chunk1", "chunk1_meaning", "definition", "definition_meaning", "status"
