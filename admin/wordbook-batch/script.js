@@ -184,6 +184,38 @@ function renderCheckResult(result, label) {
   statusEl.textContent = result.errors.length ? `${base} / ${result.errors[0]}` : base;
 }
 
+
+function showExtractStatus(message) {
+  const statusEl = document.getElementById("extractStatus");
+  if (!statusEl) return;
+  statusEl.textContent = message;
+}
+
+function extractNextUnresolved50() {
+  STATE.currentBatch = STATE.rows.filter(unresolved).slice(0, 50);
+  renderBatch(STATE.currentBatch);
+  showExtractStatus(`抽出件数: ${STATE.currentBatch.length}`);
+}
+
+function extractRange() {
+  const start = Number(document.getElementById("rangeStart").value);
+  const end = Number(document.getElementById("rangeEnd").value);
+
+  if (!Number.isInteger(start) || !Number.isInteger(end) || start <= 0 || end < start) {
+    showExtractStatus("開始行・終了行を正しく入力してください");
+    return;
+  }
+
+  const rows = STATE.rows.filter((row) => {
+    const rn = Number(row.row_number);
+    return rn >= start && rn <= end;
+  });
+
+  STATE.currentBatch = rows;
+  renderBatch(rows);
+  showExtractStatus(`範囲抽出: ${start}〜${end} (${rows.length}件)`);
+}
+
 function downloadCSV(filename, cols) {
   const rows = [cols, ...STATE.rows.map(r => cols.map(c => r[c] ?? ""))];
   const blob = new Blob(["\uFEFF" + toCSV(rows)], { type: "text/csv;charset=utf-8;" });
@@ -193,8 +225,8 @@ function bind() {
   renderTableHeader();
   document.getElementById("toolVersion").textContent = `TOOL_VERSION: ${TOOL_VERSION}`;
   document.getElementById("csvFile").addEventListener("change", async (e) => { const file = e.target.files[0]; if (!file) return; const matrix = parseCSV((await file.text()).replace(/^\uFEFF/,"")); STATE.rows = hydrateRows(matrix); STATE.currentBatch = []; renderBatch([]); document.getElementById("loadStatus").textContent = `読込完了: ${STATE.rows.length}件`; });
-  document.getElementById("extractNext50").addEventListener("click", () => { STATE.currentBatch = STATE.rows.filter(unresolved).slice(0, 50); renderBatch(STATE.currentBatch); document.getElementById("extractStatus").textContent = `抽出件数: ${STATE.currentBatch.length}`; });
-  document.getElementById("extractRange").addEventListener("click", () => { const s = Number(document.getElementById("rangeStart").value); const e = Number(document.getElementById("rangeEnd").value); if (!s || !e || e < s) return alert("開始行・終了行を正しく指定してください。"); STATE.currentBatch = STATE.rows.filter(r => r.row_number >= s && r.row_number <= e); renderBatch(STATE.currentBatch); document.getElementById("extractStatus").textContent = `範囲抽出: ${s}〜${e} (${STATE.currentBatch.length}件)`; });
+  document.getElementById("extractNext50").addEventListener("click", extractNextUnresolved50);
+  document.getElementById("extractRange").addEventListener("click", extractRange);
   document.getElementById("buildPrompt").addEventListener("click", () => { document.getElementById("promptArea").value = buildPrompt(STATE.currentBatch); });
   document.getElementById("copyPrompt").addEventListener("click", async () => { await navigator.clipboard.writeText(document.getElementById("promptArea").value || ""); });
   document.getElementById("applyPaste").addEventListener("click", () => { const result = mergePasted(document.getElementById("pasteArea").value || ""); renderBatch(STATE.currentBatch); document.getElementById("pasteStatus").textContent = result.applied > 0 ? `反映件数: ${result.applied}` : `反映件数: 0（${result.reason}）`; });

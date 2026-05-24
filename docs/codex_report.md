@@ -47,3 +47,33 @@
 
 ## チャッピーに相談すべき点
 - `COMPLETED` を `pending` と同一集計で良いか、または別表示にするか。
+
+---
+
+## 今回やったこと
+- 「指定範囲を抽出」と「次の未処理50行を抽出」の処理を分離し、ボタンごとに専用関数を割り当てた。
+- `extractRange()` を追加し、`rangeStart` / `rangeEnd` の入力値を `Number()` + `Number.isInteger()` で検証してから `row_number` 範囲抽出するよう修正した。
+- 指定範囲抽出では `status` を見ずに `row_number` のみで抽出するようにし、抽出結果を `STATE.currentBatch` に反映して `renderBatch()` するようにした。
+- 入力不正（空欄・整数でない・start <= 0・end < start）時に `extractStatus` へエラーを表示する `showExtractStatus()` を追加した。
+- 「次の未処理50行を抽出」は `status !== completed` の先頭50件抽出ロジックを `extractNextUnresolved50()` として維持した。
+
+## 変更ファイル
+- `admin/wordbook-batch/script.js`
+- `docs/codex_report.md`
+
+## テスト結果
+- `node --check admin/wordbook-batch/script.js` : PASS
+
+## 注意点
+- この環境ではブラウザ手動検証（実際のボタンクリックで 195〜244 表示確認）までは未実施。
+- `row_number` が文字列でも `Number(row.row_number)` で比較しているため、数値化不能なデータ行は範囲抽出対象外になる。
+
+## 次にやるべきこと
+- UIで以下を手動確認する：
+  - 195〜244 指定時に `row_number` 195〜244 のみ表示される
+  - 53〜102 指定時に `row_number` 53〜102 のみ表示される
+  - 「次の未処理50行を抽出」が従来どおり未完了先頭50件を出す
+- 必要なら `extractRange()` の単体テスト（DOMモック）を追加する。
+
+## チャッピーに相談すべき点
+- 範囲抽出で0件だったときの文言を「0件」表示で十分か、追加ガイダンス（例: 範囲外/row_number欠損）を出すべきか。
