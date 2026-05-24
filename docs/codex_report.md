@@ -24,3 +24,26 @@
 ## チャッピーに相談すべき点
 - `status` を常に `completed` 強制する運用が今後も妥当か（`要確認` 等のワークフローを残すか）。
 - 貼り戻し時に「現在の50行外のrow_number」を無視ではなく警告一覧表示にするか。
+
+
+---
+
+## 今回やったこと
+- `admin/wordbook-batch/script.js` の `checkRows()` で `allowedStatus` に `"COMPLETED"` を追加し、`completed` ステータスをチェック許可対象にした。
+- 既存のCSV貼り戻し処理（`mergePasted` まわり）には変更を入れず、先行修正を維持。
+
+## 変更ファイル
+- `admin/wordbook-batch/script.js`
+- `docs/codex_report.md`
+
+## テスト結果
+- `node --check admin/wordbook-batch/script.js` : PASS
+
+## 注意点
+- `checkRows()` の集計表示は `OK / 要確認 / pending` の3区分のままのため、`COMPLETED` は現在 `pending` 件数側に集計される。
+
+## 次にやるべきこと
+- 必要であれば、チェック結果表示に `COMPLETED` 件数の独立カウントを追加する。
+
+## チャッピーに相談すべき点
+- `COMPLETED` を `pending` と同一集計で良いか、または別表示にするか。
