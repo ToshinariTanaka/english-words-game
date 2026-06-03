@@ -3,19 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>重要英単語CSV 50行バッチ編集ツール</title>
+  <title>英単語CSV 50行バッチ編集ツール</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header>
-    <h1>重要英単語CSV 50行バッチ編集ツール</h1>
-    <p class="subtitle">管理者・教材作成者向け（生徒用アプリとは別ツール）</p>
+    <h1>英単語CSV 50行バッチ編集ツール</h1>
+    <p class="subtitle">管理者・教材作成者向け（複数の英単語アプリで共通利用）</p>
     <p id="toolVersion">TOOL_VERSION: wordbook-batch-v0.1.0</p>
   </header>
 
   <main>
     <section>
       <h2>1. CSV読み込み</h2>
+      <label>用途を選ぶ
+        <select id="purposeSelect">
+          <option value="junior">中学英単語</option>
+          <option value="exam">高校・大学受験英単語</option>
+          <option value="eiken">英検</option>
+          <option value="toeic">TOEIC</option>
+          <option value="textbook">教科書・定期テスト</option>
+          <option value="custom">カスタム</option>
+        </select>
+      </label>
+      <p class="helpText">選択した用途に応じた指示文を、チャッピー用プロンプトに追加します。CSV列仕様は従来どおりです。</p>
       <input type="file" id="csvFile" accept=".csv,text/csv" />
       <p id="loadStatus">CSV未読み込み</p>
     </section>
