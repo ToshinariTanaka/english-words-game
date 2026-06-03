@@ -11,6 +11,15 @@ const MASTER_COLUMNS = [
 ];
 const CHAPPY_COLUMNS = ["row_number","word","meaning","gold","level","chunk1","chunk1_meaning","chunk2","chunk2_meaning","chunk3","chunk3_meaning","definition","definition_meaning","status","note"];
 const LEVEL_TO_GOLD = { A1: 1, A2: 2, B1: 4, B2: 8, C1: 16, C2: 32 };
+const PURPOSE_GUIDANCE = {
+  junior: "用途: 中学英単語。level は「中1基本」「中2基本」「中3基本」「入試標準」を候補として、学年配当と高校入試での重要度に合うものを選んでください。例文・定義は中学生が理解しやすい基本語彙を優先してください。",
+  exam: "用途: 高校・大学受験英単語。level は従来の A1 / A2 / B1 / B2 / C1 / C2 も使えます。大学受験での頻度・抽象度・文脈理解の難しさを考慮してください。",
+  eiken: "用途: 英検。level は従来の A1 / A2 / B1 / B2 / C1 / C2 も使えます。英検の級別目安と4技能で使いやすい自然な用例を意識してください。",
+  toeic: "用途: TOEIC。ビジネス・日常業務・旅行場面で使いやすい語義とチャンクを優先し、必要に応じて A1 / A2 / B1 / B2 / C1 / C2 で難度を示してください。",
+  textbook: "用途: 教科書・定期テスト。学校教科書の本文・基本表現・定期テストで問われやすい語義を優先し、学年や単元が分かる場合は note に補足してください。",
+  custom: "用途: カスタム。対象アプリや教材の方針に合わせつつ、既存のCSV列仕様と既存値を維持して空欄を補完してください。"
+};
+const DEFAULT_PURPOSE = "junior";
 const STATE = { rows: [], currentBatch: [] };
 
 function normalizeHeader(h) { return (h || "").trim().toLowerCase(); }
@@ -89,9 +98,13 @@ function renderBatch(rows) {
 }
 function isCompletedStatus(status) { return cleanValue(status).toLowerCase() === "completed"; }
 function unresolved(r) { return !isCompletedStatus(r.status); }
-function buildPrompt(rows) {
+function getPurposeGuidance(purpose) {
+  return PURPOSE_GUIDANCE[purpose] || PURPOSE_GUIDANCE.custom;
+}
+
+function buildPrompt(rows, purpose = DEFAULT_PURPOSE) {
   const csvRows = [CHAPPY_COLUMNS]; rows.forEach(r => csvRows.push(CHAPPY_COLUMNS.map(k => r[k] ?? "")));
-  return `以下の50行について空欄補完してください。既存値は原則上書きしないでください。\n\n出力列:\n${CHAPPY_COLUMNS.join(",")}\n\n対象データCSV:\n${toCSV(csvRows)}`;
+  return `以下の50行について空欄補完してください。既存値は原則上書きしないでください。\n\n${getPurposeGuidance(purpose)}\n\n出力列:\n${CHAPPY_COLUMNS.join(",")}\n\n対象データCSV:\n${toCSV(csvRows)}`;
 }
 function stripCodeBlock(text) {
   return String(text || "")
@@ -227,7 +240,7 @@ function bind() {
   document.getElementById("csvFile").addEventListener("change", async (e) => { const file = e.target.files[0]; if (!file) return; const matrix = parseCSV((await file.text()).replace(/^\uFEFF/,"")); STATE.rows = hydrateRows(matrix); STATE.currentBatch = []; renderBatch([]); document.getElementById("loadStatus").textContent = `読込完了: ${STATE.rows.length}件`; });
   document.getElementById("extractNext50").addEventListener("click", extractNextUnresolved50);
   document.getElementById("extractRange").addEventListener("click", extractRange);
-  document.getElementById("buildPrompt").addEventListener("click", () => { document.getElementById("promptArea").value = buildPrompt(STATE.currentBatch); });
+  document.getElementById("buildPrompt").addEventListener("click", () => { const purpose = document.getElementById("purposeSelect")?.value || DEFAULT_PURPOSE; document.getElementById("promptArea").value = buildPrompt(STATE.currentBatch, purpose); });
   document.getElementById("copyPrompt").addEventListener("click", async () => { await navigator.clipboard.writeText(document.getElementById("promptArea").value || ""); });
   document.getElementById("applyPaste").addEventListener("click", () => { const result = mergePasted(document.getElementById("pasteArea").value || ""); renderBatch(STATE.currentBatch); document.getElementById("pasteStatus").textContent = result.applied > 0 ? `反映件数: ${result.applied}` : `反映件数: 0（${result.reason}）`; });
   const runCheckButton = document.getElementById("runCheck");

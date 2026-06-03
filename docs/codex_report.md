@@ -1,4 +1,46 @@
 ## 今回やったこと
+- `admin/wordbook-batch` の名称を「英単語CSV 50行バッチ編集ツール」に変更し、複数の英単語アプリで共通利用する管理者・教材作成者向けツールとして説明文を更新。
+- 「用途を選ぶ」セレクトボックスを追加し、中学英単語 / 高校・大学受験英単語 / 英検 / TOEIC / 教科書・定期テスト / カスタムを選べるようにした。
+- チャッピー用プロンプト生成時に選択用途ごとの指示文を追加。中学英単語では「中1基本」「中2基本」「中3基本」「入試標準」を案内し、高校・大学受験/英検では A1 / A2 / B1 / B2 / C1 / C2 も使える旨を明記。
+- 既存のCSV列仕様、CSVパース、50行抽出、指定範囲抽出、貼り戻し、status処理、CSV出力は維持。
+- 用途別プロンプト生成の最小回帰テストを追加。
+- README / project_status / architecture / next_tasks を今回の汎用化第1段階に合わせて更新。
+
+## 変更ファイル
+- `admin/wordbook-batch/index.html`
+- `admin/wordbook-batch/script.js`
+- `admin/wordbook-batch/style.css`
+- `admin/wordbook-batch/README.md`
+- `tests_wordbookBatchPrompt.js`
+- `README.md`
+- `docs/codex_report.md`
+- `docs/project_status.md`
+- `docs/architecture.md`
+- `docs/next_tasks.md`
+
+## テスト結果
+- `node --check admin/wordbook-batch/script.js` : PASS
+- `node tests_wordbookBatchPrompt.js` : PASS
+- `node tests_parseCsv.js` : PASS
+- スクリーンショット確認: ローカルに Chromium / Playwright / wkhtmltoimage が無く、この環境では画像取得未実施。HTML/CSS/JSの静的確認と構文チェックのみ実施。
+
+## 注意点
+- 今回は汎用化の第1段階として、用途選択はプロンプト生成文への反映に限定。CSV列構造や貼り戻し処理は変更していない。
+- `hydrateRows()` の既存 `normalizeLevel()` は従来どおり A1〜C2 ベースの正規化を行うため、読み込み済みCSV内に中学向け独自levelがある場合の扱いは今後の検討余地あり。ただし今回の要件に従い、CSVパース処理は変更していない。
+- ブラウザ実機でのセレクト操作・コピー操作・CSV貼り戻しの手動確認は未実施。
+
+## 次にやるべきこと
+- 実データで各用途を選択し、生成プロンプトをチャッピーに投入して、level / chunk / definition の品質を確認する。
+- 中学英単語の独自level（中1基本など）をCSV読み込み時にも維持する必要があるか検討する。
+- Playwright等のブラウザテスト環境を導入できる場合は、用途選択からプロンプト生成までのUI回帰テストを追加する。
+
+## チャッピーに相談すべき点
+- 用途別の指示文（特にTOEIC、教科書・定期テスト）の粒度が十分か。
+- 中学英単語の `level` 候補を、将来UI上やCSV検証ルールにも反映すべきか。
+
+---
+
+## 今回やったこと
 - `admin/wordbook-batch` の「4. チャッピー出力貼り戻し」で、quoted CSV（カンマ・改行・エスケープ付き）を正しく扱うように修正。
 - 貼り戻し処理のCSV解析を単純分割ではなく既存CSVパーサー経由に統一。
 - コードフェンス（```csv / ```）除去後に、ヘッダー有無を判定して15列（`row_number`〜`note`）でマッピングする実装に変更。

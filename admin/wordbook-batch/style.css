@@ -16,6 +16,7 @@ header, main { max-width: 1300px; margin: 0 auto; padding: 16px 24px; }
 header h1 { margin: 0; color: var(--title); }
 .subtitle { margin: 8px 0; font-weight: 600; color: #a23c00; }
 #toolVersion { font-size: 0.9rem; color: #4a5568; }
+.helpText { margin: 8px 0 12px; color: #4a5568; font-size: 0.95rem; }
 section {
   background: var(--card);
   border: 1px solid var(--line);
@@ -34,7 +35,7 @@ button {
   cursor: pointer;
 }
 button:hover { opacity: 0.9; }
-input[type="number"], textarea { border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
+input[type="number"], select, textarea { border: 1px solid var(--line); border-radius: 6px; padding: 8px; }
 textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, monospace; }
 .tableWrap { overflow-x: auto; border: 1px solid var(--line); }
 table { border-collapse: collapse; min-width: 1200px; width: 100%; }
