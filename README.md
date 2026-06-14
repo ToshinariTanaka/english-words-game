@@ -58,3 +58,38 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - `admin/wordbook-batch` を「英単語CSV 50行バッチ編集ツール」として汎用化。
 - 中学英単語・高校/大学受験・英検・TOEIC・教科書/定期テスト・カスタムの用途選択を追加。
 - 既存のCSV列仕様、50行抽出、指定範囲抽出、貼り戻し、CSV出力の基本機能は維持。
+
+## ローカルPythonツール: study-app用Excelの選択肢自動補完
+
+`tools/fill_excel_choices.py` は、study-app用の `.xlsx` を読み込み、`choice1`〜`choice3` がすべて空欄の行だけをOpenAI APIで50行ずつ補完するローカル実行用ツールです。既存の英単語RPG本体や `study-app/` の画面は変更しません。
+
+### セットアップ
+
+```bash
+python3 -m pip install -r tools/requirements.txt
+export OPENAI_API_KEY="sk-..."
+```
+
+### 実行例
+
+```bash
+python3 tools/fill_excel_choices.py input.xlsx
+```
+
+- 入力列は `row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note` を想定します。
+- `choice1`〜`choice3` がすべて空欄の行を未補完行として扱います。
+- AIには `row_number,level,question,correct` だけを渡し、`row_number,choice1,choice2,choice3` CSVだけを受け取ります。
+- `row_number` をキーに元Excelへ貼り戻し、`correct` との重複、選択肢同士の重複、空欄を検出します。
+- 不正行は最大3回再試行し、50行ごとに `output_completed.xlsx` へ途中保存します。
+- エラー時は処理済み部分を保存して停止するため、再実行すると未補完行から再開できます。
+
+主なオプション:
+
+```bash
+python3 tools/fill_excel_choices.py input.xlsx \
+  --output output_completed.xlsx \
+  --sheet Sheet1 \
+  --model gpt-4.1-mini \
+  --batch-size 50 \
+  --max-retries 3
+```

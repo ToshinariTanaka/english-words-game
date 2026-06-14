@@ -1,4 +1,40 @@
 ## 今回やったこと
+- study-app用Excelの未補完行をOpenAI APIで補完するローカルPythonツール `tools/fill_excel_choices.py` を追加。
+- `choice1`〜`choice3` がすべて空欄の行を50行ずつ処理し、AI出力CSVを `row_number` で元Excelへ貼り戻す実装にした。
+- `correct` と選択肢の重複、選択肢同士の重複、空欄を検出し、不正行のみ再試行するバリデーションを追加。
+- 50行ごとの途中保存、エラー時の処理済み部分保存、再実行時の未補完行からの再開に対応。
+- セットアップ用 `tools/requirements.txt`、補完ロジックの最小回帰テスト、README / architecture / project_status / next_tasks の説明を追加・更新。
+- 既存の英単語RPG本体、`study-app/` 本体、既存ブラウザ管理ツールは変更していない。
+
+## 変更ファイル
+- `tools/fill_excel_choices.py`
+- `tools/requirements.txt`
+- `tests_fill_excel_choices.py`
+- `README.md`
+- `docs/codex_report.md`
+- `docs/project_status.md`
+- `docs/architecture.md`
+- `docs/next_tasks.md`
+
+## テスト結果
+- `python3 -m py_compile tools/fill_excel_choices.py tests_fill_excel_choices.py` : PASS
+- `python3 tests_fill_excel_choices.py` : PASS
+
+## 注意点
+- 実行には `openpyxl` が必要なため、先に `python3 -m pip install -r tools/requirements.txt` を実行する必要がある。
+- 実API呼び出しは `OPENAI_API_KEY` が必要。今回の自動テストではAPI通信は行わず、CSV解析・重複検出などのローカルロジックを確認した。
+- デフォルトモデルは `gpt-4.1-mini`。教材品質やコストに応じて `--model` で変更できる。
+
+## 次にやるべきこと
+- 実教材Excelと実APIキーで少量バッチを実行し、選択肢品質と再試行挙動を確認する。
+- 必要なら実行ログCSVや、元ファイルの自動バックアップ機能を追加する。
+
+## チャッピーに相談すべき点
+- 不正解選択肢の難易度を、英単語/チャンク/英英辞典モードごとにより細かく指示するべきか。
+- デフォルトモデルをコスト優先にするか、品質優先にするか。
+
+---
+## 今回やったこと
 - `study-app/` の3モードCSVに `level` 列を追加し、新形式 `row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note` に更新。
 - `study-app/script.js` で `level` を読み込み、問題カードの問題ID・CSV成績表示にレベルも表示するようにした。
 - 標準の `data/*.csv` 読み込みに加え、各モード画面で手元の `.csv` / `.xlsx` をアップロードして問題を読み込める機能を追加。

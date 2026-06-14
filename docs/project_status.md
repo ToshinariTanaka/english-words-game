@@ -1,7 +1,7 @@
 # Project Status
 
-- バージョン: v0.10.2
-- 直近対応: `study-app/` の3モードCSVを `level` 付き新形式へ移行し、CSV/Excelアップロード読み込みを追加
-- 既存機能影響: なし（ルートの `index.html` / `style.css` / `script.js` は変更せず、既存RPG本体を維持）
-- 新規アプリ概要: 英単語 / チャンク / 英英辞典の3モードで標準CSVまたは手元の `.csv` / `.xlsx` を読み込み、`level` 表示、`correct` + `choice1`〜`choice3` をシャッフルした4択、正誤表示、次問、正答数・出題数・正答率、誤答復習を提供
-- 次の重点: row_numberをキーにしたlocalStorage学習履歴保存、実機ブラウザでのアップロードUI確認、GitHub Pages上でのSheetJS CDN読み込み確認
+- バージョン: v0.10.3
+- 直近対応: study-app用Excelの `choice1`〜`choice3` 空欄行をOpenAI APIで50行ずつ補完するローカルPythonツールを追加
+- 既存機能影響: なし（ルートのRPG本体、`study-app/` 本体、既存ブラウザ管理ツールは変更せず、`tools/` 配下に独立追加）
+- 新規ツール概要: `.xlsx` の未補完行抽出、OpenAI APIへの50行バッチ依頼、CSV出力の解析、row_number貼り戻し、空欄・重複検証、再試行、50行ごとの途中保存、エラー時保存停止、再実行再開に対応
+- 次の重点: 実教材Excelと実APIキーでの疎通確認、モデル/プロンプトの品質調整、必要ならログファイル出力やバックアップ保存先指定を追加
