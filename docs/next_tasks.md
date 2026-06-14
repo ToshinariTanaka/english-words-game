@@ -5,3 +5,6 @@
 - `row_number` を問題IDとして、localStorageに問題ごとの `total_correct` / `total_wrong` / `accuracy` / `current_streak` を保存・更新する。
 - 必要に応じて `study-app/README.md` や教材作成ガイドを追加する。
 - Playwright等を導入できる場合は、静的アプリのUI回帰テストを追加する。
+
+- `.xlsx` アップロードをGitHub Pages本番URLで確認し、CDNブロック時の案内文が十分か確認する。
+- CSV/Excelテンプレートのダウンロード機能を追加するか検討する。

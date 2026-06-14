@@ -1,4 +1,4 @@
-row_number,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
-1,apple,りんご,机,走る,青い,0,0,0%,0,apple は「りんご」を意味します。
-2,important,重要な,速い,静かな,浅い,0,0,0%,0,important は「重要な」という意味です。
-3,borrow,借りる,貸す,壊す,選ぶ,0,0,0%,0,borrow は「借りる」です。
+row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
+1,A1,apple,りんご,机,走る,青い,0,0,0%,0,apple は「りんご」を意味します。
+2,A2,important,重要な,速い,静かな,浅い,0,0,0%,0,important は「重要な」という意味です。
+3,B1,borrow,借りる,貸す,壊す,選ぶ,0,0,0%,0,borrow は「借りる」です。

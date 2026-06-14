@@ -36,15 +36,17 @@
 モードごとに別CSVを読み込みます。最小構成では3モード共通で以下の列を使います。
 
 ```csv
-row_number,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
+row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
 ```
 
+- `level`: 問題カードに表示する難易度・教材レベルです。
 - `question`: 英単語・チャンク・英英定義文を入れます。
 - `correct`: 正解を入れます。
 - `choice1`〜`choice3`: 不正解選択肢を入れます。
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
 - `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
 - `row_number` は将来localStorageに学習履歴を保存するための問題IDとして扱います。
+- 各モードで標準の `study-app/data/*.csv` を読み込めるほか、画面から手元の `.csv` / `.xlsx` をアップロードして同じ列形式の問題に差し替えできます。Excel読み込みはGitHub Pagesで動作するようSheetJSをCDNから読み込みます。
 
 ## UI更新（2026-05-13）
 - 解答後の結果画面に強調オーバーレイを追加（正解/不正解を瞬時に判別可能）。

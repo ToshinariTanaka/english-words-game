@@ -1,4 +1,45 @@
 ## 今回やったこと
+- `study-app/` の3モードCSVに `level` 列を追加し、新形式 `row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note` に更新。
+- `study-app/script.js` で `level` を読み込み、問題カードの問題ID・CSV成績表示にレベルも表示するようにした。
+- 標準の `data/*.csv` 読み込みに加え、各モード画面で手元の `.csv` / `.xlsx` をアップロードして問題を読み込める機能を追加。
+- `.xlsx` 読み込み用にSheetJSをCDNで読み込む構成にし、GitHub Pagesで動く静的アプリのままExcel読み込みに対応。
+- `correct` + `choice1`〜`choice3` をシャッフルして4択にする既存方針を、新形式とアップロードファイルにも適用。
+- README / architecture / project_status / next_tasks を新形式とアップロード機能に合わせて更新。
+
+## 変更ファイル
+- `study-app/index.html`
+- `study-app/style.css`
+- `study-app/script.js`
+- `study-app/data/word_mode.csv`
+- `study-app/data/chunk_mode.csv`
+- `study-app/data/definition_mode.csv`
+- `README.md`
+- `docs/codex_report.md`
+- `docs/project_status.md`
+- `docs/architecture.md`
+- `docs/next_tasks.md`
+
+## テスト結果
+- `node --check study-app/script.js` : PASS
+- `python3` による3CSVのヘッダー・必須列・4択生成元確認 : PASS
+- `node` VM DOMモックによる標準CSV読み込み、CSVアップロード、XLSXアップロード確認 : PASS
+
+## 注意点
+- `.xlsx` 読み込みはSheetJS CDNに依存するため、完全オフライン環境ではExcelアップロードが使えない。
+- CSV/Excel由来の `total_correct` / `total_wrong` / `accuracy` / `current_streak` は表示のみで、回答後の保存・ファイル更新はしない。
+- UIにアップロード欄を追加したためスクリーンショット確認を試みたが、この環境にはChromium/Playwright等のブラウザ実行環境が無く画像取得は未実施。
+
+## 次にやるべきこと
+- 実教材のExcelでアップロード確認を行い、列名の揺れや空行の扱いが問題ないか確認する。
+- `row_number` をキーにlocalStorage保存・復元を追加する。
+- Playwright等の正式なUI回帰テストを導入する。
+
+## チャッピーに相談すべき点
+- SheetJS CDN依存で十分か、オフライン利用も想定してライブラリを同梱するべきか。
+- アップロードファイルの列不足時に、現在のエラー表示だけで十分か、テンプレートCSVダウンロード機能を追加するべきか。
+
+---
+## 今回やったこと
 - `study-app/` の英単語モード、チャンクモード、英英辞典モードのCSVを新形式 `row_number,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note` に変更。
 - `question` に出題文、`correct` に正解、`choice1`〜`choice3` に不正解選択肢を入れる仕様へ移行。
 - `study-app/script.js` で `correct` + `choice1`〜`choice3` をシャッフルして4択を生成するよう変更。

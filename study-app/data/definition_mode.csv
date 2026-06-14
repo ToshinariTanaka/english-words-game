@@ -1,4 +1,4 @@
-row_number,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
-1,A place where you can borrow books.,library,station,kitchen,hospital,0,0,0%,0,library は本を借りられる場所です。
-2,To make something better.,improve,imagine,invite,include,0,0,0%,0,improve は「改善する」です。
-3,A person who teaches students.,teacher,doctor,driver,farmer,0,0,0%,0,teacher は生徒に教える人です。
+row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
+1,A1,A place where you can borrow books.,library,station,kitchen,hospital,0,0,0%,0,library は本を借りられる場所です。
+2,A2,To make something better.,improve,imagine,invite,include,0,0,0%,0,improve は「改善する」です。
+3,B1,A person who teaches students.,teacher,doctor,driver,farmer,0,0,0%,0,teacher は生徒に教える人です。
