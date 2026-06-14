@@ -22,6 +22,11 @@
         <button class="mode-button" type="button" data-mode="definition">英英辞典</button>
       </div>
       <p id="modeDescription" class="mode-description"></p>
+      <div class="upload-box">
+        <label class="upload-label" for="fileInput">CSV/Excelをアップロード</label>
+        <input id="fileInput" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        <p id="uploadStatus" class="upload-status">標準CSVを読み込みます。手元の .csv / .xlsx でも差し替えできます。</p>
+      </div>
     </section>
 
     <section class="stats-card" aria-label="学習成績">
@@ -49,6 +54,7 @@
       <button id="reviewButton" class="secondary-button" type="button" disabled>復習を始める</button>
     </section>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="./script.js"></script>
 </body>
 </html>

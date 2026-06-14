@@ -25,6 +25,7 @@ const state = {
   mistakes: [],
   reviewMode: false,
   selected: false,
+  sourceLabel: '',
 };
 
 const els = {
@@ -41,6 +42,8 @@ const els = {
   nextButton: document.getElementById('nextButton'),
   reviewSummary: document.getElementById('reviewSummary'),
   reviewButton: document.getElementById('reviewButton'),
+  fileInput: document.getElementById('fileInput'),
+  uploadStatus: document.getElementById('uploadStatus'),
 };
 
 function parseCsv(text) {
@@ -81,24 +84,50 @@ function shuffle(items) {
   return [...items].sort(() => Math.random() - 0.5);
 }
 
+function stripBom(value) {
+  return value.replace(/^\uFEFF/, '');
+}
+
+function assertRequiredHeaders(rows) {
+  const required = ['row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note'];
+  const headers = rows[0] ? Object.keys(rows[0]).map(stripBom) : [];
+  const missing = required.filter((header) => !headers.includes(header));
+  if (missing.length > 0) {
+    throw new Error(`必須列が不足しています: ${missing.join(', ')}`);
+  }
+}
+
+function parseWorkbookRows(arrayBuffer) {
+  if (!window.XLSX) {
+    throw new Error('Excel読み込みライブラリの読み込みに失敗しました。ネットワーク接続またはCDN設定を確認してください。');
+  }
+  const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) throw new Error('Excelファイルにシートがありません。');
+  return window.XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { defval: '', raw: false });
+}
+
 function normalizeQuestions(rows) {
+  assertRequiredHeaders(rows);
   return rows.map((row) => {
-    const choices = [row.correct, row.choice1, row.choice2, row.choice3].filter(Boolean);
+    const normalizedRow = Object.fromEntries(Object.entries(row).map(([key, value]) => [stripBom(key).trim(), String(value || '').trim()]));
+    const choices = [normalizedRow.correct, normalizedRow.choice1, normalizedRow.choice2, normalizedRow.choice3].filter(Boolean);
     return {
-      id: row.row_number,
-      question: row.question,
-      correct: row.correct,
+      id: normalizedRow.row_number,
+      level: normalizedRow.level,
+      question: normalizedRow.question,
+      correct: normalizedRow.correct,
       choices: shuffle(choices),
-      totalCorrect: row.total_correct || '0',
-      totalWrong: row.total_wrong || '0',
-      csvAccuracy: row.accuracy || '0%',
-      currentStreak: row.current_streak || '0',
-      note: row.note || '',
+      totalCorrect: normalizedRow.total_correct || '0',
+      totalWrong: normalizedRow.total_wrong || '0',
+      csvAccuracy: normalizedRow.accuracy || '0%',
+      currentStreak: normalizedRow.current_streak || '0',
+      note: normalizedRow.note || '',
     };
   }).filter((item) => item.id && item.question && item.correct && item.choices.length === 4);
 }
 
-async function loadMode(mode) {
+function resetSession(mode) {
   state.mode = mode;
   state.reviewMode = false;
   state.index = 0;
@@ -106,6 +135,17 @@ async function loadMode(mode) {
   state.correct = 0;
   state.mistakes = [];
   state.selected = false;
+}
+
+function applyQuestions(rows, sourceLabel) {
+  state.questions = normalizeQuestions(rows);
+  state.sourceLabel = sourceLabel;
+  els.uploadStatus.textContent = `${sourceLabel} から ${state.questions.length}問を読み込みました。`;
+  showQuestion();
+}
+
+async function loadMode(mode) {
+  resetSession(mode);
   els.questionText.textContent = 'CSVを読み込み中...';
   els.choices.innerHTML = '';
   els.feedback.hidden = true;
@@ -116,19 +156,47 @@ async function loadMode(mode) {
   try {
     const response = await fetch(MODES[mode].file);
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    state.questions = normalizeQuestions(parseCsv(await response.text()));
-    showQuestion();
+    applyQuestions(parseCsv(await response.text()), `${MODES[mode].label}の標準CSV`);
   } catch (error) {
     els.questionText.textContent = 'CSVの読み込みに失敗しました。GitHub PagesなどのWebサーバー上で開いてください。';
     els.feedback.textContent = error.message;
     els.feedback.className = 'feedback wrong';
     els.feedback.hidden = false;
+    els.uploadStatus.textContent = '標準CSVの読み込みに失敗しました。';
+  }
+}
+
+async function handleUpload(event) {
+  const [file] = event.target.files;
+  if (!file) return;
+  resetSession(state.mode);
+  updateModeUi();
+  updateStats();
+  els.questionText.textContent = 'ファイルを読み込み中...';
+  els.choices.innerHTML = '';
+  els.feedback.hidden = true;
+  els.nextButton.disabled = true;
+
+  try {
+    const extension = file.name.split('.').pop().toLowerCase();
+    const rows = extension === 'xlsx'
+      ? parseWorkbookRows(await file.arrayBuffer())
+      : parseCsv(await file.text());
+    applyQuestions(rows, `${file.name}（アップロード）`);
+  } catch (error) {
+    els.questionText.textContent = 'アップロードファイルの読み込みに失敗しました。';
+    els.feedback.textContent = error.message;
+    els.feedback.className = 'feedback wrong';
+    els.feedback.hidden = false;
+    els.uploadStatus.textContent = 'アップロードに失敗しました。';
+  } finally {
+    event.target.value = '';
   }
 }
 
 function updateModeUi() {
   els.modeButtons.forEach((button) => button.classList.toggle('active', button.dataset.mode === state.mode));
-  els.modeDescription.textContent = MODES[state.mode].description;
+  els.modeDescription.textContent = `${MODES[state.mode].description} 標準CSVまたは手元のCSV/Excelを読み込めます。`;
   els.modeLabel.textContent = state.reviewMode ? `${MODES[state.mode].label}（復習）` : MODES[state.mode].label;
 }
 
@@ -153,7 +221,7 @@ function showQuestion() {
   }
   els.questionText.textContent = current.question;
   els.feedback.className = 'feedback';
-  els.feedback.textContent = `問題ID: ${current.id} / CSV成績: 正解 ${current.totalCorrect}・不正解 ${current.totalWrong}・正答率 ${current.csvAccuracy}・連続正解 ${current.currentStreak}`;
+  els.feedback.textContent = `問題ID: ${current.id} / レベル: ${current.level || '未設定'} / CSV成績: 正解 ${current.totalCorrect}・不正解 ${current.totalWrong}・正答率 ${current.csvAccuracy}・連続正解 ${current.currentStreak}`;
   els.feedback.hidden = false;
   els.choices.innerHTML = '';
   current.choices.forEach((choice) => {
@@ -191,6 +259,7 @@ function answer(choice) {
 }
 
 function nextQuestion() {
+  if (state.questions.length === 0) return;
   state.index = (state.index + 1) % state.questions.length;
   showQuestion();
 }
@@ -208,5 +277,6 @@ function startReview() {
 els.modeButtons.forEach((button) => button.addEventListener('click', () => loadMode(button.dataset.mode)));
 els.nextButton.addEventListener('click', nextQuestion);
 els.reviewButton.addEventListener('click', startReview);
+els.fileInput.addEventListener('change', handleUpload);
 
 loadMode(state.mode);

@@ -11,7 +11,7 @@
 ## 新規: study-app
 
 - `study-app/index.html`: ゲーム要素を含まない英語学習アプリの画面。モード選択、成績、4択、復習導線を持つ。
-- `study-app/script.js`: CSV読み込み、簡易CSVパース、モード切り替え、正誤判定、正答数/出題数/正答率、誤答復習を担当。
+- `study-app/script.js`: 標準CSV読み込み、アップロードCSV/Excel読み込み、簡易CSVパース、SheetJS連携、モード切り替え、正誤判定、正答数/出題数/正答率、誤答復習を担当。
 - `study-app/style.css`: スマホ優先のカード型UI。HP/Gold/敵/バトル演出などのゲーム表現は含めない。
 - `study-app/data/word_mode.csv`: 英単語モード用CSV。
 - `study-app/data/chunk_mode.csv`: チャンクモード用CSV。
@@ -22,9 +22,10 @@
 最小構成では3モードとも次の列を使います。
 
 ```csv
-row_number,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
+row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
 ```
 
+- `level`: 問題カードに表示する難易度・教材レベルです。
 - `question`: 英単語・チャンク・英英定義文を入れます。
 - `correct`: 正解を入れます。
 - `choice1`〜`choice3`: 不正解選択肢を入れます。
