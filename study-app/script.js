@@ -82,12 +82,20 @@ function shuffle(items) {
 }
 
 function normalizeQuestions(rows) {
-  return rows.map((row) => ({
-    question: row.question,
-    correct: row.correct,
-    choices: shuffle([row.choice1, row.choice2, row.choice3, row.choice4].filter(Boolean)),
-    explanation: row.explanation || '',
-  })).filter((item) => item.question && item.correct && item.choices.length >= 2);
+  return rows.map((row) => {
+    const choices = [row.correct, row.choice1, row.choice2, row.choice3].filter(Boolean);
+    return {
+      id: row.row_number,
+      question: row.question,
+      correct: row.correct,
+      choices: shuffle(choices),
+      totalCorrect: row.total_correct || '0',
+      totalWrong: row.total_wrong || '0',
+      csvAccuracy: row.accuracy || '0%',
+      currentStreak: row.current_streak || '0',
+      note: row.note || '',
+    };
+  }).filter((item) => item.id && item.question && item.correct && item.choices.length === 4);
 }
 
 async function loadMode(mode) {
@@ -144,6 +152,9 @@ function showQuestion() {
     return;
   }
   els.questionText.textContent = current.question;
+  els.feedback.className = 'feedback';
+  els.feedback.textContent = `問題ID: ${current.id} / CSV成績: 正解 ${current.totalCorrect}・不正解 ${current.totalWrong}・正答率 ${current.csvAccuracy}・連続正解 ${current.currentStreak}`;
+  els.feedback.hidden = false;
   els.choices.innerHTML = '';
   current.choices.forEach((choice) => {
     const button = document.createElement('button');
@@ -173,7 +184,7 @@ function answer(choice) {
     if (button.textContent === choice && !isCorrect) button.classList.add('wrong');
   });
   els.feedback.className = `feedback ${isCorrect ? 'correct' : 'wrong'}`;
-  els.feedback.textContent = `${isCorrect ? '正解です。' : `不正解です。正解は「${current.correct}」です。`} ${current.explanation}`;
+  els.feedback.textContent = `${isCorrect ? '正解です。' : `不正解です。正解は「${current.correct}」です。`} ${current.note}`;
   els.feedback.hidden = false;
   els.nextButton.disabled = false;
   updateStats();

@@ -22,8 +22,15 @@
 最小構成では3モードとも次の列を使います。
 
 ```csv
-question,correct,choice1,choice2,choice3,choice4,explanation
+row_number,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
 ```
+
+- `question`: 英単語・チャンク・英英定義文を入れます。
+- `correct`: 正解を入れます。
+- `choice1`〜`choice3`: 不正解選択肢を入れます。
+- アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
+- `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
+- `row_number` は将来localStorageに学習履歴を保存するための問題IDとして扱います。
 
 今後、モードごとに列を拡張する場合も、既存RPG本体や既存CSV管理ツールとは別管理にします。
 

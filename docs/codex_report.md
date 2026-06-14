@@ -1,4 +1,44 @@
 ## 今回やったこと
+- `study-app/` の英単語モード、チャンクモード、英英辞典モードのCSVを新形式 `row_number,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note` に変更。
+- `question` に出題文、`correct` に正解、`choice1`〜`choice3` に不正解選択肢を入れる仕様へ移行。
+- `study-app/script.js` で `correct` + `choice1`〜`choice3` をシャッフルして4択を生成するよう変更。
+- `row_number` を問題IDとして保持し、将来localStorageで学習履歴を保存できるようにした。
+- `total_correct` / `total_wrong` / `accuracy` / `current_streak` をCSVから読み込み、初期版として問題ごとのCSV成績を表示するようにした。
+- 既存RPG本体（ルートの `index.html` / `style.css` / `script.js`）は変更せず、`study-app/` とドキュメントのみ更新。
+- README / architecture / project_status / next_tasks を新CSV形式に合わせて更新。
+
+## 変更ファイル
+- `study-app/script.js`
+- `study-app/data/word_mode.csv`
+- `study-app/data/chunk_mode.csv`
+- `study-app/data/definition_mode.csv`
+- `README.md`
+- `docs/codex_report.md`
+- `docs/project_status.md`
+- `docs/architecture.md`
+- `docs/next_tasks.md`
+
+## テスト結果
+- `node --check study-app/script.js` : PASS
+- `python3` によるCSVヘッダー・必須列・4択生成元（`correct` + `choice1`〜`choice3`）確認 : PASS
+
+## 注意点
+- CSV由来の `total_correct` / `total_wrong` / `accuracy` / `current_streak` は今回の初期版では表示のみで、回答後にCSVやlocalStorageへ保存・更新はしていない。
+- `row_number` は文字列として保持して問題ID表示に使っている。localStorage保存時にはキー設計を別途決める必要がある。
+- UI上の成績カード（正答数 / 出題数 / 正答率）は従来どおり現在セッションの成績を表示し、CSV由来の問題別成績は問題カード内に表示している。
+- UI文言の追加はあるが、ブラウザスクリーンショット確認はこの環境では未実施。
+
+## 次にやるべきこと
+- `row_number` をキーに、localStorageへ問題別の正解数・不正解数・正答率・連続正解数を保存/復元する。
+- 実データCSVで `row_number` の重複や欠番を検出するバリデーションを追加する。
+- Playwright等を導入できる場合は、3モード切替と4択生成のブラウザ回帰テストを追加する。
+
+## チャッピーに相談すべき点
+- CSV由来の学習成績表示を、現在の問題カード内表示で十分とするか、専用の問題別成績カードに分けるべきか。
+- localStorage保存時にCSVの初期値とローカル履歴が競合した場合、どちらを優先する運用にするか。
+
+---
+## 今回やったこと
 - 既存の英単語RPG本体を変更せず、新規ディレクトリ `study-app/` にゲーム要素なしの英語学習アプリ最小構成を追加。
 - 英単語モード、チャンクモード、英英辞典モードを分離し、それぞれ別CSVを読み込む構成にした。
 - HP / Gold / 敵キャラ / バトル演出 / レベルアップ / 報酬倍率を含めず、4択・正誤表示・次問・正答数・出題数・正答率・誤答復習に絞った。
