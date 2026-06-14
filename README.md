@@ -1,5 +1,45 @@
 # english-words-game
-英単語を倒してgoldを稼ぐ英語学習RPG
+
+英単語を倒してgoldを稼ぐ英語学習RPGです。既存のRPG本体は `index.html` / `style.css` / `script.js` で維持しています。
+
+## 新規: 英語学習アプリ（最小構成）
+
+ゲーム要素を削除した静的な英語学習アプリを `study-app/` に追加しました。GitHub Pagesなどの静的ホスティングで動作します。
+
+- 起動ファイル: `study-app/index.html`
+- ロジック: `study-app/script.js`
+- スタイル: `study-app/style.css`
+- データ:
+  - `study-app/data/word_mode.csv`（英単語モード）
+  - `study-app/data/chunk_mode.csv`（チャンクモード）
+  - `study-app/data/definition_mode.csv`（英英辞典モード）
+
+### 学習アプリで残した機能
+
+- 4択問題
+- 正解・不正解表示
+- 次の問題へ進む
+- 正答数 / 出題数 / 正答率
+- 間違えた問題の復習
+
+### 学習アプリから削除したゲーム要素
+
+- HP
+- Gold
+- 敵キャラ
+- バトル演出
+- レベルアップ
+- 報酬倍率
+
+### CSV形式
+
+モードごとに別CSVを読み込みます。最小構成では3モード共通で以下の列を使います。
+
+```csv
+question,correct,choice1,choice2,choice3,choice4,explanation
+```
+
+`correct` は `choice1`〜`choice4` のいずれかに含めてください。選択肢は表示時にシャッフルされます。
 
 ## UI更新（2026-05-13）
 - 解答後の結果画面に強調オーバーレイを追加（正解/不正解を瞬時に判別可能）。
@@ -11,4 +51,3 @@
 - `admin/wordbook-batch` を「英単語CSV 50行バッチ編集ツール」として汎用化。
 - 中学英単語・高校/大学受験・英検・TOEIC・教科書/定期テスト・カスタムの用途選択を追加。
 - 既存のCSV列仕様、50行抽出、指定範囲抽出、貼り戻し、CSV出力の基本機能は維持。
-

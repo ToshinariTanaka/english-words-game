@@ -1,4 +1,46 @@
 ## 今回やったこと
+- 既存の英単語RPG本体を変更せず、新規ディレクトリ `study-app/` にゲーム要素なしの英語学習アプリ最小構成を追加。
+- 英単語モード、チャンクモード、英英辞典モードを分離し、それぞれ別CSVを読み込む構成にした。
+- HP / Gold / 敵キャラ / バトル演出 / レベルアップ / 報酬倍率を含めず、4択・正誤表示・次問・正答数・出題数・正答率・誤答復習に絞った。
+- スマホで使いやすいカード型UIを追加。
+- README / architecture / project_status / next_tasks を新規アプリ追加に合わせて更新。
+
+## 変更ファイル
+- `study-app/index.html`
+- `study-app/style.css`
+- `study-app/script.js`
+- `study-app/data/word_mode.csv`
+- `study-app/data/chunk_mode.csv`
+- `study-app/data/definition_mode.csv`
+- `README.md`
+- `docs/codex_report.md`
+- `docs/project_status.md`
+- `docs/architecture.md`
+- `docs/next_tasks.md`
+
+## テスト結果
+- `node --check study-app/script.js` : PASS
+- `python3 -m http.server 4173` + `curl -I http://127.0.0.1:4173/study-app/` : PASS
+- `curl -fsS http://127.0.0.1:4173/study-app/data/{word_mode,chunk_mode,definition_mode}.csv` 相当のCSV取得確認 : PASS
+- スクリーンショット確認: この環境にはChromium/Playwright等のブラウザ実行環境が無いため未実施。静的配信確認とJavaScript構文チェックのみ実施。
+
+## 注意点
+- 最小構成のため、CSV列は3モード共通で `question,correct,choice1,choice2,choice3,choice4,explanation` にしている。将来、モードごとに列を拡張する余地あり。
+- `fetch()` でCSVを読むため、ローカルファイル直開きではなくGitHub PagesやローカルHTTPサーバー経由で開く必要がある。
+- 誤答復習は現在表示中モード内の間違いだけを対象にし、永続保存はしていない。
+
+## 次にやるべきこと
+- GitHub Pages上で `study-app/` を開き、CSV読み込みとUI操作を確認する。
+- 実際の教材CSVを投入し、英単語 / チャンク / 英英辞典それぞれの列設計を固める。
+- 必要なら学習履歴のlocalStorage保存や、問題順のランダム化設定を追加する。
+
+## チャッピーに相談すべき点
+- 英英辞典モードのCSV列を、現状の `question` に定義文を書く方式で十分とするか、`definition` / `answer_word` など専用列に分けるか。
+- チャンクモードに例文や日本語訳の追加列を持たせるべきか。
+
+---
+
+## 今回やったこと
 - `admin/wordbook-batch` の名称を「英単語CSV 50行バッチ編集ツール」に変更し、複数の英単語アプリで共通利用する管理者・教材作成者向けツールとして説明文を更新。
 - 「用途を選ぶ」セレクトボックスを追加し、中学英単語 / 高校・大学受験英単語 / 英検 / TOEIC / 教科書・定期テスト / カスタムを選べるようにした。
 - チャッピー用プロンプト生成時に選択用途ごとの指示文を追加。中学英単語では「中1基本」「中2基本」「中3基本」「入試標準」を案内し、高校・大学受験/英検では A1 / A2 / B1 / B2 / C1 / C2 も使える旨を明記。

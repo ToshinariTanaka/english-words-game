@@ -1,14 +1,33 @@
 # Architecture Notes
 
+## 既存RPG本体
+
 - `script.js`: ゲームロジック本体（出題、判定、Gold計算、復習モード、自動遷移）。
 - `index.html`: 画面構成（home/battle/result/gameclear/gameover）。
-- `style.css`: 共通UI + 今回追加した`feedbackOverlay`演出。
+- `style.css`: 共通UI + `feedbackOverlay`演出。
 
-今回の設計変更:
-- 判定ロジック本体には手を入れず、`judgeAnswer`から`updateFeedbackOverlay()`を呼ぶ構成へ拡張。
-- 演出の責務をCSSに寄せ、ロジック層への影響を最小化。
+既存RPG本体は今回の学習アプリ追加では変更しない方針です。
 
-admin/wordbook-batch の設計メモ:
+## 新規: study-app
+
+- `study-app/index.html`: ゲーム要素を含まない英語学習アプリの画面。モード選択、成績、4択、復習導線を持つ。
+- `study-app/script.js`: CSV読み込み、簡易CSVパース、モード切り替え、正誤判定、正答数/出題数/正答率、誤答復習を担当。
+- `study-app/style.css`: スマホ優先のカード型UI。HP/Gold/敵/バトル演出などのゲーム表現は含めない。
+- `study-app/data/word_mode.csv`: 英単語モード用CSV。
+- `study-app/data/chunk_mode.csv`: チャンクモード用CSV。
+- `study-app/data/definition_mode.csv`: 英英辞典モード用CSV。
+
+### study-app のCSV形式
+
+最小構成では3モードとも次の列を使います。
+
+```csv
+question,correct,choice1,choice2,choice3,choice4,explanation
+```
+
+今後、モードごとに列を拡張する場合も、既存RPG本体や既存CSV管理ツールとは別管理にします。
+
+## admin/wordbook-batch
+
 - `admin/wordbook-batch/index.html`: 管理者・教材作成者向けCSVバッチ編集画面。用途選択はプロンプト生成文だけに反映し、列構造や貼り戻し仕様は変更しない。
 - `admin/wordbook-batch/script.js`: CSVパース、50行/範囲抽出、チャッピー用プロンプト生成、貼り戻し、チェック、CSV書き出しを担当。用途別文言は `PURPOSE_GUIDANCE` に集約。
-
