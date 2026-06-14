@@ -36,10 +36,15 @@
 モードごとに別CSVを読み込みます。最小構成では3モード共通で以下の列を使います。
 
 ```csv
-question,correct,choice1,choice2,choice3,choice4,explanation
+row_number,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
 ```
 
-`correct` は `choice1`〜`choice4` のいずれかに含めてください。選択肢は表示時にシャッフルされます。
+- `question`: 英単語・チャンク・英英定義文を入れます。
+- `correct`: 正解を入れます。
+- `choice1`〜`choice3`: 不正解選択肢を入れます。
+- アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
+- `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
+- `row_number` は将来localStorageに学習履歴を保存するための問題IDとして扱います。
 
 ## UI更新（2026-05-13）
 - 解答後の結果画面に強調オーバーレイを追加（正解/不正解を瞬時に判別可能）。
