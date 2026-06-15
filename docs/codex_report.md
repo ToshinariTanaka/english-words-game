@@ -1,4 +1,38 @@
 ## 今回やったこと
+- `tools/fill_excel_choices.py` のAI向けプロンプトを更新し、選択肢作成ルールを強化。
+- `correct` の単なる類義語、言い換え、ほぼ同義の近縁語、派生語、複合語、`correct` を含む語を禁止する指示を追加。
+- 「中毒→依存→依存症」のような同一意味領域の近縁語連発を禁止し、誤答3個の意味領域を分散させる指示を追加。
+- 学習者が混同しやすいが別概念で明確に不正解の語を優先する指示と、「中毒」の悪い例・良い例を追加。
+- プロンプトに新ルールが含まれることを確認するテストを追加。
+- README / architecture / project_status を今回の選択肢品質ルールに合わせて更新。
+
+## 変更ファイル
+- `tools/fill_excel_choices.py`
+- `tests_fill_excel_choices.py`
+- `README.md`
+- `docs/architecture.md`
+- `docs/project_status.md`
+- `docs/codex_report.md`
+
+## テスト結果
+- `python3 -m py_compile tools/fill_excel_choices.py tests_fill_excel_choices.py` : PASS
+- `python3 tests_fill_excel_choices.py` : PASS
+- `node --check admin/wordbook-batch/script.js` : PASS
+- `node tests_wordbookBatchPrompt.js` : PASS
+
+## 注意点
+- 類義語・派生語・近縁語の禁止はAIプロンプト上の品質ルールとして強化したものです。現在の自動検証は空欄、重複、日本語correct時の英字混入が中心で、意味的な類義語・派生語判定までは機械的に検出していません。
+- 実教材では、生成結果を少量レビューして「混同しやすいが別概念」の距離感が教材方針に合うか確認してください。
+
+## 次にやるべきこと
+- 実教材Excelと実APIキーで少量バッチを実行し、強化した選択肢ルールに沿った出力になるか確認する。
+- 必要なら、同一文字列を含む語や明らかな派生語を自動検出する追加バリデーションを検討する。
+
+## チャッピーに相談すべき点
+- 「混同しやすいが別概念」の許容距離を、レベル別・品詞別にどこまで近づけるべきか。
+- 類義語禁止を厳格化しすぎて簡単すぎる選択肢になる場合、どの程度の関連性まで許可するか。
+
+## 今回やったこと
 - `tools/fill_excel_choices.py` のAIプロンプトをさらに強化し、`correct` が日本語を含む場合は `choice1`〜`choice3` を日本語のみ、英単語・英語フレーズ・英語類義語禁止、英字 `[A-Za-z]` 混入禁止として明記。
 - `ad` / `広告` の悪い例（`advertisement` / `notice` / `announcement`）と良い例（`住所` / `案内` / `発表`）をプロンプトへ複数行で追加。
 - Python側で、日本語を含む `correct` に対して選択肢へ英字が混入した場合に `validate_batch` がエラーを返す検証を維持・明確化。最大再試行後に残った場合は、row_number、Excel行番号、question/correct/choice内容を含めて停止するようにした。
