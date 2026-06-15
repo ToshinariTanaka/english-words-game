@@ -1,4 +1,43 @@
 ## 今回やったこと
+- `study-app` の内部ID `definition` を維持したまま、表示名・説明文・列判定・標準CSVを英文和訳モードの仕様に合わせました。
+- `question` / `英文` / `英語` / `問題` を英文として優先し、`correct` / `和訳` / `日本語訳` / `意味` / `正解` を正しい日本語訳として優先するよう変更しました。
+- `definition_mode.csv` の標準データを、英文を問題、日本語訳4個を選択肢にするサンプルへ差し替えました。
+- ルートRPG側の `definition` モードは英英辞典モードのまま維持し、study-app の英文和訳化と混同しないよう README / architecture を更新しました。
+- study-app の英文和訳モード用の回帰テストを追加しました。
+
+## 変更ファイル
+- `study-app/script.js`
+- `study-app/index.html`
+- `study-app/data/definition_mode.csv`
+- `tests_study_app_definition_mode.js`
+- `README.md`
+- `docs/architecture.md`
+- `docs/project_status.md`
+- `docs/codex_report.md`
+
+## テスト結果
+- `node tests_study_app_definition_mode.js` : PASS
+- `node tests_parseCsv.js` : PASS
+- `node tests_wordbookBatchPrompt.js` : PASS
+- `python3 tests_fill_excel_choices.py` : PASS
+- `node --check study-app/script.js` : PASS
+- `node --check script.js` : PASS
+
+## 注意点
+- `study-app` の `definition` は内部IDと `definition_mode.csv` ファイル名を互換性のため残していますが、画面上・標準CSV・列判定は英文和訳モードです。
+- 旧 `★英英辞典_001_補完済み###.csv` のようなファイル名でもアップロード自体は従来どおり可能です。ただし新しい英文和訳形式では `question` を英文、`correct` を日本語訳として扱います。
+- ブラウザでの手動スクリーンショット確認は未実施です。今回は表示文言と出題内容のデータ/ロジック修正、およびNodeベースの正規化・判定テストで確認しました。
+
+## 次にやるべきこと
+- 実ブラウザで `study-app/index.html` を開き、英文が問題として表示され、日本語訳4択が表示されることを目視確認する。
+- 旧ファイル名の実CSV/Excelをアップロードし、英文和訳形式の列が正しく取り込まれることを確認する。
+
+## チャッピーに相談すべき点
+- `definition` という内部IDが将来的に混乱を招く場合、互換エイリアスを残しながら新IDへ移行する時期を設けるか。
+
+---
+
+## 今回やったこと
 - `tools/fill_excel_choices.py` のAI向けプロンプトを更新し、選択肢作成ルールを強化。
 - `correct` の単なる類義語、言い換え、ほぼ同義の近縁語、派生語、複合語、`correct` を含む語を禁止する指示を追加。
 - 「中毒→依存→依存症」のような同一意味領域の近縁語連発を禁止し、誤答3個の意味領域を分散させる指示を追加。

@@ -14,11 +14,11 @@ const MODES = {
     correctAliases: ['D correct', 'correct', 'chunk_meaning', 'チャンク和訳', '和訳', '意味', '正解'],
   },
   definition: {
-    label: '英英辞典モード',
+    label: '英文和訳モード',
     file: './data/definition_mode.csv',
-    description: '英語の定義文を読んで、当てはまる英単語を選びます。',
-    questionAliases: ['C question', 'question', 'definition', '英語定義', '定義', '問題'],
-    correctAliases: ['D correct', 'correct', 'word', '英単語', '単語', '正解'],
+    description: '英文を読んで、正しい日本語訳を選びます。',
+    questionAliases: ['C question', 'question', '英文', '英語', '問題', 'sentence', 'english', 'definition', '英語定義', '定義'],
+    correctAliases: ['D correct', 'correct', '和訳', '日本語訳', '意味', '正解', 'translation', 'japanese', 'definition_meaning'],
   },
 };
 

@@ -12,7 +12,7 @@
 - データ:
   - `study-app/data/word_mode.csv`（英単語モード）
   - `study-app/data/chunk_mode.csv`（チャンクモード）
-  - `study-app/data/definition_mode.csv`（英英辞典モード）
+  - `study-app/data/definition_mode.csv`（英文和訳モード。内部IDは互換性維持のため `definition`）
 
 ### 学習アプリで残した機能
 
@@ -40,9 +40,9 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 ```
 
 - `level`: 問題カードに表示する難易度・教材レベルです。
-- `question`: 英単語・チャンク・英英定義文を入れます。
-- `correct`: 正解を入れます。
-- `choice1`〜`choice3`: 不正解選択肢を入れます。
+- `question`: 英単語モードでは英単語、チャンクモードでは英語チャンク、英文和訳モードでは英文を入れます。
+- `correct`: 正解を入れます。英文和訳モードでは英文全体の正しい日本語訳を入れます。
+- `choice1`〜`choice3`: 不正解選択肢を入れます。英文和訳モードでは日本語の誤訳選択肢を入れます。
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
 - `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
 - `row_number` は将来localStorageに学習履歴を保存するための問題IDとして扱います。
@@ -95,3 +95,7 @@ python3 tools/fill_excel_choices.py input.xlsx \
   --batch-size 50 \
   --max-retries 3
 ```
+
+### study-app の英文和訳モードについて
+
+`study-app` の `definition` 内部IDは互換性のため維持し、表示名だけでなく処理も英文和訳モードとして扱います。標準ファイル名も `study-app/data/definition_mode.csv` のままです。C列相当の `question` に英文、D列相当の `correct` に英文全体の日本語訳、E〜G列相当の `choice1`〜`choice3` に日本語の誤訳選択肢を入れます。旧ファイル名のアップロードは可能ですが、新しい英文和訳形式では `question` を英文、`correct` を日本語訳として出題します。RPG本体の英英辞典モードは別仕様のため維持しています。
