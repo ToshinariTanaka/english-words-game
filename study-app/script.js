@@ -16,6 +16,10 @@ const MODES = {
   },
 };
 
+const UPLOAD_DB_NAME = 'english-study-app';
+const UPLOAD_DB_VERSION = 1;
+const UPLOAD_STORE_NAME = 'uploaded-files';
+
 const state = {
   mode: 'word',
   questions: [],
@@ -26,6 +30,7 @@ const state = {
   reviewMode: false,
   selected: false,
   sourceLabel: '',
+  loadToken: 0,
 };
 
 const els = {
@@ -45,6 +50,67 @@ const els = {
   fileInput: document.getElementById('fileInput'),
   uploadStatus: document.getElementById('uploadStatus'),
 };
+
+function openUploadDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      reject(new Error('このブラウザではアップロードファイルを保存できません。'));
+      return;
+    }
+
+    const request = indexedDB.open(UPLOAD_DB_NAME, UPLOAD_DB_VERSION);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(UPLOAD_STORE_NAME)) {
+        database.createObjectStore(UPLOAD_STORE_NAME, { keyPath: 'mode' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('保存領域を開けませんでした。'));
+  });
+}
+
+async function getSavedUpload(mode) {
+  const database = await openUploadDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(UPLOAD_STORE_NAME, 'readonly');
+    const request = transaction.objectStore(UPLOAD_STORE_NAME).get(mode);
+
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error || new Error('保存済みファイルを読み込めませんでした。'));
+    transaction.oncomplete = () => database.close();
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error || new Error('保存済みファイルを読み込めませんでした。'));
+    };
+  });
+}
+
+async function saveUpload(mode, rows, fileName) {
+  const database = await openUploadDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(UPLOAD_STORE_NAME, 'readwrite');
+    transaction.objectStore(UPLOAD_STORE_NAME).put({
+      mode,
+      rows,
+      fileName,
+      savedAt: new Date().toISOString(),
+    });
+
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error || new Error('アップロードファイルを保存できませんでした。'));
+    };
+    transaction.onabort = () => {
+      database.close();
+      reject(transaction.error || new Error('アップロードファイルの保存が中断されました。'));
+    };
+  });
+}
 
 function parseCsv(text) {
   const rows = [];
@@ -139,14 +205,19 @@ function resetSession(mode) {
 
 function applyQuestions(rows, sourceLabel) {
   state.questions = normalizeQuestions(rows);
+  if (state.questions.length === 0) {
+    throw new Error('有効な4択問題がありません。問題文・正解・3つの誤答を確認してください。');
+  }
   state.sourceLabel = sourceLabel;
   els.uploadStatus.textContent = `${sourceLabel} から ${state.questions.length}問を読み込みました。`;
   showQuestion();
 }
 
 async function loadMode(mode) {
+  const loadToken = state.loadToken + 1;
+  state.loadToken = loadToken;
   resetSession(mode);
-  els.questionText.textContent = 'CSVを読み込み中...';
+  els.questionText.textContent = '問題を読み込み中...';
   els.choices.innerHTML = '';
   els.feedback.hidden = true;
   els.nextButton.disabled = true;
@@ -154,10 +225,24 @@ async function loadMode(mode) {
   updateStats();
 
   try {
+    const savedUpload = await getSavedUpload(mode);
+    if (loadToken !== state.loadToken || state.mode !== mode) return;
+    if (savedUpload && Array.isArray(savedUpload.rows) && savedUpload.rows.length > 0) {
+      applyQuestions(savedUpload.rows, `${savedUpload.fileName}（保存済みアップロード）`);
+      return;
+    }
+  } catch (error) {
+    console.warn('保存済みアップロードの読み込みに失敗しました。', error);
+  }
+
+  try {
     const response = await fetch(MODES[mode].file);
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    applyQuestions(parseCsv(await response.text()), `${MODES[mode].label}の標準CSV`);
+    const rows = parseCsv(await response.text());
+    if (loadToken !== state.loadToken || state.mode !== mode) return;
+    applyQuestions(rows, `${MODES[mode].label}の標準CSV`);
   } catch (error) {
+    if (loadToken !== state.loadToken || state.mode !== mode) return;
     els.questionText.textContent = 'CSVの読み込みに失敗しました。GitHub PagesなどのWebサーバー上で開いてください。';
     els.feedback.textContent = error.message;
     els.feedback.className = 'feedback wrong';
@@ -169,9 +254,8 @@ async function loadMode(mode) {
 async function handleUpload(event) {
   const [file] = event.target.files;
   if (!file) return;
-  resetSession(state.mode);
-  updateModeUi();
-  updateStats();
+  const uploadMode = state.mode;
+  state.loadToken += 1;
   els.questionText.textContent = 'ファイルを読み込み中...';
   els.choices.innerHTML = '';
   els.feedback.hidden = true;
@@ -182,13 +266,23 @@ async function handleUpload(event) {
     const rows = extension === 'xlsx'
       ? parseWorkbookRows(await file.arrayBuffer())
       : parseCsv(await file.text());
-    applyQuestions(rows, `${file.name}（アップロード）`);
+
+    const validQuestions = normalizeQuestions(rows);
+    if (validQuestions.length === 0) {
+      throw new Error('有効な4択問題がありません。問題文・正解・3つの誤答を確認してください。');
+    }
+
+    await saveUpload(uploadMode, rows, file.name);
+    resetSession(uploadMode);
+    updateModeUi();
+    updateStats();
+    applyQuestions(rows, `${file.name}（アップロード・保存済み）`);
   } catch (error) {
-    els.questionText.textContent = 'アップロードファイルの読み込みに失敗しました。';
+    els.questionText.textContent = 'アップロードファイルの読み込みまたは保存に失敗しました。';
     els.feedback.textContent = error.message;
     els.feedback.className = 'feedback wrong';
     els.feedback.hidden = false;
-    els.uploadStatus.textContent = 'アップロードに失敗しました。';
+    els.uploadStatus.textContent = 'アップロードに失敗しました。以前の保存済みファイルは保持されています。';
   } finally {
     event.target.value = '';
   }
