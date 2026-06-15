@@ -34,13 +34,26 @@ def test_validate_rejects_english_choices_when_correct_is_japanese():
     row = mod.RowItem(2, "1", "A1", "ad", "広告")
     parsed = {"1": {"choice1": "advertisement", "choice2": "notice", "choice3": "announcement"}}
     errors = mod.validate_batch([row], parsed)["1"]
-    assert "correct が日本語のため choice1〜choice3 に英語を含めないでください" in errors
+    assert "correct が日本語を含むため choice1〜choice3 に英字[A-Za-z]を含めないでください" in errors
+
+
+def test_validate_allows_japanese_choices_when_correct_is_japanese():
+    row = mod.RowItem(2, "1", "A1", "ad", "広告")
+    parsed = {"1": {"choice1": "住所", "choice2": "案内", "choice3": "発表"}}
+    assert mod.validate_batch([row], parsed) == {}
+
+
+def test_validate_allows_english_choices_when_correct_is_english():
+    row = mod.RowItem(2, "1", "A1", "an identifying mark", "sign")
+    parsed = {"1": {"choice1": "symbol", "choice2": "signal", "choice3": "gesture"}}
+    assert mod.validate_batch([row], parsed) == {}
 
 
 def test_prompt_explains_japanese_correct_requires_japanese_choices():
     prompt = mod.build_prompt([mod.RowItem(2, "1", "A1", "ad", "広告")])
-    assert "correct が日本語なら choice1〜choice3 も必ず日本語" in prompt
-    assert "英単語そのもの、英語の類義語、英語表現" in prompt
+    assert "correct が日本語を含む場合、choice1〜choice3 は必ず日本語のみ" in prompt
+    assert "英単語、英語フレーズ、英語類義語" in prompt
+    assert "A-Z または a-z が1文字でも含まれていたら不正" in prompt
     assert "question が英単語で correct が日本語の場合は、日本語4択問題" in prompt
 
 
@@ -49,5 +62,7 @@ if __name__ == "__main__":
     test_validate_detects_blank_and_duplicates()
     test_strip_code_fence_csv()
     test_validate_rejects_english_choices_when_correct_is_japanese()
+    test_validate_allows_japanese_choices_when_correct_is_japanese()
+    test_validate_allows_english_choices_when_correct_is_english()
     test_prompt_explains_japanese_correct_requires_japanese_choices()
     print("tests_fill_excel_choices: PASS")

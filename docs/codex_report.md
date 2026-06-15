@@ -1,4 +1,35 @@
 ## 今回やったこと
+- `tools/fill_excel_choices.py` のAIプロンプトをさらに強化し、`correct` が日本語を含む場合は `choice1`〜`choice3` を日本語のみ、英単語・英語フレーズ・英語類義語禁止、英字 `[A-Za-z]` 混入禁止として明記。
+- `ad` / `広告` の悪い例（`advertisement` / `notice` / `announcement`）と良い例（`住所` / `案内` / `発表`）をプロンプトへ複数行で追加。
+- Python側で、日本語を含む `correct` に対して選択肢へ英字が混入した場合に `validate_batch` がエラーを返す検証を維持・明確化。最大再試行後に残った場合は、row_number、Excel行番号、question/correct/choice内容を含めて停止するようにした。
+- 日本語正解で英語choiceを拒否するテスト、日本語choiceを許容するテスト、英語正解では英語choiceを許容するテストを追加。
+- README / project_status を日本語正解時の英字混入検証に合わせて更新。
+
+## 変更ファイル
+- `tools/fill_excel_choices.py`
+- `tests_fill_excel_choices.py`
+- `README.md`
+- `docs/codex_report.md`
+- `docs/project_status.md`
+
+## テスト結果
+- `python3 -m py_compile tools/fill_excel_choices.py tests_fill_excel_choices.py` : PASS
+- `python3 tests_fill_excel_choices.py` : PASS
+
+## 注意点
+- 日本語 `correct` の英語混入検出はASCII英字 `[A-Za-z]` を含むかどうかで判定するため、教材上あえて英字略語や固有名詞を日本語選択肢に含めたい場合は例外ルールの追加が必要。
+- 実API呼び出しは行っていないため、実教材Excelでは少量バッチでプロンプト効果と再試行時の表示を確認する必要がある。
+
+## 次にやるべきこと
+- 実教材Excelと実APIキーで少量バッチを実行し、日本語訳モードの選択肢が日本語だけになるか確認する。
+- 必要なら英字混入検出の例外許可リストや、エラーログCSV出力を追加する。
+
+## チャッピーに相談すべき点
+- 日本語訳モードでTOEIC、IT、SNSなど英字表記が自然な語を例外許可するか。
+- 不正解選択肢を意味の近さ優先にするか、品詞・長さ・学習レベルの近さ優先にするか。
+
+---
+## 今回やったこと
 - `tools/fill_excel_choices.py` のAI向けプロンプトを更新し、`choice1`〜`choice3` は `correct` と同じ言語で作ることを明記。
 - `correct` が日本語の場合、`choice1`〜`choice3` も必ず日本語にし、英単語そのもの・英語類義語・英語表現を入れないように明記。
 - `question` が英単語で `correct` が日本語の場合は、日本語4択問題として扱う条件と、`ad` / `広告` の悪い例・良い例をプロンプトへ追加。
