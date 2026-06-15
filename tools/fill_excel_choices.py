@@ -58,6 +58,17 @@ def normalize_for_duplicate(value: str) -> str:
     return " ".join(value.strip().casefold().split())
 
 
+def contains_japanese(value: str) -> bool:
+    return any(
+        "\u3040" <= char <= "\u30ff" or "\u3400" <= char <= "\u9fff"
+        for char in value
+    )
+
+
+def contains_ascii_letter(value: str) -> bool:
+    return any("a" <= char.lower() <= "z" for char in value)
+
+
 def is_blank(value: object) -> bool:
     return clean(value) == ""
 
@@ -109,6 +120,10 @@ def build_prompt(rows: list[RowItem]) -> str:
 - ヘッダーは必ず row_number,choice1,choice2,choice3 にしてください。
 - row_number は入力と完全一致させてください。
 - choice1〜choice3 は空欄禁止です。
+- choice1〜choice3 は必ず correct と同じ言語で作ってください。
+- correct が日本語なら choice1〜choice3 も必ず日本語にしてください。英単語そのもの、英語の類義語、英語表現は絶対に入れないでください。
+- question が英単語で correct が日本語の場合は、日本語4択問題として扱い、選択肢は日本語の不正解訳だけにしてください。
+- 例: question が ad、correct が 広告 の場合、悪い例は advertisement, notice, announcement。良い例は 住所, 案内, 発表。
 - correct と choice1〜choice3 は重複禁止です。
 - choice1〜choice3 同士も重複禁止です。
 - 学習者が迷う程度に近いが、明確に不正解の選択肢にしてください。
@@ -176,6 +191,8 @@ def validate_choices(item: RowItem, choices: dict[str, str]) -> list[str]:
     normalized_choices = [normalize_for_duplicate(value) for value in values]
     if normalized_correct and normalized_correct in normalized_choices:
         errors.append("correct と choice1〜choice3 が重複しています")
+    if contains_japanese(item.correct) and any(contains_ascii_letter(value) for value in values):
+        errors.append("correct が日本語のため choice1〜choice3 に英語を含めないでください")
     if len([value for value in normalized_choices if value]) != len(set(value for value in normalized_choices if value)):
         errors.append("choice1〜choice3 同士が重複しています")
     return errors
