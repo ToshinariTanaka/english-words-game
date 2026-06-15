@@ -3,17 +3,36 @@ const MODES = {
     label: '英単語モード',
     file: './data/word_mode.csv',
     description: '英単語を見て、日本語の意味を選びます。',
+    questionAliases: ['question', 'word', '英単語', '単語', '問題'],
+    correctAliases: ['correct', 'meaning', '和訳', '意味', '正解'],
   },
   chunk: {
     label: 'チャンクモード',
     file: './data/chunk_mode.csv',
     description: '英語のかたまり表現を見て、自然な意味を選びます。',
+    questionAliases: ['question', 'chunk', 'チャンク', '問題'],
+    correctAliases: ['correct', 'chunk_meaning', 'チャンク和訳', '和訳', '意味', '正解'],
   },
   definition: {
     label: '英英辞典モード',
     file: './data/definition_mode.csv',
     description: '英語の定義文を読んで、当てはまる英単語を選びます。',
+    questionAliases: ['question', 'definition', '英語定義', '定義', '問題'],
+    correctAliases: ['correct', 'word', '英単語', '単語', '正解'],
   },
+};
+
+const COMMON_ALIASES = {
+  id: ['row_number', 'row', 'id', '番号', '行番号'],
+  level: ['level', 'レベル'],
+  choice1: ['choice1', 'choice_1', 'wrong1', 'incorrect1', '誤答1', '選択肢1'],
+  choice2: ['choice2', 'choice_2', 'wrong2', 'incorrect2', '誤答2', '選択肢2'],
+  choice3: ['choice3', 'choice_3', 'wrong3', 'incorrect3', '誤答3', '選択肢3'],
+  totalCorrect: ['total_correct', 'totalCorrect', '累計正解回数', '正解数'],
+  totalWrong: ['total_wrong', 'totalWrong', '累計不正解回数', '不正解数'],
+  accuracy: ['accuracy', '正答率', '累計正解率'],
+  currentStreak: ['current_streak', 'currentStreak', '現在の連勝数', '連続正解'],
+  note: ['note', '備考', 'メモ'],
 };
 
 const UPLOAD_DB_NAME = 'english-study-app';
@@ -142,8 +161,9 @@ function parseCsv(text) {
   row.push(cell);
   if (row.some((value) => value.trim() !== '')) rows.push(row);
 
+  if (rows.length === 0) return [];
   const [headers, ...records] = rows;
-  return records.map((record) => Object.fromEntries(headers.map((header, index) => [header.trim(), (record[index] || '').trim()])));
+  return records.map((record) => Object.fromEntries(headers.map((header, index) => [stripBom(header).trim(), (record[index] || '').trim()])));
 }
 
 function shuffle(items) {
@@ -151,46 +171,48 @@ function shuffle(items) {
 }
 
 function stripBom(value) {
-  return value.replace(/^\uFEFF/, '');
+  return String(value || '').replace(/^\uFEFF/, '');
 }
 
-function assertRequiredHeaders(rows) {
-  const required = ['row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note'];
-  const headers = rows[0] ? Object.keys(rows[0]).map(stripBom) : [];
-  const missing = required.filter((header) => !headers.includes(header));
-  if (missing.length > 0) {
-    throw new Error(`必須列が不足しています: ${missing.join(', ')}`);
+function pickField(row, aliases) {
+  for (const alias of aliases) {
+    const value = row[alias];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value).trim();
+    }
   }
-}
-
-function parseWorkbookRows(arrayBuffer) {
-  if (!window.XLSX) {
-    throw new Error('Excel読み込みライブラリの読み込みに失敗しました。ネットワーク接続またはCDN設定を確認してください。');
-  }
-  const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) throw new Error('Excelファイルにシートがありません。');
-  return window.XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { defval: '', raw: false });
+  return '';
 }
 
 function normalizeQuestions(rows) {
-  assertRequiredHeaders(rows);
-  return rows.map((row) => {
-    const normalizedRow = Object.fromEntries(Object.entries(row).map(([key, value]) => [stripBom(key).trim(), String(value || '').trim()]));
-    const choices = [normalizedRow.correct, normalizedRow.choice1, normalizedRow.choice2, normalizedRow.choice3].filter(Boolean);
+  const modeConfig = MODES[state.mode];
+
+  return rows.map((row, index) => {
+    const normalizedRow = Object.fromEntries(
+      Object.entries(row || {}).map(([key, value]) => [stripBom(key).trim(), String(value ?? '').trim()]),
+    );
+    const correct = pickField(normalizedRow, modeConfig.correctAliases);
+    const choices = [
+      correct,
+      pickField(normalizedRow, COMMON_ALIASES.choice1),
+      pickField(normalizedRow, COMMON_ALIASES.choice2),
+      pickField(normalizedRow, COMMON_ALIASES.choice3),
+    ];
+    const uniqueChoices = [...new Set(choices.filter(Boolean))];
+
     return {
-      id: normalizedRow.row_number,
-      level: normalizedRow.level,
-      question: normalizedRow.question,
-      correct: normalizedRow.correct,
-      choices: shuffle(choices),
-      totalCorrect: normalizedRow.total_correct || '0',
-      totalWrong: normalizedRow.total_wrong || '0',
-      csvAccuracy: normalizedRow.accuracy || '0%',
-      currentStreak: normalizedRow.current_streak || '0',
-      note: normalizedRow.note || '',
+      id: pickField(normalizedRow, COMMON_ALIASES.id) || String(index + 1),
+      level: pickField(normalizedRow, COMMON_ALIASES.level),
+      question: pickField(normalizedRow, modeConfig.questionAliases),
+      correct,
+      choices: shuffle(uniqueChoices),
+      totalCorrect: pickField(normalizedRow, COMMON_ALIASES.totalCorrect) || '0',
+      totalWrong: pickField(normalizedRow, COMMON_ALIASES.totalWrong) || '0',
+      csvAccuracy: pickField(normalizedRow, COMMON_ALIASES.accuracy) || '0%',
+      currentStreak: pickField(normalizedRow, COMMON_ALIASES.currentStreak) || '0',
+      note: pickField(normalizedRow, COMMON_ALIASES.note),
     };
-  }).filter((item) => item.id && item.question && item.correct && item.choices.length === 4);
+  }).filter((item) => item.question && item.correct && item.choices.length === 4);
 }
 
 function resetSession(mode) {
@@ -205,11 +227,24 @@ function resetSession(mode) {
 
 function applyQuestions(rows, sourceLabel) {
   state.questions = normalizeQuestions(rows);
-  if (state.questions.length === 0) {
-    throw new Error('有効な4択問題がありません。問題文・正解・3つの誤答を確認してください。');
-  }
   state.sourceLabel = sourceLabel;
-  els.uploadStatus.textContent = `${sourceLabel} から ${state.questions.length}問を読み込みました。`;
+  const skippedCount = Math.max(rows.length - state.questions.length, 0);
+  const skippedMessage = skippedCount > 0 ? ` 選択肢などが不足している${skippedCount}行は出題しません。` : '';
+  els.uploadStatus.textContent = `${sourceLabel} から ${state.questions.length}問を読み込みました。${skippedMessage}`;
+
+  if (state.questions.length === 0) {
+    state.index = 0;
+    els.progressLabel.textContent = '0 / 0';
+    els.questionText.textContent = '出題できる問題がありません。';
+    els.choices.innerHTML = '';
+    els.feedback.textContent = '正解と3つの誤答選択肢がそろっている行だけを出題します。';
+    els.feedback.className = 'feedback';
+    els.feedback.hidden = false;
+    els.nextButton.disabled = true;
+    updateModeUi();
+    return;
+  }
+
   showQuestion();
 }
 
@@ -267,11 +302,6 @@ async function handleUpload(event) {
       ? parseWorkbookRows(await file.arrayBuffer())
       : parseCsv(await file.text());
 
-    const validQuestions = normalizeQuestions(rows);
-    if (validQuestions.length === 0) {
-      throw new Error('有効な4択問題がありません。問題文・正解・3つの誤答を確認してください。');
-    }
-
     await saveUpload(uploadMode, rows, file.name);
     resetSession(uploadMode);
     updateModeUi();
@@ -286,6 +316,16 @@ async function handleUpload(event) {
   } finally {
     event.target.value = '';
   }
+}
+
+function parseWorkbookRows(arrayBuffer) {
+  if (!window.XLSX) {
+    throw new Error('Excel読み込みライブラリの読み込みに失敗しました。ネットワーク接続またはCDN設定を確認してください。');
+  }
+  const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) throw new Error('Excelファイルにシートがありません。');
+  return window.XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { defval: '', raw: false });
 }
 
 function updateModeUi() {
