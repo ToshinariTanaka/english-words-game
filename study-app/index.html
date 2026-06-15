@@ -21,6 +21,33 @@
         <button class="mode-button" type="button" data-mode="definition">英英辞典</button>
       </div>
       <p id="modeDescription" class="mode-description"></p>
+
+      <section class="quiz-settings" aria-labelledby="settingsTitle">
+        <h3 id="settingsTitle">出題設定</h3>
+        <div class="setting-grid">
+          <label class="setting-field" for="questionCount">
+            <span>出題数</span>
+            <select id="questionCount">
+              <option value="10">10問</option>
+              <option value="20">20問</option>
+              <option value="30">30問</option>
+              <option value="40">40問</option>
+              <option value="50">50問</option>
+              <option value="70">70問</option>
+              <option value="100">100問</option>
+              <option value="150">150問</option>
+              <option value="all" selected>全て</option>
+            </select>
+          </label>
+          <label class="random-toggle" for="randomOrder">
+            <input id="randomOrder" type="checkbox">
+            <span>ランダム出題</span>
+          </label>
+        </div>
+        <button id="startQuizButton" class="secondary-button settings-start-button" type="button" disabled>この設定で出題開始</button>
+        <p id="settingsStatus" class="settings-status">問題を読み込むと出題設定を利用できます。</p>
+      </section>
+
       <div class="upload-box">
         <label class="upload-label" for="fileInput">CSV/Excelをアップロード</label>
         <input id="fileInput" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
@@ -55,24 +82,5 @@
   </main>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="./script.js"></script>
-  <script>
-    // Excelの列記号付き見出し（A row_number ～ L note）にも対応する。
-    // 出題に必要なのはA～G列だけで、H～L列は空欄でもよい。
-    COMMON_ALIASES.id.unshift('A row_number');
-    COMMON_ALIASES.level.unshift('B level');
-    COMMON_ALIASES.choice1.unshift('E choice1');
-    COMMON_ALIASES.choice2.unshift('F choice2');
-    COMMON_ALIASES.choice3.unshift('G choice3');
-    COMMON_ALIASES.totalCorrect.unshift('H total_correct');
-    COMMON_ALIASES.totalWrong.unshift('I total_wrong');
-    COMMON_ALIASES.accuracy.unshift('J accuracy');
-    COMMON_ALIASES.currentStreak.unshift('K current_streak');
-    COMMON_ALIASES.note.unshift('L note');
-
-    Object.values(MODES).forEach((mode) => {
-      mode.questionAliases.unshift('C question');
-      mode.correctAliases.unshift('D correct');
-    });
-  </script>
 </body>
 </html>
