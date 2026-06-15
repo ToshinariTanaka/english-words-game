@@ -3,36 +3,36 @@ const MODES = {
     label: '英単語モード',
     file: './data/word_mode.csv',
     description: '英単語を見て、日本語の意味を選びます。',
-    questionAliases: ['question', 'word', '英単語', '単語', '問題'],
-    correctAliases: ['correct', 'meaning', '和訳', '意味', '正解'],
+    questionAliases: ['C question', 'question', 'word', '英単語', '単語', '問題'],
+    correctAliases: ['D correct', 'correct', 'meaning', '和訳', '意味', '正解'],
   },
   chunk: {
     label: 'チャンクモード',
     file: './data/chunk_mode.csv',
     description: '英語のかたまり表現を見て、自然な意味を選びます。',
-    questionAliases: ['question', 'chunk', 'チャンク', '問題'],
-    correctAliases: ['correct', 'chunk_meaning', 'チャンク和訳', '和訳', '意味', '正解'],
+    questionAliases: ['C question', 'question', 'chunk', 'チャンク', '問題'],
+    correctAliases: ['D correct', 'correct', 'chunk_meaning', 'チャンク和訳', '和訳', '意味', '正解'],
   },
   definition: {
     label: '英英辞典モード',
     file: './data/definition_mode.csv',
     description: '英語の定義文を読んで、当てはまる英単語を選びます。',
-    questionAliases: ['question', 'definition', '英語定義', '定義', '問題'],
-    correctAliases: ['correct', 'word', '英単語', '単語', '正解'],
+    questionAliases: ['C question', 'question', 'definition', '英語定義', '定義', '問題'],
+    correctAliases: ['D correct', 'correct', 'word', '英単語', '単語', '正解'],
   },
 };
 
 const COMMON_ALIASES = {
-  id: ['row_number', 'row', 'id', '番号', '行番号'],
-  level: ['level', 'レベル'],
-  choice1: ['choice1', 'choice_1', 'wrong1', 'incorrect1', '誤答1', '選択肢1'],
-  choice2: ['choice2', 'choice_2', 'wrong2', 'incorrect2', '誤答2', '選択肢2'],
-  choice3: ['choice3', 'choice_3', 'wrong3', 'incorrect3', '誤答3', '選択肢3'],
-  totalCorrect: ['total_correct', 'totalCorrect', '累計正解回数', '正解数'],
-  totalWrong: ['total_wrong', 'totalWrong', '累計不正解回数', '不正解数'],
-  accuracy: ['accuracy', '正答率', '累計正解率'],
-  currentStreak: ['current_streak', 'currentStreak', '現在の連勝数', '連続正解'],
-  note: ['note', '備考', 'メモ'],
+  id: ['A row_number', 'row_number', 'row', 'id', '番号', '行番号'],
+  level: ['B level', 'level', 'レベル'],
+  choice1: ['E choice1', 'choice1', 'choice_1', 'wrong1', 'incorrect1', '誤答1', '選択肢1'],
+  choice2: ['F choice2', 'choice2', 'choice_2', 'wrong2', 'incorrect2', '誤答2', '選択肢2'],
+  choice3: ['G choice3', 'choice3', 'choice_3', 'wrong3', 'incorrect3', '誤答3', '選択肢3'],
+  totalCorrect: ['H total_correct', 'total_correct', 'totalCorrect', '累計正解回数', '正解数'],
+  totalWrong: ['I total_wrong', 'total_wrong', 'totalWrong', '累計不正解回数', '不正解数'],
+  accuracy: ['J accuracy', 'accuracy', '正答率', '累計正解率'],
+  currentStreak: ['K current_streak', 'current_streak', 'currentStreak', '現在の連勝数', '連続正解'],
+  note: ['L note', 'note', '備考', 'メモ'],
 };
 
 const UPLOAD_DB_NAME = 'english-study-app';
@@ -41,6 +41,7 @@ const UPLOAD_STORE_NAME = 'uploaded-files';
 
 const state = {
   mode: 'word',
+  questionPool: [],
   questions: [],
   index: 0,
   answered: 0,
@@ -68,6 +69,10 @@ const els = {
   reviewButton: document.getElementById('reviewButton'),
   fileInput: document.getElementById('fileInput'),
   uploadStatus: document.getElementById('uploadStatus'),
+  questionCount: document.getElementById('questionCount'),
+  randomOrder: document.getElementById('randomOrder'),
+  startQuizButton: document.getElementById('startQuizButton'),
+  settingsStatus: document.getElementById('settingsStatus'),
 };
 
 function openUploadDatabase() {
@@ -163,11 +168,28 @@ function parseCsv(text) {
 
   if (rows.length === 0) return [];
   const [headers, ...records] = rows;
-  return records.map((record) => Object.fromEntries(headers.map((header, index) => [stripBom(header).trim(), (record[index] || '').trim()])));
+  return records.map((record) => Object.fromEntries(
+    headers.map((header, index) => [stripBom(header).trim(), (record[index] || '').trim()]),
+  ));
+}
+
+function parseWorkbookRows(arrayBuffer) {
+  if (!window.XLSX) {
+    throw new Error('Excel読み込みライブラリの読み込みに失敗しました。ネットワーク接続またはCDN設定を確認してください。');
+  }
+  const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) throw new Error('Excelファイルにシートがありません。');
+  return window.XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { defval: '', raw: false });
 }
 
 function shuffle(items) {
-  return [...items].sort(() => Math.random() - 0.5);
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
 }
 
 function stripBom(value) {
@@ -205,7 +227,7 @@ function normalizeQuestions(rows) {
       level: pickField(normalizedRow, COMMON_ALIASES.level),
       question: pickField(normalizedRow, modeConfig.questionAliases),
       correct,
-      choices: shuffle(uniqueChoices),
+      choices: uniqueChoices,
       totalCorrect: pickField(normalizedRow, COMMON_ALIASES.totalCorrect) || '0',
       totalWrong: pickField(normalizedRow, COMMON_ALIASES.totalWrong) || '0',
       csvAccuracy: pickField(normalizedRow, COMMON_ALIASES.accuracy) || '0%',
@@ -215,49 +237,110 @@ function normalizeQuestions(rows) {
   }).filter((item) => item.question && item.correct && item.choices.length === 4);
 }
 
-function resetSession(mode) {
-  state.mode = mode;
-  state.reviewMode = false;
+function resetSessionStats() {
   state.index = 0;
   state.answered = 0;
   state.correct = 0;
   state.mistakes = [];
+  state.reviewMode = false;
   state.selected = false;
+  updateStats();
+}
+
+function setLoadingState(message) {
+  state.questionPool = [];
+  state.questions = [];
+  resetSessionStats();
+  els.questionText.textContent = message;
+  els.choices.innerHTML = '';
+  els.feedback.hidden = true;
+  els.progressLabel.textContent = '0 / 0';
+  els.nextButton.disabled = true;
+  els.nextButton.textContent = '次の問題へ';
+  els.startQuizButton.disabled = true;
+  els.settingsStatus.textContent = '問題を読み込むと出題設定を利用できます。';
+}
+
+function updateQuestionCountOptions(availableCount) {
+  Array.from(els.questionCount.options).forEach((option) => {
+    if (option.value === 'all') {
+      option.disabled = false;
+      return;
+    }
+    option.disabled = Number(option.value) > availableCount;
+  });
+
+  const selectedOption = els.questionCount.selectedOptions[0];
+  if (!selectedOption || selectedOption.disabled) {
+    els.questionCount.value = 'all';
+  }
+}
+
+function getConfiguredQuestionCount() {
+  if (els.questionCount.value === 'all') return state.questionPool.length;
+  return Math.min(Number(els.questionCount.value), state.questionPool.length);
+}
+
+function cloneQuestionForSession(question) {
+  return {
+    ...question,
+    choices: shuffle(question.choices),
+  };
+}
+
+function beginConfiguredSession() {
+  if (state.questionPool.length === 0) return;
+
+  resetSessionStats();
+  const random = els.randomOrder.checked;
+  const requestedCount = getConfiguredQuestionCount();
+  const orderedPool = random ? shuffle(state.questionPool) : [...state.questionPool];
+  state.questions = orderedPool.slice(0, requestedCount).map(cloneQuestionForSession);
+
+  const countLabel = requestedCount === state.questionPool.length ? '全問' : `${requestedCount}問`;
+  const orderLabel = random ? 'ランダム' : '元の順番';
+  els.settingsStatus.textContent = `全${state.questionPool.length}問から、${orderLabel}で${countLabel}を出題します。`;
+  showQuestion();
+}
+
+function showEmptyState() {
+  state.questions = [];
+  state.index = 0;
+  els.progressLabel.textContent = '0 / 0';
+  els.questionText.textContent = '出題できる問題がありません。';
+  els.choices.innerHTML = '';
+  els.feedback.textContent = '正解と3つの誤答選択肢がそろっている行だけを出題します。';
+  els.feedback.className = 'feedback';
+  els.feedback.hidden = false;
+  els.nextButton.disabled = true;
+  els.startQuizButton.disabled = true;
+  els.settingsStatus.textContent = '出題可能な行がありません。';
+  updateModeUi();
 }
 
 function applyQuestions(rows, sourceLabel) {
-  state.questions = normalizeQuestions(rows);
+  state.questionPool = normalizeQuestions(rows);
   state.sourceLabel = sourceLabel;
-  const skippedCount = Math.max(rows.length - state.questions.length, 0);
+  const skippedCount = Math.max(rows.length - state.questionPool.length, 0);
   const skippedMessage = skippedCount > 0 ? ` 選択肢などが不足している${skippedCount}行は出題しません。` : '';
-  els.uploadStatus.textContent = `${sourceLabel} から ${state.questions.length}問を読み込みました。${skippedMessage}`;
+  els.uploadStatus.textContent = `${sourceLabel} から ${state.questionPool.length}問を読み込みました。${skippedMessage}`;
+  updateQuestionCountOptions(state.questionPool.length);
 
-  if (state.questions.length === 0) {
-    state.index = 0;
-    els.progressLabel.textContent = '0 / 0';
-    els.questionText.textContent = '出題できる問題がありません。';
-    els.choices.innerHTML = '';
-    els.feedback.textContent = '正解と3つの誤答選択肢がそろっている行だけを出題します。';
-    els.feedback.className = 'feedback';
-    els.feedback.hidden = false;
-    els.nextButton.disabled = true;
-    updateModeUi();
+  if (state.questionPool.length === 0) {
+    showEmptyState();
     return;
   }
 
-  showQuestion();
+  els.startQuizButton.disabled = false;
+  beginConfiguredSession();
 }
 
 async function loadMode(mode) {
   const loadToken = state.loadToken + 1;
   state.loadToken = loadToken;
-  resetSession(mode);
-  els.questionText.textContent = '問題を読み込み中...';
-  els.choices.innerHTML = '';
-  els.feedback.hidden = true;
-  els.nextButton.disabled = true;
+  state.mode = mode;
+  setLoadingState('問題を読み込み中...');
   updateModeUi();
-  updateStats();
 
   try {
     const savedUpload = await getSavedUpload(mode);
@@ -291,10 +374,7 @@ async function handleUpload(event) {
   if (!file) return;
   const uploadMode = state.mode;
   state.loadToken += 1;
-  els.questionText.textContent = 'ファイルを読み込み中...';
-  els.choices.innerHTML = '';
-  els.feedback.hidden = true;
-  els.nextButton.disabled = true;
+  setLoadingState('ファイルを読み込み中...');
 
   try {
     const extension = file.name.split('.').pop().toLowerCase();
@@ -303,9 +383,8 @@ async function handleUpload(event) {
       : parseCsv(await file.text());
 
     await saveUpload(uploadMode, rows, file.name);
-    resetSession(uploadMode);
+    state.mode = uploadMode;
     updateModeUi();
-    updateStats();
     applyQuestions(rows, `${file.name}（アップロード・保存済み）`);
   } catch (error) {
     els.questionText.textContent = 'アップロードファイルの読み込みまたは保存に失敗しました。';
@@ -316,16 +395,6 @@ async function handleUpload(event) {
   } finally {
     event.target.value = '';
   }
-}
-
-function parseWorkbookRows(arrayBuffer) {
-  if (!window.XLSX) {
-    throw new Error('Excel読み込みライブラリの読み込みに失敗しました。ネットワーク接続またはCDN設定を確認してください。');
-  }
-  const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) throw new Error('Excelファイルにシートがありません。');
-  return window.XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { defval: '', raw: false });
 }
 
 function updateModeUi() {
@@ -348,11 +417,12 @@ function showQuestion() {
   els.nextButton.disabled = true;
   const current = state.questions[state.index];
   els.progressLabel.textContent = state.questions.length === 0 ? '0 / 0' : `${state.index + 1} / ${state.questions.length}`;
+
   if (!current) {
-    els.questionText.textContent = 'このモードの問題はありません。';
-    els.choices.innerHTML = '';
+    showEmptyState();
     return;
   }
+
   els.questionText.textContent = current.question;
   els.feedback.className = 'feedback';
   els.feedback.textContent = `問題ID: ${current.id} / レベル: ${current.level || '未設定'} / CSV成績: 正解 ${current.totalCorrect}・不正解 ${current.totalWrong}・正答率 ${current.csvAccuracy}・連続正解 ${current.currentStreak}`;
@@ -363,9 +433,10 @@ function showQuestion() {
     button.type = 'button';
     button.className = 'choice-button';
     button.textContent = choice;
-    button.addEventListener('click', () => answer(choice, button));
+    button.addEventListener('click', () => answer(choice));
     els.choices.appendChild(button);
   });
+  els.nextButton.textContent = state.index === state.questions.length - 1 ? '結果を見る' : '次の問題へ';
   updateModeUi();
 }
 
@@ -375,11 +446,13 @@ function answer(choice) {
   const current = state.questions[state.index];
   const isCorrect = choice === current.correct;
   state.answered += 1;
+
   if (isCorrect) {
     state.correct += 1;
   } else if (!state.reviewMode) {
     state.mistakes.push(current);
   }
+
   document.querySelectorAll('.choice-button').forEach((button) => {
     button.disabled = true;
     if (button.textContent === current.correct) button.classList.add('correct');
@@ -392,18 +465,36 @@ function answer(choice) {
   updateStats();
 }
 
+function finishSession() {
+  const rate = state.answered === 0 ? 0 : Math.round((state.correct / state.answered) * 100);
+  els.progressLabel.textContent = `${state.questions.length} / ${state.questions.length}`;
+  els.questionText.textContent = state.reviewMode ? '復習が終わりました。' : '学習が終わりました。';
+  els.choices.innerHTML = '';
+  els.feedback.className = 'feedback';
+  els.feedback.textContent = `${state.answered}問中${state.correct}問正解、正答率${rate}%です。`;
+  els.feedback.hidden = false;
+  els.nextButton.disabled = true;
+  els.nextButton.textContent = '次の問題へ';
+  updateModeUi();
+}
+
 function nextQuestion() {
   if (state.questions.length === 0) return;
-  state.index = (state.index + 1) % state.questions.length;
+  if (state.index >= state.questions.length - 1) {
+    finishSession();
+    return;
+  }
+  state.index += 1;
   showQuestion();
 }
 
 function startReview() {
   if (state.mistakes.length === 0) return;
-  state.questions = shuffle(state.mistakes);
+  state.questions = shuffle(state.mistakes).map(cloneQuestionForSession);
   state.mistakes = [];
   state.index = 0;
   state.reviewMode = true;
+  state.selected = false;
   showQuestion();
   updateStats();
 }
@@ -412,5 +503,6 @@ els.modeButtons.forEach((button) => button.addEventListener('click', () => loadM
 els.nextButton.addEventListener('click', nextQuestion);
 els.reviewButton.addEventListener('click', startReview);
 els.fileInput.addEventListener('change', handleUpload);
+els.startQuizButton.addEventListener('click', beginConfiguredSession);
 
 loadMode(state.mode);
