@@ -57,6 +57,18 @@ def test_prompt_explains_japanese_correct_requires_japanese_choices():
     assert "question が英単語で correct が日本語の場合は、日本語4択問題" in prompt
 
 
+def test_prompt_strengthens_distractor_quality_rules():
+    prompt = mod.build_prompt([mod.RowItem(2, "1", "A1", "addiction", "中毒")])
+    assert "correct の単なる類義語、言い換え、ほぼ同義の近縁語は禁止" in prompt
+    assert "correct の派生語、複合語、接頭辞・接尾辞を付けただけの語は禁止" in prompt
+    assert "correct の文字列を含む語は禁止" in prompt
+    assert "同じ意味領域の近縁語を連発しない" in prompt
+    assert "choice1〜choice3 は意味領域を分散" in prompt
+    assert "学習者が混同しやすいが、別概念" in prompt
+    assert "choice1: 依存" in prompt
+    assert "choice1: 習慣" in prompt
+
+
 if __name__ == "__main__":
     test_parse_response_and_validate_success()
     test_validate_detects_blank_and_duplicates()
@@ -65,4 +77,5 @@ if __name__ == "__main__":
     test_validate_allows_japanese_choices_when_correct_is_japanese()
     test_validate_allows_english_choices_when_correct_is_english()
     test_prompt_explains_japanese_correct_requires_japanese_choices()
+    test_prompt_strengthens_distractor_quality_rules()
     print("tests_fill_excel_choices: PASS")
