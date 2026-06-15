@@ -29,8 +29,25 @@ def test_strip_code_fence_csv():
     text = "```csv\nrow_number,choice1,choice2,choice3\n7,a,b,c\n```"
     assert mod.parse_response(text)["7"]["choice3"] == "c"
 
+
+def test_validate_rejects_english_choices_when_correct_is_japanese():
+    row = mod.RowItem(2, "1", "A1", "ad", "広告")
+    parsed = {"1": {"choice1": "advertisement", "choice2": "notice", "choice3": "announcement"}}
+    errors = mod.validate_batch([row], parsed)["1"]
+    assert "correct が日本語のため choice1〜choice3 に英語を含めないでください" in errors
+
+
+def test_prompt_explains_japanese_correct_requires_japanese_choices():
+    prompt = mod.build_prompt([mod.RowItem(2, "1", "A1", "ad", "広告")])
+    assert "correct が日本語なら choice1〜choice3 も必ず日本語" in prompt
+    assert "英単語そのもの、英語の類義語、英語表現" in prompt
+    assert "question が英単語で correct が日本語の場合は、日本語4択問題" in prompt
+
+
 if __name__ == "__main__":
     test_parse_response_and_validate_success()
     test_validate_detects_blank_and_duplicates()
     test_strip_code_fence_csv()
+    test_validate_rejects_english_choices_when_correct_is_japanese()
+    test_prompt_explains_japanese_correct_requires_japanese_choices()
     print("tests_fill_excel_choices: PASS")

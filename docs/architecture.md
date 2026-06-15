@@ -44,6 +44,7 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 
 - `tools/fill_excel_choices.py`: ローカル実行用のExcel補完CLI。study-app列形式の `.xlsx` を読み込み、`choice1`〜`choice3` がすべて空欄の行を未補完行として抽出する。
 - 50行単位でOpenAI Chat Completions APIへ `row_number,level,question,correct` のCSVを送り、AI出力を `row_number,choice1,choice2,choice3` のCSVに限定するプロンプトを使う。
-- `row_number` をキーにExcelへ貼り戻し、`correct` と不正解選択肢の重複、選択肢同士の重複、空欄を検証する。検証NGの行だけを再試行対象にする。
+- プロンプトでは `choice1`〜`choice3` を `correct` と同じ言語にすることを明記する。特に `question` が英単語で `correct` が日本語の場合は日本語4択問題として扱い、英単語・英語類義語・英語表現を選択肢に含めない。
+- `row_number` をキーにExcelへ貼り戻し、`correct` と不正解選択肢の重複、選択肢同士の重複、空欄、日本語 `correct` に対する英語選択肢混入を検証する。検証NGの行だけを再試行対象にする。
 - バッチ完了ごとに `output_completed.xlsx` へ保存し、例外発生時も処理済み部分を保存して停止する。再実行時は空欄のまま残った行から再開する。
 - 既存RPG本体、study-app本体、ブラウザ管理ツールとは独立した補助ツールとして配置する。

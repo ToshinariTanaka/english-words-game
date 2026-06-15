@@ -1,4 +1,36 @@
 ## 今回やったこと
+- `tools/fill_excel_choices.py` のAI向けプロンプトを更新し、`choice1`〜`choice3` は `correct` と同じ言語で作ることを明記。
+- `correct` が日本語の場合、`choice1`〜`choice3` も必ず日本語にし、英単語そのもの・英語類義語・英語表現を入れないように明記。
+- `question` が英単語で `correct` が日本語の場合は、日本語4択問題として扱う条件と、`ad` / `広告` の悪い例・良い例をプロンプトへ追加。
+- 日本語の `correct` に対してAI出力の選択肢に英字が混入した場合にバリデーションエラーへする確認を追加。
+- README / architecture / project_status を今回の選択肢言語ルールに合わせて更新。
+
+## 変更ファイル
+- `tools/fill_excel_choices.py`
+- `tests_fill_excel_choices.py`
+- `README.md`
+- `docs/codex_report.md`
+- `docs/project_status.md`
+- `docs/architecture.md`
+
+## テスト結果
+- `python3 -m py_compile tools/fill_excel_choices.py tests_fill_excel_choices.py` : PASS
+- `python3 tests_fill_excel_choices.py` : PASS
+
+## 注意点
+- 日本語 `correct` の英語混入検出はASCII英字を含む選択肢をエラーにする簡易判定。略語や固有名詞など、教材上あえて英字を使う選択肢が必要な場合は追加調整が必要。
+- 実API呼び出しは今回も行っていないため、実教材Excelでは少量バッチでプロンプト効果を確認する必要がある。
+
+## 次にやるべきこと
+- 実教材Excelと実APIキーで少量バッチを実行し、日本語訳モードの選択肢が日本語だけになるか確認する。
+- 必要なら日本語/英語以外の言語判定や、許可する英字パターンの例外設定を追加する。
+
+## チャッピーに相談すべき点
+- 日本語選択肢で、TOEICやIT用語など英字表記が自然な語をどこまで許可するべきか。
+- 日本語訳モードの不正解選択肢を「意味が近い日本語」に寄せるか、「品詞や長さが近い日本語」に寄せるか。
+
+---
+## 今回やったこと
 - study-app用Excelの未補完行をOpenAI APIで補完するローカルPythonツール `tools/fill_excel_choices.py` を追加。
 - `choice1`〜`choice3` がすべて空欄の行を50行ずつ処理し、AI出力CSVを `row_number` で元Excelへ貼り戻す実装にした。
 - `correct` と選択肢の重複、選択肢同士の重複、空欄を検出し、不正行のみ再試行するバリデーションを追加。
