@@ -121,9 +121,22 @@ def build_prompt(rows: list[RowItem]) -> str:
 - row_number は入力と完全一致させてください。
 - choice1〜choice3 は空欄禁止です。
 - choice1〜choice3 は必ず correct と同じ言語で作ってください。
-- correct が日本語なら choice1〜choice3 も必ず日本語にしてください。英単語そのもの、英語の類義語、英語表現は絶対に入れないでください。
+- correct が日本語を含む場合、choice1〜choice3 は必ず日本語のみで出力してください。
+- correct が日本語を含む場合、choice1〜choice3 に英単語、英語フレーズ、英語類義語を入れることは禁止です。
+- correct が日本語を含む場合、choice1〜choice3 に A-Z または a-z が1文字でも含まれていたら不正です。
 - question が英単語で correct が日本語の場合は、日本語4択問題として扱い、選択肢は日本語の不正解訳だけにしてください。
-- 例: question が ad、correct が 広告 の場合、悪い例は advertisement, notice, announcement。良い例は 住所, 案内, 発表。
+- 悪い例:
+  question: ad
+  correct: 広告
+  choice1: advertisement
+  choice2: notice
+  choice3: announcement
+- 良い例:
+  question: ad
+  correct: 広告
+  choice1: 住所
+  choice2: 案内
+  choice3: 発表
 - correct と choice1〜choice3 は重複禁止です。
 - choice1〜choice3 同士も重複禁止です。
 - 学習者が迷う程度に近いが、明確に不正解の選択肢にしてください。
@@ -192,7 +205,7 @@ def validate_choices(item: RowItem, choices: dict[str, str]) -> list[str]:
     if normalized_correct and normalized_correct in normalized_choices:
         errors.append("correct と choice1〜choice3 が重複しています")
     if contains_japanese(item.correct) and any(contains_ascii_letter(value) for value in values):
-        errors.append("correct が日本語のため choice1〜choice3 に英語を含めないでください")
+        errors.append("correct が日本語を含むため choice1〜choice3 に英字[A-Za-z]を含めないでください")
     if len([value for value in normalized_choices if value]) != len(set(value for value in normalized_choices if value)):
         errors.append("choice1〜choice3 同士が重複しています")
     return errors
@@ -264,8 +277,23 @@ def process_workbook(args: argparse.Namespace) -> int:
                 print(f"  再試行対象: {len(pending)}件")
                 time.sleep(args.retry_delay)
             if pending:
-                detail = "; ".join(f"{rn}: {', '.join(errs)}" for rn, errs in last_errors.items())
-                raise RuntimeError(f"重複または空欄が解消できませんでした: {detail}")
+                row_by_number = {row.row_number: row for row in batch}
+                details = []
+                for row_number, errs in last_errors.items():
+                    row = row_by_number.get(row_number)
+                    choices = parsed.get(row_number, {}) if "parsed" in locals() else {}
+                    row_label = f"Excel行{row.excel_row}" if row else "Excel行不明"
+                    content = (
+                        f"question={row.question!r}, correct={row.correct!r}, "
+                        f"choice1={choices.get('choice1', '')!r}, "
+                        f"choice2={choices.get('choice2', '')!r}, "
+                        f"choice3={choices.get('choice3', '')!r}"
+                        if row
+                        else f"choices={choices!r}"
+                    )
+                    details.append(f"row_number={row_number} ({row_label}): {', '.join(errs)}; {content}")
+                detail = " / ".join(details)
+                raise RuntimeError(f"最大再試行回数を超えても不正な選択肢が残りました: {detail}")
             processed += len(batch)
             workbook.save(output)
             print(f"途中保存: {output} ({processed}/{len(unfilled)}件完了)")

@@ -79,7 +79,7 @@ python3 tools/fill_excel_choices.py input.xlsx
 - 入力列は `row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note` を想定します。
 - `choice1`〜`choice3` がすべて空欄の行を未補完行として扱います。
 - AIには `row_number,level,question,correct` だけを渡し、`row_number,choice1,choice2,choice3` CSVだけを受け取ります。
-- `choice1`〜`choice3` は `correct` と同じ言語で作るよう指示します。英単語モードのように `question` が英単語で `correct` が日本語の場合は、日本語4択問題として扱い、英単語・英語類義語・英語表現を不正解選択肢に入れないよう明記しています。
+- `choice1`〜`choice3` は `correct` と同じ言語で作るよう指示します。英単語モードのように `question` が英単語で `correct` が日本語の場合は、日本語4択問題として扱い、英単語・英語フレーズ・英語類義語を不正解選択肢に入れないよう明記しています。さらに、`correct` が日本語を含む場合は `choice1`〜`choice3` に英字 `[A-Za-z]` が1文字でも含まれると不正として再試行します。
 - `row_number` をキーに元Excelへ貼り戻し、`correct` との重複、選択肢同士の重複、空欄、日本語の `correct` に対する英語選択肢混入を検出します。
 - 不正行は最大3回再試行し、50行ごとに `output_completed.xlsx` へ途中保存します。
 - エラー時は処理済み部分を保存して停止するため、再実行すると未補完行から再開できます。
