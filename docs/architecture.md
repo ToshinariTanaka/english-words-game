@@ -15,7 +15,7 @@
 - `study-app/style.css`: スマホ優先のカード型UI。HP/Gold/敵/バトル演出などのゲーム表現は含めない。
 - `study-app/data/word_mode.csv`: 英単語モード用CSV。
 - `study-app/data/chunk_mode.csv`: チャンクモード用CSV。
-- `study-app/data/definition_mode.csv`: 英英辞典モード用CSV。
+- `study-app/data/definition_mode.csv`: 英文和訳モード用CSV。内部IDとファイル名は互換性維持のため `definition` のまま。
 
 ### study-app のCSV形式
 
@@ -26,9 +26,9 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 ```
 
 - `level`: 問題カードに表示する難易度・教材レベルです。
-- `question`: 英単語・チャンク・英英定義文を入れます。
-- `correct`: 正解を入れます。
-- `choice1`〜`choice3`: 不正解選択肢を入れます。
+- `question`: 英単語モードでは英単語、チャンクモードでは英語チャンク、英文和訳モードでは英文を入れます。
+- `correct`: 正解を入れます。英文和訳モードでは英文全体の正しい日本語訳を入れます。
+- `choice1`〜`choice3`: 不正解選択肢を入れます。英文和訳モードでは日本語の誤訳選択肢を入れます。
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
 - `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
 - `row_number` は将来localStorageに学習履歴を保存するための問題IDとして扱います。
@@ -49,3 +49,7 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - `row_number` をキーにExcelへ貼り戻し、`correct` と不正解選択肢の重複、選択肢同士の重複、空欄、日本語 `correct` に対する英語選択肢混入を検証する。検証NGの行だけを再試行対象にする。
 - バッチ完了ごとに `output_completed.xlsx` へ保存し、例外発生時も処理済み部分を保存して停止する。再実行時は空欄のまま残った行から再開する。
 - 既存RPG本体、study-app本体、ブラウザ管理ツールとは独立した補助ツールとして配置する。
+
+### study-app の英文和訳モード
+
+`study-app/script.js` のモードキー `definition` は保存済みアップロードや既存URL/CSV名との互換性のため変更しません。ただし `study-app` では表示名を「英文和訳モード」とし、説明文は「英文を読んで、正しい日本語訳を選びます。」です。列判定は `question` / `英文` / `英語` / `問題` を英文として優先し、`correct` / `和訳` / `日本語訳` / `意味` / `正解` を日本語訳として優先します。RPG本体の `definition` モードは英英辞典モードのまま別仕様として維持します。
