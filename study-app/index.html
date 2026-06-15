@@ -55,5 +55,24 @@
   </main>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="./script.js"></script>
+  <script>
+    // Excelの列記号付き見出し（A row_number ～ L note）にも対応する。
+    // 出題に必要なのはA～G列だけで、H～L列は空欄でもよい。
+    COMMON_ALIASES.id.unshift('A row_number');
+    COMMON_ALIASES.level.unshift('B level');
+    COMMON_ALIASES.choice1.unshift('E choice1');
+    COMMON_ALIASES.choice2.unshift('F choice2');
+    COMMON_ALIASES.choice3.unshift('G choice3');
+    COMMON_ALIASES.totalCorrect.unshift('H total_correct');
+    COMMON_ALIASES.totalWrong.unshift('I total_wrong');
+    COMMON_ALIASES.accuracy.unshift('J accuracy');
+    COMMON_ALIASES.currentStreak.unshift('K current_streak');
+    COMMON_ALIASES.note.unshift('L note');
+
+    Object.values(MODES).forEach((mode) => {
+      mode.questionAliases.unshift('C question');
+      mode.correctAliases.unshift('D correct');
+    });
+  </script>
 </body>
 </html>
