@@ -22,7 +22,7 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-button { font: inherit; }
+button, select, input { font: inherit; }
 
 .app-shell {
   width: min(100%, 760px);
@@ -63,6 +63,73 @@ h1 { margin: 0 0 10px; font-size: clamp(2rem, 8vw, 3.2rem); line-height: 1.05; }
 .mode-button { background: #f8fafc; color: var(--text); font-weight: 700; }
 .mode-button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
+.quiz-settings {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #f8fbff;
+}
+
+.quiz-settings h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.setting-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.setting-field {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.setting-field select {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.random-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.random-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+}
+
+.settings-start-button { margin-top: 12px; }
+.settings-status {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: .92rem;
+}
+
 .stats-card { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 14px; margin-top: 14px; text-align: center; }
 .stats-card span { display: block; font-size: 1.5rem; font-weight: 900; }
 .stats-card small { color: var(--muted); }
@@ -83,17 +150,6 @@ h1 { margin: 0 0 10px; font-size: clamp(2rem, 8vw, 3.2rem); line-height: 1.05; }
 .secondary-button { background: #eef4ff; color: var(--primary-dark); }
 .review-card { display: grid; grid-template-columns: 1fr; gap: 6px; }
 .review-card p { margin: 0; }
-
-@media (hover: hover) {
-  .mode-button:hover, .choice-button:hover, .primary-button:hover:not(:disabled), .secondary-button:hover:not(:disabled) { transform: translateY(-1px); }
-}
-
-@media (max-width: 520px) {
-  .app-shell { padding: 12px 10px 28px; }
-  .hero, .mode-card, .stats-card, .quiz-card, .review-card { border-radius: 20px; }
-  .mode-grid { grid-template-columns: 1fr; }
-  .choice-button { min-height: 56px; }
-}
 
 .upload-box {
   margin-top: 14px;
@@ -124,4 +180,16 @@ h1 { margin: 0 0 10px; font-size: clamp(2rem, 8vw, 3.2rem); line-height: 1.05; }
   color: var(--muted);
   line-height: 1.5;
   font-size: .92rem;
+}
+
+@media (hover: hover) {
+  .mode-button:hover, .choice-button:hover, .primary-button:hover:not(:disabled), .secondary-button:hover:not(:disabled) { transform: translateY(-1px); }
+}
+
+@media (max-width: 520px) {
+  .app-shell { padding: 12px 10px 28px; }
+  .hero, .mode-card, .stats-card, .quiz-card, .review-card { border-radius: 20px; }
+  .mode-grid { grid-template-columns: 1fr; }
+  .setting-grid { grid-template-columns: 1fr; }
+  .choice-button { min-height: 56px; }
 }
