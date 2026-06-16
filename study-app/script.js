@@ -25,6 +25,40 @@ const MODES = {
 const API_BASE = typeof window !== 'undefined' ? window.location.origin : '';
 const SHARED_CACHE_PREFIX = 'englishWordsGame.sharedQuestions.';
 
+
+const STANDARD_COLUMNS = [
+  'row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3',
+  'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note',
+];
+
+function normalizeStandardRow(row) {
+  const cells = Array.isArray(row) ? row : STANDARD_COLUMNS.map((column) => row?.[column] ?? '');
+  return Object.fromEntries(STANDARD_COLUMNS.map((column, index) => [column, stripBom(cells[index] ?? '').trim()]));
+}
+
+function normalizeMatrixRows(matrix) {
+  if (!matrix.length) return [];
+  return matrix.slice(1).map(normalizeStandardRow);
+}
+
+function detectModeFromFilename(filename, fallbackMode) {
+  if (/英単語|英単語テスト/.test(filename)) return 'word';
+  if (/チャンク/.test(filename)) return 'chunk';
+  if (/英文和訳/.test(filename)) return 'definition';
+  return fallbackMode;
+}
+
+function decodeText(buffer) {
+  const bytes = buffer instanceof ArrayBuffer ? buffer : buffer.buffer;
+  const utf8 = new TextDecoder('utf-8').decode(bytes);
+  if (!utf8.includes('�')) return utf8;
+  try {
+    return new TextDecoder('shift_jis').decode(bytes);
+  } catch (error) {
+    return utf8;
+  }
+}
+
 const COMMON_ALIASES = {
   id: ['A row_number', 'row_number', 'row', 'id', '番号', '行番号'],
   level: ['B level', 'level', 'レベル'],
@@ -105,11 +139,7 @@ function parseCsv(text) {
   row.push(cell);
   if (row.some((value) => value.trim() !== '')) rows.push(row);
 
-  if (rows.length === 0) return [];
-  const [headers, ...records] = rows;
-  return records.map((record) => Object.fromEntries(
-    headers.map((header, index) => [stripBom(header).trim(), (record[index] || '').trim()]),
-  ));
+  return normalizeMatrixRows(rows);
 }
 
 function parseWorkbookRows(arrayBuffer) {
@@ -119,7 +149,8 @@ function parseWorkbookRows(arrayBuffer) {
   const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
   const firstSheetName = workbook.SheetNames[0];
   if (!firstSheetName) throw new Error('Excelファイルにシートがありません。');
-  return window.XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { defval: '', raw: false });
+  const matrix = window.XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { header: 1, defval: '', raw: false });
+  return normalizeMatrixRows(matrix);
 }
 
 function shuffle(items) {
@@ -276,8 +307,7 @@ function applyQuestions(rows, sourceLabel, options = {}) {
 
 
 function rowsToCsv(rows) {
-  if (!rows.length) return '';
-  const headers = Object.keys(rows[0]);
+  const headers = STANDARD_COLUMNS;
   const escapeCell = (value) => {
     const text = String(value ?? '');
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
@@ -344,15 +374,18 @@ async function loadMode(mode) {
 async function handleUpload(event) {
   const [file] = event.target.files;
   if (!file) return;
-  const uploadMode = state.mode;
+  const uploadMode = detectModeFromFilename(file.name || '', state.mode);
   state.loadToken += 1;
   setLoadingState('ファイルを読み込み中...');
+
+  let parsedRows = null;
 
   try {
     const extension = file.name.split('.').pop().toLowerCase();
     const rows = extension === 'xlsx'
       ? parseWorkbookRows(await file.arrayBuffer())
-      : parseCsv(await file.text());
+      : parseCsv(decodeText(await file.arrayBuffer()));
+    parsedRows = rows;
 
     const formData = new FormData();
     formData.append('mode', uploadMode);
@@ -368,11 +401,19 @@ async function handleUpload(event) {
     updateModeUi();
     applyQuestions(rows, '共通問題データ', { message: '共通問題データを保存しました。PC・iPhone共通で利用できます' });
   } catch (error) {
-    els.questionText.textContent = 'アップロードファイルの読み込みに失敗しました。';
-    els.feedback.textContent = error.message;
-    els.feedback.className = 'feedback wrong';
-    els.feedback.hidden = false;
-    els.uploadStatus.textContent = 'アップロードに失敗しました。Render版ではサーバー保存APIを確認してください。GitHub Pagesでは端末間共有保存はできません。';
+    if (parsedRows) {
+      state.mode = uploadMode;
+      updateModeUi();
+      applyQuestions(parsedRows, 'アップロードファイル', {
+        message: `サーバー保存には失敗しましたが、一時確認用に${parsedRows.length}行を読み込みました。API: /api/questions/upload 理由: ${error.message}`,
+      });
+    } else {
+      els.questionText.textContent = 'アップロードファイルの読み込みに失敗しました。';
+      els.feedback.textContent = error.message;
+      els.feedback.className = 'feedback wrong';
+      els.feedback.hidden = false;
+      els.uploadStatus.textContent = `アップロードに失敗しました。API: /api/questions/upload 理由: ${error.message}`;
+    }
   } finally {
     event.target.value = '';
   }
