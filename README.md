@@ -112,3 +112,22 @@ python3 tools/fill_excel_choices.py input.xlsx \
 ### study-app の英文和訳モードについて
 
 `study-app` の `definition` 内部IDは互換性のため維持し、表示名だけでなく処理も英文和訳モードとして扱います。標準ファイル名も `study-app/data/definition_mode.csv` のままです。C列相当の `question` に英文、D列相当の `correct` に英文全体の日本語訳、E〜G列相当の `choice1`〜`choice3` に日本語の誤訳選択肢を入れます。旧ファイル名のアップロードは可能ですが、新しい英文和訳形式では `question` を英文、`correct` を日本語訳として出題します。RPG本体の英英辞典モードは別仕様のため維持しています。
+
+## Render本番運用と共通問題データ
+
+Renderでは `server.js` を起動し、静的ファイル配信と共通問題データAPIを同じURLで提供します。アップロードされたCSV/Excelはブラウザの `localStorage` を正本にせず、Persistent Disk上の `/var/data/english_words_game/current-questions.json` に保存します。
+
+### API
+
+- `GET /api/questions/current?mode=word|chunk|definition`: 現在保存されている共通問題データを返します。未保存の場合は404を返し、画面側は標準CSVへフォールバックします。
+- `POST /api/questions/upload`: `multipart/form-data` の `file` と `mode` を受け取り、CSV/Excelを行データへ変換してPersistent Diskへ保存します。
+- `GET /api/questions/status?mode=word|chunk|definition`: 保存有無、問題数、最終更新日時、保存ファイルパスを返します。
+
+### Render設定
+
+`render.yaml` に、Node Web Service、`npm start`、Persistent Diskのマウント先 `/var/data` を定義しています。保存先は環境変数で変更できます。
+
+- `DATA_DIR`: 既定値 `/var/data/english_words_game`
+- `QUESTIONS_FILE`: 既定値 `${DATA_DIR}/current-questions.json`
+
+GitHub Pagesは静的ホスティングのため、`POST /api/questions/upload` でのサーバー保存は動作しません。端末間共有が必要な場合はRender版URLを利用してください。

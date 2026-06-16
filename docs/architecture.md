@@ -66,3 +66,13 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 起動時・モード切替時は常に標準CSVを `fetch` し、`IndexedDB` / `localStorage` に保存された過去のアップロードデータを標準CSVより優先しません。CSV/Excelアップロードは現在表示中モードの一時確認用で、ページ再読み込みやモード切替後は再び標準CSVへ戻ります。
 
 ルートRPG本体は `data/default-words.csv` を標準問題として読み込みます。CSV/Excelアップロードは同様に一時確認用であり、アップロード本文を `localStorage` に保存して次回起動時に優先する仕様は廃止しています。なお、Goldなど問題データ本体ではないユーザー状態の保存は既存どおり別用途として扱います。
+
+## Render共通問題データAPI
+
+Render版は `server.js` が静的ファイルとAPIを同一オリジンで提供します。アップロードされたCSV/Excelはサーバー側で行データへ変換し、Persistent Disk想定の `/var/data/english_words_game/current-questions.json` に保存します。
+
+- `GET /api/questions/current?mode=word|chunk|definition`: 保存済み行データを返す。未保存なら404。
+- `POST /api/questions/upload`: `multipart/form-data` の `mode` と `file` を受け取り、CSV/Excelを変換して保存する。
+- `GET /api/questions/status?mode=word|chunk|definition`: 保存状態、問題数、最終更新日時を返す。
+
+`study-app` は共通問題データAPIを正本として扱い、localStorageは取得済みデータの補助キャッシュに限定します。API取得失敗時のみ標準CSVを読み込みます。
