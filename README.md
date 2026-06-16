@@ -4,7 +4,7 @@
 
 ## 新規: 英語学習アプリ（最小構成）
 
-ゲーム要素を削除した英語学習アプリを `study-app/` に追加しました。PC・iPhone共通保存を使う本番導線はRender版 `https://english-words-game.onrender.com/study-app/` に統一します。GitHub Pages版は標準CSVの閲覧・一時確認のみで、サーバー保存はできません。
+ゲーム要素を削除した英語学習アプリを `study-app/` に追加しました。PC・iPhone共通保存を使う本番導線はRender版 （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） に統一します。GitHub Pages版は標準CSVの閲覧・一時確認のみで、サーバー保存はできません。
 
 - 起動ファイル: `study-app/index.html`
 - ロジック: `study-app/script.js`
@@ -132,7 +132,7 @@ Renderでは `server.js` を起動し、静的ファイル配信と共通問題�
 - `DATA_DIR`: 既定値 `/var/data/english_words_game`
 - `QUESTIONS_FILE`: 既定値 `${DATA_DIR}/current-questions.json`
 
-GitHub Pagesは静的ホスティングのため、`POST /api/questions/upload` でのサーバー保存は動作しません。端末間共有が必要な場合はRender版URL `https://english-words-game.onrender.com/study-app/` を利用してください。RPG本体にも同URLへのリンクを表示し、GitHub Pages版の学習アプリ画面では「サーバー保存不可」とRender版へのリンクを表示します。
+GitHub Pagesは静的ホスティングのため、`POST /api/questions/upload` でのサーバー保存は動作しません。端末間共有が必要な場合はRender版URL （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） を利用してください。RPG本体にも同URLへのリンクを表示し、GitHub Pages版の学習アプリ画面では「サーバー保存不可」とRender版へのリンクを表示します。
 
 ## Render版への統一（2026-06-16更新）
 
@@ -157,7 +157,7 @@ RenderサーバーはディレクトリURLの `index.html` を自動解決しま
 
 ### PC・iPhoneで同じ問題を読む確認
 
-1. Render版URL `https://english-words-game.onrender.com/study-app/` をPCで開きます。
+1. Render版URL （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） をPCで開きます。
 2. RPG本体 `/` または学習アプリ `/study-app/` からCSV/Excelをアップロードします。
 3. iPhoneで同じRender版URLの `/` または `/study-app/` を開きます。
 4. 共通問題データの読み込みメッセージと問題数が、PCでアップロードした内容と一致することを確認します。

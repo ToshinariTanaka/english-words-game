@@ -23,7 +23,7 @@ const MODES = {
 };
 
 const API_BASE = typeof window !== 'undefined' ? window.location.origin : '';
-const RENDER_STUDY_APP_URL = 'https://english-words-game.onrender.com/study-app/';
+const RENDER_STUDY_APP_URL = ''; // 未確認のRender URLは設定しない。確定後に /study-app/ まで含めて設定する。
 const HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : '';
 const IS_GITHUB_PAGES = HOSTNAME.endsWith('github.io');
 const IS_RENDER = HOSTNAME.endsWith('onrender.com') || HOSTNAME === 'localhost' || HOSTNAME === '127.0.0.1';
@@ -115,10 +115,20 @@ const els = {
 };
 
 
+function renderStudyAppLinkText() {
+  return RENDER_STUDY_APP_URL
+    ? `<a href="${RENDER_STUDY_APP_URL}">Render版で開く</a>`
+    : 'Render版URL未確認（正しいWeb Service URLを確認してください）';
+}
+
+function renderStudyAppUrlText() {
+  return RENDER_STUDY_APP_URL || 'Render版URL未確認（正しいWeb Service URLを確認してください）';
+}
+
 function updateHostingStatus() {
   if (!els.hostingStatus) return;
   if (IS_GITHUB_PAGES) {
-    els.hostingStatus.innerHTML = `現在の配信元: GitHub Pages（サーバー保存不可） / <a href="${RENDER_STUDY_APP_URL}">Render版で開く</a>`;
+    els.hostingStatus.innerHTML = `現在の配信元: GitHub Pages（サーバー保存不可） / ${renderStudyAppLinkText()}`;
     els.hostingStatus.className = 'hosting-status hosting-status-warning';
     return;
   }
@@ -133,7 +143,7 @@ function updateHostingStatus() {
 
 function serverSaveUnavailableMessage() {
   if (IS_GITHUB_PAGES) {
-    return `GitHub Pages版ではサーバー保存不可です。PC・iPhone共通保存はRender版 ${RENDER_STUDY_APP_URL} を開いてください。`;
+    return `GitHub Pages版ではサーバー保存不可です。PC・iPhone共通保存は ${renderStudyAppUrlText()} を開いてください。`;
   }
   return '';
 }
@@ -450,7 +460,7 @@ async function handleUpload(event) {
 
 function updateModeUi() {
   els.modeButtons.forEach((button) => button.classList.toggle('active', button.dataset.mode === state.mode));
-  const hostingMessage = IS_GITHUB_PAGES ? `現在はGitHub Pages版です。サーバー保存不可のため、共通保存はRender版 ${RENDER_STUDY_APP_URL} を使ってください。` : 'Render版では共通問題データを優先し、取得失敗時のみ標準CSVを読み込みます。';
+  const hostingMessage = IS_GITHUB_PAGES ? `現在はGitHub Pages版です。サーバー保存不可のため、共通保存は ${renderStudyAppUrlText()} を使ってください。` : 'Render版では共通問題データを優先し、取得失敗時のみ標準CSVを読み込みます。';
   els.modeDescription.textContent = `${MODES[state.mode].description} ${hostingMessage}`;
   els.modeLabel.textContent = state.reviewMode ? `${MODES[state.mode].label}（復習）` : MODES[state.mode].label;
 }

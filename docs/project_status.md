@@ -9,4 +9,4 @@
 - `study-app` は起動時・モード切替時に `/api/questions/current?mode=...` を優先し、取得失敗時のみ標準CSVへフォールバックする。
 - GitHub Pagesでは端末間共有保存不可。PC・iPhone間で同じ問題データを読む確認はRender版URLで行う。
 
-- 2026-06-16: UpTra/RPG本体から開く学習アプリ導線をRender版 `https://english-words-game.onrender.com/study-app/` に統一し、GitHub Pages版では「サーバー保存不可」とRender版への誘導を表示する。
+- 2026-06-16: UpTra/RPG本体から開く学習アプリ導線をRender版 （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） に統一し、GitHub Pages版では「サーバー保存不可」とRender版への誘導を表示する。
