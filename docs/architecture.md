@@ -60,7 +60,7 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 
 ## 共通問題データの読み込み方針
 
-`study-app/` は、GitHub Pagesなどの静的ホスティングで配信される以下の標準CSVを共通問題データの本体として扱います。
+Render版の `study-app/` は共通問題データAPIを正本として扱います。GitHub Pagesなどの静的ホスティングではサーバー保存不可のため、以下の標準CSVをフォールバックとして読み、画面でRender版へ誘導します。
 
 1. 英単語モード: `study-app/data/word_mode.csv`
 2. チャンクモード: `study-app/data/chunk_mode.csv`
@@ -79,7 +79,7 @@ Render版は `server.js` が静的ファイルとAPIを同一オリジンで提�
 - `POST /api/study-app/upload`: study-app向けの互換アップロードAPI。A〜L列だけを標準列として読み、`/var/data/study-app/{word_mode.csv,chunk_mode.csv,definition_mode.csv}` に標準CSVとしても保存する。
 - `GET /api/questions/status?mode=word|chunk|definition`: 保存状態、問題数、最終更新日時を返す。
 
-`study-app` は共通問題データAPIを正本として扱い、localStorageは取得済みデータの補助キャッシュに限定します。API取得失敗時のみ標準CSVを読み込みます。
+`study-app` は共通問題データAPIを正本として扱い、localStorageは取得済みデータの補助キャッシュに限定します。API取得失敗時のみ標準CSVを読み込みます。GitHub Pages版では `/api/questions/upload` が存在しないため、アップロード失敗時にサーバー保存不可とRender版URL `https://english-words-game.onrender.com/study-app/` を表示します。
 
 ## Render統一後のURLとデータ正本
 

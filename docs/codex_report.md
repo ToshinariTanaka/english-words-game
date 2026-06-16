@@ -1,37 +1,40 @@
 ## 今回やったこと
-- study-appのCSV/Excel読み込みを、A〜Lの最初の12列だけを標準列として扱う位置ベースの正規化に変更しました。
-- M列以降の余分な列と、後方に混ざる `A row_number` / `note` などの重複ヘッダーを無視するようにしました。
-- UTF-8 BOM付きCSVを正常に読み込み、UTF-8で文字化けが出る場合は可能な範囲でShift_JIS/CP932デコードを試すようにしました。
-- ファイル名に「英単語」「英単語テスト」「チャンク」「英文和訳」が含まれる場合、アップロード先モードを自動判定するようにしました。判定できない場合は従来どおり現在選択中モードを使います。
-- Render版サーバーのアップロードAPIでも同じA〜L標準化を行い、`POST /api/study-app/upload` を `POST /api/questions/upload` と同じ処理で受け入れるようにしました。
-- サーバー保存時に、モード別の標準CSVを `/var/data/study-app/{word_mode.csv,chunk_mode.csv,definition_mode.csv}` へBOM付きUTF-8で保存するようにしました。
-- アップロード失敗時の画面表示にAPI名と理由を含め、原因を追いやすくしました。
+- RPG本体のホーム画面に、PC・iPhone共通保存用のRender版「英語学習アプリ（アプトレ）」リンクを追加しました。
+- Render上で開いている場合は同一オリジンの `/study-app/`、GitHub Pages等で開いている場合は `https://english-words-game.onrender.com/study-app/` へ誘導するようにしました。
+- 学習アプリ画面に現在の配信元を表示し、GitHub Pages版では「サーバー保存不可」とRender版へのリンクを明示するようにしました。
+- GitHub Pages版でアップロードAPIが失敗した場合のメッセージに、Render版へ移動すべき理由を追加しました。
+- Render版 `/study-app/` と `POST /api/questions/upload` は既存の `server.js` ルーティングを維持し、今回のUI変更後もローカルで動作確認しました。
 
 ## 変更ファイル
+- `index.html`
+- `script.js`
+- `style.css`
+- `study-app/index.html`
 - `study-app/script.js`
-- `server.js`
-- `tests_study_app_definition_mode.js`
+- `study-app/style.css`
 - `README.md`
 - `docs/architecture.md`
 - `docs/project_status.md`
+- `docs/next_tasks.md`
 - `docs/codex_report.md`
 
 ## テスト結果
 - `npm test` : PASS
-- ローカルNodeサーバーを一時起動し、UTF-8 BOM付き・日本語/★付きファイル名・英文中カンマ・M列以降の重複ヘッダーを含むCSVを `POST /api/study-app/upload` へ送信できることを確認 : PASS
-- 保存された `/var/data/study-app` 相当のCSVが標準ヘッダー `row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note` になり、M列以降を含まないことを確認 : PASS
+- `DATA_DIR=/tmp/ewg-test-data STUDY_APP_DATA_DIR=/tmp/ewg-test-study PORT=3131 npm start` でローカルサーバーを起動 : PASS
+- `curl -I http://127.0.0.1:3131/study-app/` でRender相当のディレクトリURL `/study-app/` が `study-app/index.html` として返ることを確認 : PASS
+- `curl -F mode=word -F file=@/tmp/ewg-upload.csv http://127.0.0.1:3131/api/questions/upload` で `POST /api/questions/upload` が成功し、件数が返ることを確認 : PASS
+- `curl http://127.0.0.1:3131/api/questions/current?mode=word` でアップロード済み問題が取得できることを確認 : PASS
 
 ## 注意点
-- ユーザー指定の実ファイル3点（`★英単語テスト_001_補完済み003.csv` / `★チャンク_001_補完済み005.csv` / `★英文和訳_001_補完済み002.csv`）はリポジトリ内に存在しなかったため、同等条件のテストCSVで確認しました。
-- `.xlsx` のサーバー側直接パースは依存ライブラリがないため未対応です。ブラウザ側ではSheetJSでExcelを読み、正規化CSVとしてAPIへ送信します。
-- PC/iPhone間で同じ問題が読めるかは、Render本番環境とPersistent Disk設定での実機確認が必要です。ローカルではAPI保存と標準CSV書き出しまで確認済みです。
-- GitHub Pagesではサーバー保存APIが使えないため、アップロード内容は一時確認用途です。
+- 実際のRenderサービスURLは `https://english-words-game.onrender.com/study-app/` として実装しました。Render側のサービス名が異なる場合は `script.js` と `study-app/script.js` の定数を差し替える必要があります。
+- PC/iPhoneの実機共有確認は、Render本番へデプロイ後に同じRender URLで行う必要があります。ローカルではAPI保存と取得まで確認済みです。
+- GitHub Pages版では引き続き標準CSVの閲覧はできますが、`/api/questions/upload` が存在しないためサーバー保存はできません。
 
 ## 次にやるべきこと
-- 実教材3ファイルを入手して、今回追加したA〜L位置ベース読み込み、選択肢不足行スキップ、問題数表示を実データで確認する。
-- Render本番へデプロイし、PCでアップロード後、iPhoneで同じモードを開いて同じ問題セットが読まれることを確認する。
-- サーバー側でも`.xlsx`を直接受け入れる必要がある場合は、xlsxライブラリの導入可否を判断する。
+- Render本番へデプロイし、UpTraから開いたURLが `github.io` ではなく `onrender.com` になっていることを実機確認する。
+- PCでRender版にCSV/Excelをアップロード後、iPhoneで同じRender URLを開いて同じ問題数が表示されることを確認する。
+- RenderサービスURLが確定URLと異なる場合は、定数とREADMEを修正する。
 
 ## チャッピーに相談すべき点
-- Render APIで保存するJSON正本と `/var/data/study-app/*.csv` のどちらを運用上の一次データと呼ぶか。
-- サーバー側Excel直接アップロード対応のために依存ライブラリを追加してよいか。
+- Renderの正式サービスURLが `https://english-words-game.onrender.com/` で確定かどうか。
+- GitHub Pages版アクセス時に警告表示だけで残すか、自動的にRender版へリダイレクトするか。

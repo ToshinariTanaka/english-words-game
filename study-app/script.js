@@ -23,6 +23,10 @@ const MODES = {
 };
 
 const API_BASE = typeof window !== 'undefined' ? window.location.origin : '';
+const RENDER_STUDY_APP_URL = 'https://english-words-game.onrender.com/study-app/';
+const HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : '';
+const IS_GITHUB_PAGES = HOSTNAME.endsWith('github.io');
+const IS_RENDER = HOSTNAME.endsWith('onrender.com') || HOSTNAME === 'localhost' || HOSTNAME === '127.0.0.1';
 const SHARED_CACHE_PREFIX = 'englishWordsGame.sharedQuestions.';
 
 
@@ -107,7 +111,32 @@ const els = {
   randomOrder: document.getElementById('randomOrder'),
   startQuizButton: document.getElementById('startQuizButton'),
   settingsStatus: document.getElementById('settingsStatus'),
+  hostingStatus: document.getElementById('hostingStatus'),
 };
+
+
+function updateHostingStatus() {
+  if (!els.hostingStatus) return;
+  if (IS_GITHUB_PAGES) {
+    els.hostingStatus.innerHTML = `現在の配信元: GitHub Pages（サーバー保存不可） / <a href="${RENDER_STUDY_APP_URL}">Render版で開く</a>`;
+    els.hostingStatus.className = 'hosting-status hosting-status-warning';
+    return;
+  }
+  if (IS_RENDER) {
+    els.hostingStatus.textContent = `現在の配信元: Render版（PC・iPhone共通保存対応） ${API_BASE}`;
+    els.hostingStatus.className = 'hosting-status hosting-status-ok';
+    return;
+  }
+  els.hostingStatus.textContent = `現在の配信元: ${API_BASE || 'ローカル/不明'}（/api/questions/upload がある環境のみ共通保存対応）`;
+  els.hostingStatus.className = 'hosting-status';
+}
+
+function serverSaveUnavailableMessage() {
+  if (IS_GITHUB_PAGES) {
+    return `GitHub Pages版ではサーバー保存不可です。PC・iPhone共通保存はRender版 ${RENDER_STUDY_APP_URL} を開いてください。`;
+  }
+  return '';
+}
 
 function parseCsv(text) {
   const rows = [];
@@ -405,14 +434,14 @@ async function handleUpload(event) {
       state.mode = uploadMode;
       updateModeUi();
       applyQuestions(parsedRows, 'アップロードファイル', {
-        message: `サーバー保存には失敗しましたが、一時確認用に${parsedRows.length}行を読み込みました。API: /api/questions/upload 理由: ${error.message}`,
+        message: `${serverSaveUnavailableMessage()}サーバー保存には失敗しましたが、一時確認用に${parsedRows.length}行を読み込みました。API: /api/questions/upload 理由: ${error.message}`,
       });
     } else {
       els.questionText.textContent = 'アップロードファイルの読み込みに失敗しました。';
       els.feedback.textContent = error.message;
       els.feedback.className = 'feedback wrong';
       els.feedback.hidden = false;
-      els.uploadStatus.textContent = `アップロードに失敗しました。API: /api/questions/upload 理由: ${error.message}`;
+      els.uploadStatus.textContent = `${serverSaveUnavailableMessage()}アップロードに失敗しました。API: /api/questions/upload 理由: ${error.message}`;
     }
   } finally {
     event.target.value = '';
@@ -421,7 +450,8 @@ async function handleUpload(event) {
 
 function updateModeUi() {
   els.modeButtons.forEach((button) => button.classList.toggle('active', button.dataset.mode === state.mode));
-  els.modeDescription.textContent = `${MODES[state.mode].description} Render版では共通問題データを優先し、取得失敗時のみ標準CSVを読み込みます。GitHub Pagesでは端末間共有保存はできません。`;
+  const hostingMessage = IS_GITHUB_PAGES ? `現在はGitHub Pages版です。サーバー保存不可のため、共通保存はRender版 ${RENDER_STUDY_APP_URL} を使ってください。` : 'Render版では共通問題データを優先し、取得失敗時のみ標準CSVを読み込みます。';
+  els.modeDescription.textContent = `${MODES[state.mode].description} ${hostingMessage}`;
   els.modeLabel.textContent = state.reviewMode ? `${MODES[state.mode].label}（復習）` : MODES[state.mode].label;
 }
 
@@ -527,4 +557,5 @@ els.reviewButton.addEventListener('click', startReview);
 els.fileInput.addEventListener('change', handleUpload);
 els.startQuizButton.addEventListener('click', beginConfiguredSession);
 
+updateHostingStatus();
 loadMode(state.mode);

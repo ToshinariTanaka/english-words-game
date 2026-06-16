@@ -405,3 +405,31 @@ h1 {
     min-height: 56px;
   }
 }
+
+
+.hosting-status {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.hosting-status a {
+  color: #9be7ff;
+}
+
+.hosting-status-ok {
+  border-color: rgba(110, 231, 168, 0.45);
+  background: rgba(110, 231, 168, 0.12);
+  color: #d9ffe8;
+}
+
+.hosting-status-warning {
+  border-color: rgba(246, 208, 111, 0.55);
+  background: rgba(246, 208, 111, 0.14);
+  color: #fff4cf;
+}

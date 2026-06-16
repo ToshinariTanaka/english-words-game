@@ -249,3 +249,18 @@ button:disabled {
     margin-right: 10px;
   }
 }
+
+
+.study-app-link {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(118, 227, 155, 0.45);
+  border-radius: 10px;
+  background: rgba(118, 227, 155, 0.12);
+  color: #e7ffef;
+  font-weight: 700;
+}
+
+.study-app-link a {
+  color: #9be7ff;
+}

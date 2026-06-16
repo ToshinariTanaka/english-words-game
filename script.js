@@ -7,6 +7,7 @@ const GAME_VERSION = "v0.9.8";
 const DEFAULT_WORDS_PATH = "./data/default-words.csv";
 const QUESTIONS_API_CURRENT = "/api/questions/current";
 const QUESTIONS_API_UPLOAD = "/api/questions/upload";
+const RENDER_STUDY_APP_URL = "https://english-words-game.onrender.com/study-app/";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 const QUESTION_MODES = {
   meaning: {
@@ -38,6 +39,14 @@ const WORDBOOK_CATEGORIES = {
   sample: "サンプル",
   user: "ユーザー単語帳",
 };
+
+
+function updateStudyAppRenderLink() {
+  const link = document.getElementById("study-app-render-link");
+  if (!link) return;
+  const isRender = window.location.hostname.endsWith("onrender.com") || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  link.href = isRender ? new URL("/study-app/", window.location.origin).href : RENDER_STUDY_APP_URL;
+}
 
 const BUILTIN_WORDBOOKS = {
   important100: {
@@ -983,6 +992,7 @@ el.clearRetryBtn.addEventListener("click", () => {
   showScreen("home");
 });
 
+updateStudyAppRenderLink();
 populateCategorySelect();
 el.wordbookCategory.value = "standard";
 populateWordbookSelect("standard");
