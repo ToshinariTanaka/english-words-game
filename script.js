@@ -3,7 +3,9 @@ const HOSPITAL_GOLD_PENALTY = 200;
 const AUTO_NEXT_MIN_MS = 100;
 const AUTO_NEXT_MAX_MS = 3000;
 const REVIEW_START_DELAY_MS = 3000;
-const GAME_VERSION = "v0.9.6";
+const GAME_VERSION = "v0.9.7";
+const DEFAULT_WORDS_PATH = "./data/default-words.csv";
+const UPLOADED_WORDS_STORAGE_KEY = "englishWordsGameUploadedWordsCsv";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 const QUESTION_MODES = {
   meaning: {
@@ -99,6 +101,8 @@ const screens = {
 
 const el = {
   csvFile: document.getElementById("csv-file"),
+  dataSourceStatus: document.getElementById("data-source-status"),
+  resetUploadedDataBtn: document.getElementById("reset-uploaded-data-btn"),
   loadWordbookBtn: document.getElementById("load-wordbook-btn"),
   wordbookCategory: document.getElementById("wordbook-category"),
   wordbookSelect: document.getElementById("wordbook-select"),
@@ -437,6 +441,22 @@ function updateStatus() {
 
 function updateVersionLabel() {
   if (el.versionLabel) el.versionLabel.textContent = GAME_VERSION;
+}
+
+function setDataSourceStatus(message) {
+  if (el.dataSourceStatus) el.dataSourceStatus.textContent = message;
+}
+
+function saveUploadedWordsCsv(csvText) {
+  localStorage.setItem(UPLOADED_WORDS_STORAGE_KEY, csvText);
+}
+
+function loadStoredUploadedWordsCsv() {
+  return localStorage.getItem(UPLOADED_WORDS_STORAGE_KEY) || "";
+}
+
+function clearStoredUploadedWordsCsv() {
+  localStorage.removeItem(UPLOADED_WORDS_STORAGE_KEY);
 }
 
 function getSelectedQuestionCount() {
@@ -796,7 +816,7 @@ async function loadBuiltinWordBook() {
   }
 }
 
-function loadWordsFromCsv(csvText) {
+function loadWordsFromCsv(csvText, messageBuilder) {
   clearAutoNextTimer();
   const parsed = parseCsv(csvText);
   if (parsed.length < 4) {
@@ -828,15 +848,80 @@ function loadWordsFromCsv(csvText) {
   const chunkText = chunkCount >= 4
     ? ` / チャンクモード: ${chunkCount}件対応`
     : " / チャンクモード: chunk と chunk_meaning が4件未満";
-  el.homeMessage.textContent = `${words.length}語を読み込みました。現在Gold: ${gold}${definitionText}${chunkText}`;
+  const defaultMessage = `${words.length}語を読み込みました。現在Gold: ${gold}${definitionText}${chunkText}`;
+  el.homeMessage.textContent = typeof messageBuilder === "function"
+    ? messageBuilder({ count: words.length, definitionText, chunkText, gold })
+    : defaultMessage;
   el.startBtn.disabled = false;
+}
+
+async function loadDefaultWords() {
+  setDataSourceStatus("標準問題ファイルを読み込み中");
+  try {
+    const response = await fetch(DEFAULT_WORDS_PATH, { cache: "no-cache" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const csvText = await response.text();
+    loadWordsFromCsv(csvText, ({ count, definitionText, chunkText }) => {
+      const message = `標準問題ファイルを読み込みました：${count}問`;
+      setDataSourceStatus(message);
+      return `${message}。現在Gold: ${gold}${definitionText}${chunkText}`;
+    });
+  } catch (error) {
+    console.error("Failed to load default words:", error);
+    loadWordsFromCsv(BUILTIN_WORDBOOKS.sample10.csv, ({ count, definitionText, chunkText }) => {
+      const message = "標準問題ファイルの読み込みに失敗したため、内蔵サンプルを使用中";
+      setDataSourceStatus(`${message}：${count}問`);
+      return `${message}：${count}問。現在Gold: ${gold}${definitionText}${chunkText}`;
+    });
+  }
+}
+
+async function loadInitialWords() {
+  const storedCsv = loadStoredUploadedWordsCsv();
+  if (storedCsv) {
+    loadWordsFromCsv(storedCsv, ({ count, definitionText, chunkText }) => {
+      const message = `アップロード済みデータを使用中：${count}問`;
+      setDataSourceStatus(message);
+      return `${message}。現在Gold: ${gold}${definitionText}${chunkText}`;
+    });
+    if (!el.startBtn.disabled) return;
+    clearStoredUploadedWordsCsv();
+  }
+  await loadDefaultWords();
+}
+
+async function readUploadedFileAsCsv(file) {
+  const fileName = file.name || "";
+  const isExcel = /\.(xlsx|xls)$/i.test(fileName);
+  if (!isExcel) return file.text();
+
+  if (!window.XLSX) {
+    throw new Error("Excelファイルの読み込みライブラリを取得できませんでした。CSVで再アップロードしてください。");
+  }
+
+  const buffer = await file.arrayBuffer();
+  const workbook = window.XLSX.read(buffer, { type: "array" });
+  const firstSheetName = workbook.SheetNames[0];
+  if (!firstSheetName) throw new Error("Excelファイルにシートがありません。");
+  return window.XLSX.utils.sheet_to_csv(workbook.Sheets[firstSheetName]);
 }
 
 el.csvFile.addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
-  const text = await file.text();
-  loadWordsFromCsv(text);
+  try {
+    const text = await readUploadedFileAsCsv(file);
+    loadWordsFromCsv(text, ({ count, definitionText, chunkText }) => {
+      saveUploadedWordsCsv(text);
+      const message = `アップロード済みデータを使用中：${count}問`;
+      setDataSourceStatus(message);
+      return `${message}。現在Gold: ${gold}${definitionText}${chunkText}`;
+    });
+  } catch (error) {
+    console.error("Failed to read uploaded word file:", error);
+    el.homeMessage.textContent = error.message || "アップロードファイルの読み込みに失敗しました。";
+    setDataSourceStatus("アップロードファイルの読み込みに失敗しました");
+  }
 });
 
 el.wordbookCategory.addEventListener("change", (event) => {
@@ -845,6 +930,12 @@ el.wordbookCategory.addEventListener("change", (event) => {
   populateWordbookSelect(event.target.value);
 });
 
+el.resetUploadedDataBtn.addEventListener("click", async () => {
+  clearAutoNextTimer();
+  clearStoredUploadedWordsCsv();
+  if (el.csvFile) el.csvFile.value = "";
+  await loadDefaultWords();
+});
 el.loadWordbookBtn.addEventListener("click", loadBuiltinWordBook);
 el.startBtn.addEventListener("click", startGame);
 el.hintBtn.addEventListener("click", useHint);
@@ -869,3 +960,4 @@ populateWordbookSelect("standard");
 resetHintState();
 updateVersionLabel();
 updateStatus();
+loadInitialWords();

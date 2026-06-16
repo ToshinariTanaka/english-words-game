@@ -88,6 +88,7 @@ button:disabled {
 #next-btn,
 #retry-btn,
 #load-wordbook-btn,
+#reset-uploaded-data-btn,
 #clear-retry-btn {
   background: var(--accent);
   color: #041022;
@@ -129,6 +130,16 @@ button:disabled {
 
 .message {
   min-height: 1.3em;
+}
+
+.data-source-status {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(110, 200, 255, 0.45);
+  border-radius: 10px;
+  background: rgba(110, 200, 255, 0.12);
+  color: #e8f7ff;
+  font-weight: 700;
 }
 
 .answer {
