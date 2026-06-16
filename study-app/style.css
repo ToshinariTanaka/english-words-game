@@ -111,6 +111,7 @@ h1 {
 .mode-button,
 .primary-button,
 .secondary-button,
+.speech-button,
 .choice-button {
   min-height: 48px;
   border-radius: 16px;
@@ -175,7 +176,8 @@ h1 {
   font-weight: 800;
 }
 
-.random-toggle {
+.random-toggle,
+.speech-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -190,7 +192,8 @@ h1 {
   cursor: pointer;
 }
 
-.random-toggle input {
+.random-toggle input,
+.speech-toggle input {
   width: 20px;
   height: 20px;
   accent-color: var(--primary);
@@ -294,7 +297,8 @@ h1 {
 }
 
 .primary-button,
-.secondary-button {
+.secondary-button,
+.speech-button {
   width: 100%;
   margin-top: 14px;
   padding: 12px 16px;
@@ -316,7 +320,8 @@ h1 {
   cursor: not-allowed;
 }
 
-.secondary-button {
+.secondary-button,
+.speech-button {
   background: linear-gradient(
     180deg,
     rgba(86, 152, 228, 0.28) 0%,
@@ -404,4 +409,16 @@ h1 {
   .choice-button {
     min-height: 56px;
   }
+}
+
+.speech-button {
+  margin: -6px 0 16px;
+  padding: 10px 14px;
+  min-height: 44px;
+  font-weight: 900;
+}
+
+.speech-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

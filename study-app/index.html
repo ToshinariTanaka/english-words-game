@@ -43,6 +43,10 @@
             <input id="randomOrder" type="checkbox">
             <span>ランダム出題</span>
           </label>
+          <label class="speech-toggle" for="autoSpeech">
+            <input id="autoSpeech" type="checkbox">
+            <span>問題を自動で読み上げる</span>
+          </label>
         </div>
         <button id="startQuizButton" class="secondary-button settings-start-button" type="button" disabled>この設定で出題開始</button>
         <p id="settingsStatus" class="settings-status">問題を読み込むと出題設定を利用できます。</p>
@@ -67,6 +71,7 @@
         <span id="progressLabel">0 / 0</span>
       </div>
       <h2 id="questionText">CSVを読み込み中...</h2>
+      <button id="replaySpeechButton" class="speech-button" type="button" disabled>🔊 もう一度聞く</button>
       <div id="choices" class="choices"></div>
       <div id="feedback" class="feedback" hidden></div>
       <button id="nextButton" class="primary-button" type="button" disabled>次の問題へ</button>

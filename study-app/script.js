@@ -38,6 +38,9 @@ const COMMON_ALIASES = {
 const UPLOAD_DB_NAME = 'english-study-app';
 const UPLOAD_DB_VERSION = 1;
 const UPLOAD_STORE_NAME = 'uploaded-files';
+const AUTO_SPEECH_STORAGE_KEY = 'englishStudyAppAutoSpeechEnabled';
+const SPEECH_LANGUAGE = 'en-US';
+const SPEECH_RATE = 0.85;
 
 const state = {
   mode: 'word',
@@ -71,6 +74,8 @@ const els = {
   uploadStatus: document.getElementById('uploadStatus'),
   questionCount: document.getElementById('questionCount'),
   randomOrder: document.getElementById('randomOrder'),
+  autoSpeech: document.getElementById('autoSpeech'),
+  replaySpeechButton: document.getElementById('replaySpeechButton'),
   startQuizButton: document.getElementById('startQuizButton'),
   settingsStatus: document.getElementById('settingsStatus'),
 };
@@ -237,6 +242,47 @@ function normalizeQuestions(rows) {
   }).filter((item) => item.question && item.correct && item.choices.length === 4);
 }
 
+function loadAutoSpeechEnabled() {
+  return localStorage.getItem(AUTO_SPEECH_STORAGE_KEY) !== 'false';
+}
+
+function saveAutoSpeechEnabled(enabled) {
+  localStorage.setItem(AUTO_SPEECH_STORAGE_KEY, enabled ? 'true' : 'false');
+}
+
+function getCurrentPrompt() {
+  return state.questions[state.index]?.question || '';
+}
+
+function speakPrompt(prompt) {
+  const text = String(prompt || '').trim();
+  if (!text || !('speechSynthesis' in window)) return;
+
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = SPEECH_LANGUAGE;
+    utterance.rate = SPEECH_RATE;
+    window.speechSynthesis.speak(utterance);
+  } catch (error) {
+    console.warn('Speech synthesis failed:', error);
+  }
+}
+
+function replayCurrentPrompt() {
+  speakPrompt(getCurrentPrompt());
+}
+
+function maybeAutoSpeakCurrentPrompt() {
+  if (!els.autoSpeech?.checked) return;
+  speakPrompt(getCurrentPrompt());
+}
+
+function initializeSpeechSetting() {
+  if (!els.autoSpeech) return;
+  els.autoSpeech.checked = loadAutoSpeechEnabled();
+}
+
 function resetSessionStats() {
   state.index = 0;
   state.answered = 0;
@@ -256,6 +302,7 @@ function setLoadingState(message) {
   els.feedback.hidden = true;
   els.progressLabel.textContent = '0 / 0';
   els.nextButton.disabled = true;
+  if (els.replaySpeechButton) els.replaySpeechButton.disabled = true;
   els.nextButton.textContent = '次の問題へ';
   els.startQuizButton.disabled = true;
   els.settingsStatus.textContent = '問題を読み込むと出題設定を利用できます。';
@@ -313,6 +360,7 @@ function showEmptyState() {
   els.feedback.className = 'feedback';
   els.feedback.hidden = false;
   els.nextButton.disabled = true;
+  if (els.replaySpeechButton) els.replaySpeechButton.disabled = true;
   els.startQuizButton.disabled = true;
   els.settingsStatus.textContent = '出題可能な行がありません。';
   updateModeUi();
@@ -424,6 +472,7 @@ function showQuestion() {
   }
 
   els.questionText.textContent = current.question;
+  if (els.replaySpeechButton) els.replaySpeechButton.disabled = false;
   els.feedback.className = 'feedback';
   els.feedback.textContent = `問題ID: ${current.id} / レベル: ${current.level || '未設定'} / CSV成績: 正解 ${current.totalCorrect}・不正解 ${current.totalWrong}・正答率 ${current.csvAccuracy}・連続正解 ${current.currentStreak}`;
   els.feedback.hidden = false;
@@ -438,6 +487,7 @@ function showQuestion() {
   });
   els.nextButton.textContent = state.index === state.questions.length - 1 ? '結果を見る' : '次の問題へ';
   updateModeUi();
+  maybeAutoSpeakCurrentPrompt();
 }
 
 function answer(choice) {
@@ -474,6 +524,7 @@ function finishSession() {
   els.feedback.textContent = `${state.answered}問中${state.correct}問正解、正答率${rate}%です。`;
   els.feedback.hidden = false;
   els.nextButton.disabled = true;
+  if (els.replaySpeechButton) els.replaySpeechButton.disabled = true;
   els.nextButton.textContent = '次の問題へ';
   updateModeUi();
 }
@@ -504,5 +555,8 @@ els.nextButton.addEventListener('click', nextQuestion);
 els.reviewButton.addEventListener('click', startReview);
 els.fileInput.addEventListener('change', handleUpload);
 els.startQuizButton.addEventListener('click', beginConfiguredSession);
+els.replaySpeechButton.addEventListener('click', replayCurrentPrompt);
+els.autoSpeech.addEventListener('change', () => saveAutoSpeechEnabled(els.autoSpeech.checked));
 
+initializeSpeechSetting();
 loadMode(state.mode);
