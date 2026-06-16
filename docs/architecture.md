@@ -17,6 +17,11 @@
 - `study-app/data/chunk_mode.csv`: チャンクモード用CSV。
 - `study-app/data/definition_mode.csv`: 英文和訳モード用CSV。内部IDとファイル名は互換性維持のため `definition` のまま。
 
+
+### study-app の音声読み上げ
+
+`study-app` は Web Speech API の `speechSynthesis` を使い、外部音声ファイルを使わずに現在問題の `question` を英語音声で再生します。対象は英単語モードの英単語、チャンクモードの英語チャンク、英文和訳モードの英文です。問題表示時はホーム設定「問題を自動で読み上げる」がONの場合のみ自動再生し、問題画面の「🔊 もう一度聞く」ボタンは設定OFFでも手動再生できます。自動読み上げ設定は `localStorage` の `englishStudyAppAutoSpeechEnabled` に保存し、未保存時はONとして扱います。再生前に `speechSynthesis.cancel()` を呼び、直前の読み上げが残らないようにしています。
+
 ### study-app のCSV形式
 
 最小構成では3モードとも次の列を使います。

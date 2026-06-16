@@ -1,4 +1,46 @@
 ## 今回やったこと
+- `study-app` に Web Speech API の `speechSynthesis` を使った英語読み上げ機能を追加しました。
+- 英単語モード、チャンクモード、英文和訳モードの現在問題 `question` だけを読み上げるようにしました。
+- 問題表示時に自動で1回読み上げ、問題画面の「🔊 もう一度聞く」ボタンで手動再生できるようにしました。
+- ホーム画面に「問題を自動で読み上げる」チェックボックスを追加し、初期値ON・`localStorage`保存にしました。
+- 自動読み上げOFF時でも手動再生ボタンは使えるようにし、日本語選択肢や正解表示は読み上げないようにしました。
+- README / architecture / project_status / next_tasks を音声読み上げ仕様に合わせて更新しました。
+
+## 変更ファイル
+- `study-app/index.html`
+- `study-app/script.js`
+- `study-app/style.css`
+- `README.md`
+- `docs/architecture.md`
+- `docs/project_status.md`
+- `docs/next_tasks.md`
+- `docs/codex_report.md`
+
+## テスト結果
+- `node tests_study_app_definition_mode.js` : PASS
+- `node --check study-app/script.js` : PASS
+- `node --check script.js` : PASS
+- `node tests_parseCsv.js` : PASS
+- `node tests_wordbookBatchPrompt.js` : PASS
+- `python3 tests_fill_excel_choices.py` : PASS
+
+## 注意点
+- iPhone Safariではブラウザ仕様により自動読み上げがブロックされる場合があります。その場合も「🔊 もう一度聞く」ボタンのユーザー操作で再生できる想定です。
+- この環境にはブラウザ自動操作ツールがないため、実機での音声出力とスクリーンショット確認は未実施です。UI上は出題設定に自動読み上げチェック、問題カードに再生ボタンが追加されます。
+- 読み上げ対象は `question` の英語問題文のみで、日本語の選択肢・正解表示・フィードバックは読み上げません。
+
+## 次にやるべきこと
+- 実ブラウザで3モードを開き、問題表示時の自動読み上げと「🔊 もう一度聞く」ボタンの再生を確認する。
+- 自動読み上げOFF設定が再読み込み後も保持され、OFF中でも手動再生できることを確認する。
+- iPhone Safariで自動再生制限時の挙動を確認する。
+
+## チャッピーに相談すべき点
+- 読み上げ速度 `0.85` が学習者に合うか、学年・教材レベル別に調整UIを追加するか。
+- 将来的に `en-US` 以外（英英/英豪など）のアクセント選択が必要か。
+
+---
+
+## 今回やったこと
 - ルートRPG本体で、アプリ起動時に保存済みアップロードCSV/Excelを優先し、なければ `./data/default-words.csv` を fetch で自動読み込みするようにしました。
 - fetch 失敗時は既存の内蔵サンプル10語へフォールバックする読み込み優先順位にしました。
 - CSVアップロード時に同じ端末・同じブラウザの `localStorage` へCSV本文（Excelは先頭シートをCSV化した内容）を保存し、次回起動時もアップロード済みデータを優先するようにしました。
