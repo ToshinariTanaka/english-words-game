@@ -1,37 +1,37 @@
 ## 今回やったこと
-- Render APIを共通問題データの正本として扱う方針に合わせ、RPG本体も起動時に `GET /api/questions/current` を優先取得するようにしました。
-- RPG本体で共通問題データ取得に成功した場合は「共通問題データから○問を読み込みました」を表示し、取得失敗時のみ `data/default-words.csv`（さらに失敗時は内蔵サンプル）へフォールバックするようにしました。
-- RPG本体のCSV/Excelアップロードを一時確認ではなく `POST /api/questions/upload` へ保存する処理に変更し、学習アプリ側からのアップロードと同じ共通問題データを更新するようにしました。
-- サーバー側で `GET /api/questions/current` / `GET /api/questions/status` のモード指定なしアクセスを「現在の共通問題データ」として解決し、従来の `?mode=word|chunk|definition` も維持しました。
-- `/`、`/study-app/`、`/admin/wordbook-batch/` のようなディレクトリURLで、それぞれの `index.html` を自動解決するようにしました。
-- README、設計メモ、プロジェクト状況、次タスクをRender統一方針に合わせて更新しました。
+- study-appのCSV/Excel読み込みを、A〜Lの最初の12列だけを標準列として扱う位置ベースの正規化に変更しました。
+- M列以降の余分な列と、後方に混ざる `A row_number` / `note` などの重複ヘッダーを無視するようにしました。
+- UTF-8 BOM付きCSVを正常に読み込み、UTF-8で文字化けが出る場合は可能な範囲でShift_JIS/CP932デコードを試すようにしました。
+- ファイル名に「英単語」「英単語テスト」「チャンク」「英文和訳」が含まれる場合、アップロード先モードを自動判定するようにしました。判定できない場合は従来どおり現在選択中モードを使います。
+- Render版サーバーのアップロードAPIでも同じA〜L標準化を行い、`POST /api/study-app/upload` を `POST /api/questions/upload` と同じ処理で受け入れるようにしました。
+- サーバー保存時に、モード別の標準CSVを `/var/data/study-app/{word_mode.csv,chunk_mode.csv,definition_mode.csv}` へBOM付きUTF-8で保存するようにしました。
+- アップロード失敗時の画面表示にAPI名と理由を含め、原因を追いやすくしました。
 
 ## 変更ファイル
+- `study-app/script.js`
 - `server.js`
-- `script.js`
-- `index.html`
+- `tests_study_app_definition_mode.js`
 - `README.md`
-- `docs/codex_report.md`
-- `docs/project_status.md`
 - `docs/architecture.md`
-- `docs/next_tasks.md`
+- `docs/project_status.md`
+- `docs/codex_report.md`
 
 ## テスト結果
 - `npm test` : PASS
-- ローカルNodeサーバーを一時起動し、`/`、`/study-app/`、`/admin/wordbook-batch/` がHTMLとして返ることを確認 : PASS
-- ローカルNodeサーバーへ `POST /api/questions/upload` でCSVを保存し、`GET /api/questions/current` が同じ4問を返すことを確認 : PASS
+- ローカルNodeサーバーを一時起動し、UTF-8 BOM付き・日本語/★付きファイル名・英文中カンマ・M列以降の重複ヘッダーを含むCSVを `POST /api/study-app/upload` へ送信できることを確認 : PASS
+- 保存された `/var/data/study-app` 相当のCSVが標準ヘッダー `row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note` になり、M列以降を含まないことを確認 : PASS
 
 ## 注意点
-- PCアップロード後にiPhoneで同じ問題セットが読まれるかは、同一Render URL・Persistent Diskありの本番環境での実機確認が必要です。ローカルではAPI保存・取得の一貫性まで確認済みです。
-- RenderのPersistent Diskを `/var/data` にマウントする前提です。Diskなしの環境では再起動や再デプロイで保存データが失われる可能性があります。
-- GitHub Pagesなど静的ホスティングではAPI保存ができないため、端末間共有を使う場合はRender版URLを利用してください。
-- 学習アプリは従来どおりモード別 `?mode=...` を利用します。RPG本体はモード指定なしの現在データを読みます。サーバーは最新アップロードを `current` として保持します。
+- ユーザー指定の実ファイル3点（`★英単語テスト_001_補完済み003.csv` / `★チャンク_001_補完済み005.csv` / `★英文和訳_001_補完済み002.csv`）はリポジトリ内に存在しなかったため、同等条件のテストCSVで確認しました。
+- `.xlsx` のサーバー側直接パースは依存ライブラリがないため未対応です。ブラウザ側ではSheetJSでExcelを読み、正規化CSVとしてAPIへ送信します。
+- PC/iPhone間で同じ問題が読めるかは、Render本番環境とPersistent Disk設定での実機確認が必要です。ローカルではAPI保存と標準CSV書き出しまで確認済みです。
+- GitHub Pagesではサーバー保存APIが使えないため、アップロード内容は一時確認用途です。
 
 ## 次にやるべきこと
-- Render本番へデプロイし、PCでアップロードしたあと、iPhoneで `/` と `/study-app/` を開いて同じ問題セットが読まれることを実機確認する。
-- 必要ならアップロードAPIに管理者トークンや認証を追加し、誰でも共通データを上書きできる状態を避ける。
-- 共通問題データJSONのバックアップ・復元手順を決める。
+- 実教材3ファイルを入手して、今回追加したA〜L位置ベース読み込み、選択肢不足行スキップ、問題数表示を実データで確認する。
+- Render本番へデプロイし、PCでアップロード後、iPhoneで同じモードを開いて同じ問題セットが読まれることを確認する。
+- サーバー側でも`.xlsx`を直接受け入れる必要がある場合は、xlsxライブラリの導入可否を判断する。
 
 ## チャッピーに相談すべき点
-- RPG本体が常に「最後にアップロードされたモード」を読む運用でよいか、またはRPG用データを `word` モード固定にするか。
-- 共通問題データを全員で1セットに固定するか、クラス・教材・ユーザー単位で切り替える必要があるか。
+- Render APIで保存するJSON正本と `/var/data/study-app/*.csv` のどちらを運用上の一次データと呼ぶか。
+- サーバー側Excel直接アップロード対応のために依存ライブラリを追加してよいか。

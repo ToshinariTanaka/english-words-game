@@ -46,6 +46,8 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
 - `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
 - `row_number` は問題IDとして扱います。学習履歴を将来保存する場合も、共通問題データ本体とは分離して設計します。
+- `A row_number`〜`L note` 形式の教材CSV/Excelも受け入れます。読み込み時は最初の12列（A〜L）だけを標準列として扱い、M列以降の余分な列や後方の重複ヘッダーは無視します。
+- `question` / `correct` / `choice1`〜`choice3` がそろった行だけを出題し、選択肢不足行はエラーにせずスキップします。
 - 各モードは起動時・モード切替時に必ず標準の `study-app/data/*.csv` を読み込みます。画面から手元の `.csv` / `.xlsx` をアップロードできますが、一時確認用であり端末内へ保存して次回起動時に優先することはしません。Excel読み込みはGitHub Pagesで動作するようSheetJSをCDNから読み込みます。
 
 
@@ -148,6 +150,7 @@ RenderサーバーはディレクトリURLの `index.html` を自動解決しま
 
 - `GET /api/questions/current`: 現在の共通問題データを取得します。RPG本体は起動時にこのAPIを優先します。
 - `POST /api/questions/upload`: CSV/Excel由来の問題データを共通問題データとして保存します。RPG側・学習アプリ側のどちらからアップロードしても同じ保存先を更新します。
+- `POST /api/study-app/upload`: 学習アプリ用の互換APIです。`mode=word|chunk|definition` と `file` を受け取り、A〜L列だけを標準CSVへ正規化して `/var/data/study-app/*.csv` にも保存します。
 - `GET /api/questions/status`: 保存状態、問題数、最終更新日時、保存ファイルパスを返します。
 
 学習アプリは既存互換のため `?mode=word|chunk|definition` を付けてモード別データを読みます。RPG本体はモード指定なしの現在データを読み、取得に成功した場合は「共通問題データから○問を読み込みました」と表示します。取得に失敗した場合のみ `data/default-words.csv` へフォールバックします。

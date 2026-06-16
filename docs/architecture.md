@@ -32,6 +32,9 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
 - `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
 - `row_number` は問題IDとして扱います。学習履歴を将来保存する場合も、共通問題データ本体とは分離して設計します。
+- 教材CSV/Excelは、元ヘッダーが `A row_number,B level,C question,...,L note` 形式でも、保存時は上記の標準ヘッダーへ正規化します。
+- 読み込み時は最初の12列（A〜L）だけを標準列として位置ベースで読み、M列以降は無視します。後方に重複ヘッダーがあってもA〜L列を上書きしません。
+- 出題対象は `question` / `correct` / `choice1`〜`choice3` がそろった行だけです。不足行はエラーにせずスキップします。
 
 今後、モードごとに列を拡張する場合も、既存RPG本体や既存CSV管理ツールとは別管理にします。
 
@@ -73,6 +76,7 @@ Render版は `server.js` が静的ファイルとAPIを同一オリジンで提�
 
 - `GET /api/questions/current?mode=word|chunk|definition`: 保存済み行データを返す。未保存なら404。
 - `POST /api/questions/upload`: `multipart/form-data` の `mode` と `file` を受け取り、CSV/Excelを変換して保存する。
+- `POST /api/study-app/upload`: study-app向けの互換アップロードAPI。A〜L列だけを標準列として読み、`/var/data/study-app/{word_mode.csv,chunk_mode.csv,definition_mode.csv}` に標準CSVとしても保存する。
 - `GET /api/questions/status?mode=word|chunk|definition`: 保存状態、問題数、最終更新日時を返す。
 
 `study-app` は共通問題データAPIを正本として扱い、localStorageは取得済みデータの補助キャッシュに限定します。API取得失敗時のみ標準CSVを読み込みます。
