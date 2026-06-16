@@ -4,9 +4,9 @@ const assert = require('assert');
 
 const source = fs.readFileSync('study-app/script.js', 'utf8');
 const start = source.indexOf('const MODES =');
-const end = source.indexOf('function resetSessionStats');
+const end = source.indexOf('function setLoadingState');
 const snippet = source.slice(start, end);
-const sandbox = { document: { querySelectorAll: () => [], getElementById: () => ({}) }, indexedDB: {} };
+const sandbox = { document: { querySelectorAll: () => [], getElementById: () => ({}) } };
 vm.createContext(sandbox);
 vm.runInContext(`${snippet}; state.mode = 'definition'; this.MODES = MODES; this.COMMON_ALIASES = COMMON_ALIASES; this.parseCsv = parseCsv; this.normalizeQuestions = normalizeQuestions;`, sandbox);
 

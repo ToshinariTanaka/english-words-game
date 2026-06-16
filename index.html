@@ -13,11 +13,11 @@
         <p>英単語モンスターを倒して gold を稼ごう！</p>
         <p id="version-label" class="hint">version</p>
         <div class="panel">
-          <label for="csv-file">単語CSVを読み込む</label>
+          <label for="csv-file">単語CSV/Excelを一時確認する</label>
           <input id="csv-file" type="file" accept=".csv,.xlsx,.xls" />
-          <p class="hint">対応列: word/meaning/level/chunk/chunk_meaning/definition/definition_meaning（日本語見出しも可）。その他の列は無視します。</p>
+          <p class="hint">アップロードしたファイルは一時確認用です。共通利用する問題は標準CSVに反映してください。対応列: word/meaning/level/chunk/chunk_meaning/definition/definition_meaning（日本語見出しも可）。</p>
           <p id="data-source-status" class="data-source-status" aria-live="polite">標準問題ファイルを読み込み中</p>
-          <button id="reset-uploaded-data-btn" type="button">アップロード済みデータを消去して標準問題に戻す</button>
+          <button id="reset-uploaded-data-btn" type="button">標準問題に戻す</button>
           <label for="wordbook-category">カテゴリを選ぶ</label>
           <select id="wordbook-category"></select>
           <label for="wordbook-select">単語帳を選ぶ</label>

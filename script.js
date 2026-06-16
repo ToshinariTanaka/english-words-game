@@ -3,9 +3,8 @@ const HOSPITAL_GOLD_PENALTY = 200;
 const AUTO_NEXT_MIN_MS = 100;
 const AUTO_NEXT_MAX_MS = 3000;
 const REVIEW_START_DELAY_MS = 3000;
-const GAME_VERSION = "v0.9.7";
+const GAME_VERSION = "v0.9.8";
 const DEFAULT_WORDS_PATH = "./data/default-words.csv";
-const UPLOADED_WORDS_STORAGE_KEY = "englishWordsGameUploadedWordsCsv";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 const QUESTION_MODES = {
   meaning: {
@@ -447,18 +446,6 @@ function setDataSourceStatus(message) {
   if (el.dataSourceStatus) el.dataSourceStatus.textContent = message;
 }
 
-function saveUploadedWordsCsv(csvText) {
-  localStorage.setItem(UPLOADED_WORDS_STORAGE_KEY, csvText);
-}
-
-function loadStoredUploadedWordsCsv() {
-  return localStorage.getItem(UPLOADED_WORDS_STORAGE_KEY) || "";
-}
-
-function clearStoredUploadedWordsCsv() {
-  localStorage.removeItem(UPLOADED_WORDS_STORAGE_KEY);
-}
-
 function getSelectedQuestionCount() {
   const playableWords = getPlayableWords();
   if (!el.questionCount || el.questionCount.value === "all") return playableWords.length;
@@ -877,16 +864,6 @@ async function loadDefaultWords() {
 }
 
 async function loadInitialWords() {
-  const storedCsv = loadStoredUploadedWordsCsv();
-  if (storedCsv) {
-    loadWordsFromCsv(storedCsv, ({ count, definitionText, chunkText }) => {
-      const message = `アップロード済みデータを使用中：${count}問`;
-      setDataSourceStatus(message);
-      return `${message}。現在Gold: ${gold}${definitionText}${chunkText}`;
-    });
-    if (!el.startBtn.disabled) return;
-    clearStoredUploadedWordsCsv();
-  }
   await loadDefaultWords();
 }
 
@@ -912,10 +889,9 @@ el.csvFile.addEventListener("change", async (event) => {
   try {
     const text = await readUploadedFileAsCsv(file);
     loadWordsFromCsv(text, ({ count, definitionText, chunkText }) => {
-      saveUploadedWordsCsv(text);
-      const message = `アップロード済みデータを使用中：${count}問`;
+      const message = `アップロードデータを一時確認中：${count}問`;
       setDataSourceStatus(message);
-      return `${message}。現在Gold: ${gold}${definitionText}${chunkText}`;
+      return `${message}。全端末で共通利用する問題は標準CSVに反映してください。現在Gold: ${gold}${definitionText}${chunkText}`;
     });
   } catch (error) {
     console.error("Failed to read uploaded word file:", error);
@@ -932,7 +908,6 @@ el.wordbookCategory.addEventListener("change", (event) => {
 
 el.resetUploadedDataBtn.addEventListener("click", async () => {
   clearAutoNextTimer();
-  clearStoredUploadedWordsCsv();
   if (el.csvFile) el.csvFile.value = "";
   await loadDefaultWords();
 });

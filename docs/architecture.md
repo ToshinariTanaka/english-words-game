@@ -31,7 +31,7 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - `choice1`〜`choice3`: 不正解選択肢を入れます。英文和訳モードでは日本語の誤訳選択肢を入れます。
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
 - `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
-- `row_number` は将来localStorageに学習履歴を保存するための問題IDとして扱います。
+- `row_number` は問題IDとして扱います。学習履歴を将来保存する場合も、共通問題データ本体とは分離して設計します。
 
 今後、モードごとに列を拡張する場合も、既存RPG本体や既存CSV管理ツールとは別管理にします。
 
@@ -52,15 +52,17 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 
 ### study-app の英文和訳モード
 
-`study-app/script.js` のモードキー `definition` は保存済みアップロードや既存URL/CSV名との互換性のため変更しません。ただし `study-app` では表示名を「英文和訳モード」とし、説明文は「英文を読んで、正しい日本語訳を選びます。」です。列判定は `question` / `英文` / `英語` / `問題` を英文として優先し、`correct` / `和訳` / `日本語訳` / `意味` / `正解` を日本語訳として優先します。RPG本体の `definition` モードは英英辞典モードのまま別仕様として維持します。
+`study-app/script.js` のモードキー `definition` は既存URL/CSV名との互換性のため変更しません。ただし `study-app` では表示名を「英文和訳モード」とし、説明文は「英文を読んで、正しい日本語訳を選びます。」です。列判定は `question` / `英文` / `英語` / `問題` を英文として優先し、`correct` / `和訳` / `日本語訳` / `意味` / `正解` を日本語訳として優先します。RPG本体の `definition` モードは英英辞典モードのまま別仕様として維持します。
 
 
-## ルートRPG本体の問題データ読み込み順
+## 共通問題データの読み込み方針
 
-`index.html` / `script.js` のRPG本体は、起動時に以下の順で問題データを決定する。
+`study-app/` は、GitHub Pagesなどの静的ホスティングで配信される以下の標準CSVを共通問題データの本体として扱います。
 
-1. `localStorage` の `englishWordsGameUploadedWordsCsv` に保存されたアップロードCSV/Excel。
-2. GitHub Pagesで配信される相対パス `./data/default-words.csv`。
-3. fetch失敗時の内蔵サンプルCSV。
+1. 英単語モード: `study-app/data/word_mode.csv`
+2. チャンクモード: `study-app/data/chunk_mode.csv`
+3. 英文和訳モード: `study-app/data/definition_mode.csv`
 
-アップロードCSV/Excelは端末・ブラウザローカルの状態として扱い、PCとiPhone間では同期しない。共通の標準問題を更新したい場合は、リポジトリ内の `data/default-words.csv` を変更する。
+起動時・モード切替時は常に標準CSVを `fetch` し、`IndexedDB` / `localStorage` に保存された過去のアップロードデータを標準CSVより優先しません。CSV/Excelアップロードは現在表示中モードの一時確認用で、ページ再読み込みやモード切替後は再び標準CSVへ戻ります。
+
+ルートRPG本体は `data/default-words.csv` を標準問題として読み込みます。CSV/Excelアップロードは同様に一時確認用であり、アップロード本文を `localStorage` に保存して次回起動時に優先する仕様は廃止しています。なお、Goldなど問題データ本体ではないユーザー状態の保存は既存どおり別用途として扱います。
