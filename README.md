@@ -48,6 +48,19 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - `row_number` は将来localStorageに学習履歴を保存するための問題IDとして扱います。
 - 各モードで標準の `study-app/data/*.csv` を読み込めるほか、画面から手元の `.csv` / `.xlsx` をアップロードして同じ列形式の問題に差し替えできます。Excel読み込みはGitHub Pagesで動作するようSheetJSをCDNから読み込みます。
 
+
+## 標準問題ファイルの自動読み込み（2026-06-16）
+
+ルートのRPG本体は、起動時に端末内の保存済みアップロードCSV/Excelを優先し、保存済みデータがない場合は GitHub Pages 上で `./data/default-words.csv` を自動読み込みします。これにより、PCでCSVをアップロードした状態に依存せず、iPhoneなど別端末の初回アクセスでも同じ標準問題を使えます。
+
+読み込み優先順位は以下です。
+
+1. 同じ端末・同じブラウザの `localStorage` に保存されたアップロードCSV/Excel
+2. リポジトリ内の標準問題ファイル `data/default-words.csv`
+3. 標準問題ファイルの取得に失敗した場合の内蔵サンプル10語
+
+画面には現在のデータソースを表示します。アップロードCSV/Excelを消したい場合は「アップロード済みデータを消去して標準問題に戻す」ボタンで `localStorage` の保存済みCSV/Excel由来データを削除し、標準問題ファイルを再読み込みできます。PCとiPhone間でアップロードデータは同期しません。端末を問わず共通化したい問題は `data/default-words.csv` を更新してください。
+
 ## UI更新（2026-05-13）
 - 解答後の結果画面に強調オーバーレイを追加（正解/不正解を瞬時に判別可能）。
 - 正解: ✅ / 緑グロー / ポップ演出 / `+○ Gold`強調 / キラキラ演出。

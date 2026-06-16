@@ -53,3 +53,14 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 ### study-app の英文和訳モード
 
 `study-app/script.js` のモードキー `definition` は保存済みアップロードや既存URL/CSV名との互換性のため変更しません。ただし `study-app` では表示名を「英文和訳モード」とし、説明文は「英文を読んで、正しい日本語訳を選びます。」です。列判定は `question` / `英文` / `英語` / `問題` を英文として優先し、`correct` / `和訳` / `日本語訳` / `意味` / `正解` を日本語訳として優先します。RPG本体の `definition` モードは英英辞典モードのまま別仕様として維持します。
+
+
+## ルートRPG本体の問題データ読み込み順
+
+`index.html` / `script.js` のRPG本体は、起動時に以下の順で問題データを決定する。
+
+1. `localStorage` の `englishWordsGameUploadedWordsCsv` に保存されたアップロードCSV/Excel。
+2. GitHub Pagesで配信される相対パス `./data/default-words.csv`。
+3. fetch失敗時の内蔵サンプルCSV。
+
+アップロードCSV/Excelは端末・ブラウザローカルの状態として扱い、PCとiPhone間では同期しない。共通の標準問題を更新したい場合は、リポジトリ内の `data/default-words.csv` を変更する。

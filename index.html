@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>英単語RPG MVP</title>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=20260616" />
   </head>
   <body>
     <main class="container">
@@ -14,8 +14,10 @@
         <p id="version-label" class="hint">version</p>
         <div class="panel">
           <label for="csv-file">単語CSVを読み込む</label>
-          <input id="csv-file" type="file" accept=".csv" />
+          <input id="csv-file" type="file" accept=".csv,.xlsx,.xls" />
           <p class="hint">対応列: word/meaning/level/chunk/chunk_meaning/definition/definition_meaning（日本語見出しも可）。その他の列は無視します。</p>
+          <p id="data-source-status" class="data-source-status" aria-live="polite">標準問題ファイルを読み込み中</p>
+          <button id="reset-uploaded-data-btn" type="button">アップロード済みデータを消去して標準問題に戻す</button>
           <label for="wordbook-category">カテゴリを選ぶ</label>
           <select id="wordbook-category"></select>
           <label for="wordbook-select">単語帳を選ぶ</label>
@@ -86,6 +88,7 @@
         </div>
       </section>
     </main>
-    <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="script.js?v=20260616"></script>
   </body>
 </html>

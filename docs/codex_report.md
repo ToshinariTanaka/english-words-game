@@ -1,4 +1,42 @@
 ## 今回やったこと
+- ルートRPG本体で、アプリ起動時に保存済みアップロードCSV/Excelを優先し、なければ `./data/default-words.csv` を fetch で自動読み込みするようにしました。
+- fetch 失敗時は既存の内蔵サンプル10語へフォールバックする読み込み優先順位にしました。
+- CSVアップロード時に同じ端末・同じブラウザの `localStorage` へCSV本文（Excelは先頭シートをCSV化した内容）を保存し、次回起動時もアップロード済みデータを優先するようにしました。
+- 現在のデータソース表示と「アップロード済みデータを消去して標準問題に戻す」ボタンを追加しました。
+- GitHub Pages / iPhone Safari のキャッシュ対策として、ルート `index.html` の CSS / JS 読み込みに `?v=20260616` を付けました。
+- 標準問題ファイル `data/default-words.csv` を追加し、README / architecture / project_status を更新しました。
+
+## 変更ファイル
+- `index.html`
+- `style.css`
+- `script.js`
+- `data/default-words.csv`
+- `README.md`
+- `docs/architecture.md`
+- `docs/project_status.md`
+- `docs/codex_report.md`
+
+## テスト結果
+- `node --check script.js` : PASS
+- `node tests_parseCsv.js` : PASS
+
+## 注意点
+- PCとiPhone間でアップロード済みCSVは同期しません。これは今回の仕様どおりです。共通化したい問題は `data/default-words.csv` を更新してください。
+- 今回の自動確認は構文チェックとCSVパーサー回帰テストです。実機のiPhone Safariでの目視確認は未実施です。
+- UI変更がありますが、この実行環境ではブラウザスクリーンショット取得までは行っていません。画面上部のアップロード欄直下にデータソース表示とリセットボタンが追加されます。
+
+## 次にやるべきこと
+- GitHub Pagesへ反映後、PCとiPhone Safariの初回アクセスで `data/default-words.csv` が同じ件数で読み込まれることを実機確認する。
+- PCでCSVをアップロード後、PCではアップロード済みデータ、iPhoneでは標準問題ファイルが使われることを確認する。
+- リセットボタンで保存済みアップロードCSV/Excelが消え、標準問題へ戻ることを確認する。
+
+## チャッピーに相談すべき点
+- 標準問題の正式なCSV内容を `data/default-words.csv` にどの教材データで運用するか。
+- ルートRPG本体のExcelアップロードはSheetJS CDNに依存するため、CDN依存を許容するか、CSV運用を標準にするか。
+
+---
+
+## 今回やったこと
 - `study-app` の内部ID `definition` を維持したまま、表示名・説明文・列判定・標準CSVを英文和訳モードの仕様に合わせました。
 - `question` / `英文` / `英語` / `問題` を英文として優先し、`correct` / `和訳` / `日本語訳` / `意味` / `正解` を正しい日本語訳として優先するよう変更しました。
 - `definition_mode.csv` の標準データを、英文を問題、日本語訳4個を選択肢にするサンプルへ差し替えました。
