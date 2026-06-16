@@ -1,6 +1,9 @@
 # Project Status
 
 - 2026-06-16: Render本番運用向けにNodeサーバーを追加し、共通問題データAPIを実装。
-- CSV/Excelアップロード後の問題データは、ブラウザlocalStorageではなくRender Persistent Disk想定の `/var/data/english_words_game/current-questions.json` に保存する方針へ変更。
+- 2026-06-16: RPG本体もRender APIの `GET /api/questions/current` を起動時に優先し、成功時は共通問題データ、失敗時のみ `data/default-words.csv` へフォールバックする構成へ変更。
+- 2026-06-16: RPG本体と `study-app/` のどちらからアップロードしても `POST /api/questions/upload` で同じPersistent Disk上の共通問題データを更新する方針へ統一。
+- 2026-06-16: `/`、`/study-app/`、`/admin/wordbook-batch/` のディレクトリURLはRenderサーバーが各 `index.html` に自動解決する。
+- CSV/Excelアップロード後の問題データは、ブラウザlocalStorageではなくRender Persistent Disk想定の `/var/data/english_words_game/current-questions.json` に保存する。
 - `study-app` は起動時・モード切替時に `/api/questions/current?mode=...` を優先し、取得失敗時のみ標準CSVへフォールバックする。
-- GitHub Pagesでは端末間共有保存不可。Render版URLではPC・iPhone・ログインIDに関係なく同じ問題データを参照する。
+- GitHub Pagesでは端末間共有保存不可。PC・iPhone間で同じ問題データを読む確認はRender版URLで行う。
