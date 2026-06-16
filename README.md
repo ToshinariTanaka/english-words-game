@@ -4,7 +4,7 @@
 
 ## 新規: 英語学習アプリ（最小構成）
 
-ゲーム要素を削除した静的な英語学習アプリを `study-app/` に追加しました。GitHub Pagesなどの静的ホスティングで動作します。
+ゲーム要素を削除した英語学習アプリを `study-app/` に追加しました。PC・iPhone共通保存を使う本番導線はRender版 `https://english-words-game.onrender.com/study-app/` に統一します。GitHub Pages版は標準CSVの閲覧・一時確認のみで、サーバー保存はできません。
 
 - 起動ファイル: `study-app/index.html`
 - ロジック: `study-app/script.js`
@@ -48,18 +48,18 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - `row_number` は問題IDとして扱います。学習履歴を将来保存する場合も、共通問題データ本体とは分離して設計します。
 - `A row_number`〜`L note` 形式の教材CSV/Excelも受け入れます。読み込み時は最初の12列（A〜L）だけを標準列として扱い、M列以降の余分な列や後方の重複ヘッダーは無視します。
 - `question` / `correct` / `choice1`〜`choice3` がそろった行だけを出題し、選択肢不足行はエラーにせずスキップします。
-- 各モードは起動時・モード切替時に必ず標準の `study-app/data/*.csv` を読み込みます。画面から手元の `.csv` / `.xlsx` をアップロードできますが、一時確認用であり端末内へ保存して次回起動時に優先することはしません。Excel読み込みはGitHub Pagesで動作するようSheetJSをCDNから読み込みます。
+- Render版では各モードの起動時・モード切替時に `GET /api/questions/current?mode=...` を優先し、未保存・取得失敗時のみ標準の `study-app/data/*.csv` を読み込みます。画面から手元の `.csv` / `.xlsx` をアップロードすると `POST /api/questions/upload` でサーバー保存します。GitHub Pages版では `/api/questions/upload` が存在しないため、画面上に「サーバー保存不可」とRender版への誘導を表示します。
 
 
 ## 標準問題ファイルの自動読み込み（2026-06-16）
 
-`study-app/` は、全端末・全ブラウザ・全ログイン状態で同じ問題を使うため、標準CSVを共通問題データの本体として扱います。
+Render版の `study-app/` は、全端末・全ブラウザ・全ログイン状態で同じ問題を使うため、Render API上の共通問題データを正本として扱います。未保存時の初期データとして、以下の標準CSVへフォールバックします。
 
 - 英単語モード: `study-app/data/word_mode.csv`
 - チャンクモード: `study-app/data/chunk_mode.csv`
 - 英文和訳モード: `study-app/data/definition_mode.csv`
 
-起動時・モード切替時は常に上記CSVを読み込み、過去にアップロードしたCSV/Excelを `localStorage` / `IndexedDB` から復元して標準CSVより優先することはありません。アップロード機能は残していますが、一時確認用です。全端末で共通利用したい問題は、該当する標準CSVへ反映してください。
+Render版では起動時・モード切替時に共通問題データAPIを優先し、取得できない場合のみ上記CSVを読み込みます。過去にアップロードしたCSV/Excelを `localStorage` / `IndexedDB` から復元して標準CSVより優先することはありません。GitHub Pages版でのアップロードはサーバー保存不可のため一時確認用です。全端末で共通利用したい問題はRender版URLからアップロードしてください。
 
 ルートのRPG本体も、起動時は `./data/default-words.csv` を標準問題として読み込みます。ルート画面のCSV/Excelアップロードも一時確認用で、端末内保存したアップロードデータを次回起動時に優先する仕様は廃止しました。
 
@@ -132,7 +132,7 @@ Renderでは `server.js` を起動し、静的ファイル配信と共通問題�
 - `DATA_DIR`: 既定値 `/var/data/english_words_game`
 - `QUESTIONS_FILE`: 既定値 `${DATA_DIR}/current-questions.json`
 
-GitHub Pagesは静的ホスティングのため、`POST /api/questions/upload` でのサーバー保存は動作しません。端末間共有が必要な場合はRender版URLを利用してください。
+GitHub Pagesは静的ホスティングのため、`POST /api/questions/upload` でのサーバー保存は動作しません。端末間共有が必要な場合はRender版URL `https://english-words-game.onrender.com/study-app/` を利用してください。RPG本体にも同URLへのリンクを表示し、GitHub Pages版の学習アプリ画面では「サーバー保存不可」とRender版へのリンクを表示します。
 
 ## Render版への統一（2026-06-16更新）
 
@@ -157,7 +157,7 @@ RenderサーバーはディレクトリURLの `index.html` を自動解決しま
 
 ### PC・iPhoneで同じ問題を読む確認
 
-1. Render版URLをPCで開きます。
+1. Render版URL `https://english-words-game.onrender.com/study-app/` をPCで開きます。
 2. RPG本体 `/` または学習アプリ `/study-app/` からCSV/Excelをアップロードします。
 3. iPhoneで同じRender版URLの `/` または `/study-app/` を開きます。
 4. 共通問題データの読み込みメッセージと問題数が、PCでアップロードした内容と一致することを確認します。
