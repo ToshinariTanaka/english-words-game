@@ -13,3 +13,10 @@
 - 実教材Excelを使って `tools/fill_excel_choices.py` を実行し、AI生成の不正解選択肢品質と再試行挙動を確認する。
 - OpenAI APIの利用モデル、コスト、教材品質のバランスを見て、デフォルトモデルやプロンプトを調整する。
 - 必要に応じて、補完ログCSV、実行前バックアップ、対象シート自動検出の強化を追加する。
+
+## Render運用後の確認候補
+
+- Render Persistent Diskを `/var/data` にマウントしてデプロイする。
+- PCでCSV/Excelをアップロードし、iPhoneの同じRender URLで共通問題データが表示されることを確認する。
+- アップロードAPIに管理者認証を付けるか検討する。
+- `/var/data/english_words_game/current-questions.json` のバックアップ手順を決める。

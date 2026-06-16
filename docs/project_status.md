@@ -1,14 +1,6 @@
 # Project Status
 
-- バージョン: v0.10.5
-- 直近対応: `study-app` とルートRPG本体で、アップロードCSV/Excelを端末内保存して標準CSVより優先する仕様を廃止し、標準CSVを共通問題データの本体に変更
-- 既存機能影響: ルートRPG本体の英英辞典モード、study-app の英単語モード/チャンクモード、既存ブラウザ管理ツールは維持
-- 新規ツール概要: `.xlsx` の未補完行抽出、OpenAI APIへの50行バッチ依頼、CSV出力の解析、row_number貼り戻し、空欄・重複検証、日本語正解時の英語選択肢混入検証、再試行、50行ごとの途中保存、エラー時保存停止、再実行再開に対応
-- 次の重点: PC/iPhone実機で標準CSVが同じ内容として読み込まれること、アップロードが一時確認に留まることを確認
-
-
-## 2026-06-16 標準CSVを共通問題データの本体に変更
-- `study-app` は起動時・モード切替時に、英単語/チャンク/英文和訳それぞれの `study-app/data/*.csv` を常に読み込む方針に変更。
-- `IndexedDB` に保存した過去のアップロードCSV/Excelを読み込んで標準CSVより優先する処理を削除。
-- CSV/Excelアップロードは一時確認用として残し、画面文言でも「全端末で共通利用する問題は標準CSVに反映」と明示。
-- ルートRPG本体もアップロード本文を `localStorage` に保存して次回起動時に優先する仕様を廃止し、起動時は `data/default-words.csv` を標準問題として読み込む。
+- 2026-06-16: Render本番運用向けにNodeサーバーを追加し、共通問題データAPIを実装。
+- CSV/Excelアップロード後の問題データは、ブラウザlocalStorageではなくRender Persistent Disk想定の `/var/data/english_words_game/current-questions.json` に保存する方針へ変更。
+- `study-app` は起動時・モード切替時に `/api/questions/current?mode=...` を優先し、取得失敗時のみ標準CSVへフォールバックする。
+- GitHub Pagesでは端末間共有保存不可。Render版URLではPC・iPhone・ログインIDに関係なく同じ問題データを参照する。

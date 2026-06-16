@@ -22,6 +22,9 @@ const MODES = {
   },
 };
 
+const API_BASE = typeof window !== 'undefined' ? window.location.origin : '';
+const SHARED_CACHE_PREFIX = 'englishWordsGame.sharedQuestions.';
+
 const COMMON_ALIASES = {
   id: ['A row_number', 'row_number', 'row', 'id', '番号', '行番号'],
   level: ['B level', 'level', 'レベル'],
@@ -254,12 +257,12 @@ function showEmptyState() {
   updateModeUi();
 }
 
-function applyQuestions(rows, sourceLabel) {
+function applyQuestions(rows, sourceLabel, options = {}) {
   state.questionPool = normalizeQuestions(rows);
   state.sourceLabel = sourceLabel;
   const skippedCount = Math.max(rows.length - state.questionPool.length, 0);
   const skippedMessage = skippedCount > 0 ? ` 選択肢などが不足している${skippedCount}行は出題しません。` : '';
-  els.uploadStatus.textContent = `${sourceLabel} から ${state.questionPool.length}問を読み込みました。${skippedMessage}`;
+  els.uploadStatus.textContent = options.message || `${sourceLabel} から ${state.questionPool.length}問を読み込みました。${skippedMessage}`;
   updateQuestionCountOptions(state.questionPool.length);
 
   if (state.questionPool.length === 0) {
@@ -271,6 +274,46 @@ function applyQuestions(rows, sourceLabel) {
   beginConfiguredSession();
 }
 
+
+function rowsToCsv(rows) {
+  if (!rows.length) return '';
+  const headers = Object.keys(rows[0]);
+  const escapeCell = (value) => {
+    const text = String(value ?? '');
+    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  return [headers, ...rows.map((row) => headers.map((header) => row[header] ?? ''))]
+    .map((row) => row.map(escapeCell).join(','))
+    .join('\n');
+}
+
+function sharedCacheKey(mode) {
+  return `${SHARED_CACHE_PREFIX}${mode}`;
+}
+
+function cacheSharedQuestions(mode, payload) {
+  try {
+    localStorage.setItem(sharedCacheKey(mode), JSON.stringify(payload));
+  } catch (error) {
+    console.warn('Failed to cache shared questions:', error);
+  }
+}
+
+async function fetchSharedQuestions(mode) {
+  const response = await fetch(`${API_BASE}/api/questions/current?mode=${encodeURIComponent(mode)}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  const payload = await response.json();
+  if (!payload.ok || !Array.isArray(payload.rows)) throw new Error(payload.error || '共通問題データの形式が不正です。');
+  cacheSharedQuestions(mode, payload);
+  return payload;
+}
+
+async function loadStandardCsv(mode) {
+  const response = await fetch(MODES[mode].file);
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return parseCsv(await response.text());
+}
+
 async function loadMode(mode) {
   const loadToken = state.loadToken + 1;
   state.loadToken = loadToken;
@@ -279,18 +322,22 @@ async function loadMode(mode) {
   updateModeUi();
 
   try {
-    const response = await fetch(MODES[mode].file);
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-    const rows = parseCsv(await response.text());
+    const shared = await fetchSharedQuestions(mode);
     if (loadToken !== state.loadToken || state.mode !== mode) return;
-    applyQuestions(rows, `${MODES[mode].label}の標準CSV`);
-  } catch (error) {
-    if (loadToken !== state.loadToken || state.mode !== mode) return;
-    els.questionText.textContent = 'CSVの読み込みに失敗しました。GitHub PagesなどのWebサーバー上で開いてください。';
-    els.feedback.textContent = error.message;
-    els.feedback.className = 'feedback wrong';
-    els.feedback.hidden = false;
-    els.uploadStatus.textContent = '標準CSVの読み込みに失敗しました。';
+    applyQuestions(shared.rows, '共通問題データ', { message: `共通問題データから${shared.rows.length}問を読み込みました` });
+  } catch (sharedError) {
+    try {
+      const rows = await loadStandardCsv(mode);
+      if (loadToken !== state.loadToken || state.mode !== mode) return;
+      applyQuestions(rows, '標準CSV', { message: `標準CSVから${rows.length}問を読み込みました` });
+    } catch (standardError) {
+      if (loadToken !== state.loadToken || state.mode !== mode) return;
+      els.questionText.textContent = 'CSVの読み込みに失敗しました。GitHub PagesなどのWebサーバー上で開いてください。';
+      els.feedback.textContent = `共通問題データ: ${sharedError.message} / 標準CSV: ${standardError.message}`;
+      els.feedback.className = 'feedback wrong';
+      els.feedback.hidden = false;
+      els.uploadStatus.textContent = '標準CSVの読み込みに失敗しました。';
+    }
   }
 }
 
@@ -307,15 +354,25 @@ async function handleUpload(event) {
       ? parseWorkbookRows(await file.arrayBuffer())
       : parseCsv(await file.text());
 
+    const formData = new FormData();
+    formData.append('mode', uploadMode);
+    const normalizedCsv = rowsToCsv(rows);
+    const normalizedFile = new File([normalizedCsv], file.name.replace(/\.xlsx?$/i, '.csv'), { type: 'text/csv' });
+    formData.append('file', normalizedFile);
+    const response = await fetch(`${API_BASE}/api/questions/upload`, { method: 'POST', body: formData });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) throw new Error(result.error || `${response.status} ${response.statusText}`);
+
+    cacheSharedQuestions(uploadMode, { ok: true, mode: uploadMode, rows, count: rows.length, updatedAt: result.updatedAt, filename: file.name });
     state.mode = uploadMode;
     updateModeUi();
-    applyQuestions(rows, `${file.name}（一時確認用アップロード）`);
+    applyQuestions(rows, '共通問題データ', { message: '共通問題データを保存しました。PC・iPhone共通で利用できます' });
   } catch (error) {
     els.questionText.textContent = 'アップロードファイルの読み込みに失敗しました。';
     els.feedback.textContent = error.message;
     els.feedback.className = 'feedback wrong';
     els.feedback.hidden = false;
-    els.uploadStatus.textContent = 'アップロードに失敗しました。標準CSVへ戻すにはモードを切り替えるかページを再読み込みしてください。';
+    els.uploadStatus.textContent = 'アップロードに失敗しました。Render版ではサーバー保存APIを確認してください。GitHub Pagesでは端末間共有保存はできません。';
   } finally {
     event.target.value = '';
   }
@@ -323,7 +380,7 @@ async function handleUpload(event) {
 
 function updateModeUi() {
   els.modeButtons.forEach((button) => button.classList.toggle('active', button.dataset.mode === state.mode));
-  els.modeDescription.textContent = `${MODES[state.mode].description} 起動時・モード切替時は常に標準CSVを読み込みます。アップロードはこの端末での一時確認用です。`;
+  els.modeDescription.textContent = `${MODES[state.mode].description} Render版では共通問題データを優先し、取得失敗時のみ標準CSVを読み込みます。GitHub Pagesでは端末間共有保存はできません。`;
   els.modeLabel.textContent = state.reviewMode ? `${MODES[state.mode].label}（復習）` : MODES[state.mode].label;
 }
 
