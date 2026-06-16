@@ -79,7 +79,7 @@ Render版は `server.js` が静的ファイルとAPIを同一オリジンで提�
 - `POST /api/study-app/upload`: study-app向けの互換アップロードAPI。A〜L列だけを標準列として読み、`/var/data/study-app/{word_mode.csv,chunk_mode.csv,definition_mode.csv}` に標準CSVとしても保存する。
 - `GET /api/questions/status?mode=word|chunk|definition`: 保存状態、問題数、最終更新日時を返す。
 
-`study-app` は共通問題データAPIを正本として扱い、localStorageは取得済みデータの補助キャッシュに限定します。API取得失敗時のみ標準CSVを読み込みます。GitHub Pages版では `/api/questions/upload` が存在しないため、アップロード失敗時にサーバー保存不可とRender版URL `https://english-words-game.onrender.com/study-app/` を表示します。
+`study-app` は共通問題データAPIを正本として扱い、localStorageは取得済みデータの補助キャッシュに限定します。API取得失敗時のみ標準CSVを読み込みます。GitHub Pages版では `/api/questions/upload` が存在しないため、アップロード失敗時にサーバー保存不可とRender版URL （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） を表示します。
 
 ## Render統一後のURLとデータ正本
 
