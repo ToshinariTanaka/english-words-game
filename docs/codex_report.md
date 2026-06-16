@@ -1,4 +1,48 @@
 ## 今回やったこと
+- `study-app` の起動時・モード切替時に、保存済みアップロードデータではなく常に各モードの標準CSVを読み込むように変更しました。
+- `study-app` の IndexedDB 保存/復元処理を削除し、CSV/Excelアップロードは現在の画面での一時確認用に限定しました。
+- ルートRPG本体でも、アップロードCSV/Excel本文を localStorage に保存して次回起動時に優先する仕様を廃止し、起動時は標準CSVを読み込むようにしました。
+- アップロード画面の文言を、全端末で共通利用する問題は標準CSVへ反映する運用だと分かる内容に変更しました。
+- README / architecture / project_status / next_tasks を、標準CSVを共通問題データの本体とする方針へ更新しました。
+
+## 変更ファイル
+- `study-app/script.js`
+- `study-app/index.html`
+- `script.js`
+- `index.html`
+- `tests_study_app_definition_mode.js`
+- `README.md`
+- `docs/architecture.md`
+- `docs/project_status.md`
+- `docs/next_tasks.md`
+- `docs/codex_report.md`
+
+## テスト結果
+- `node tests_parseCsv.js` : PASS
+- `node tests_study_app_definition_mode.js` : PASS
+- `python3 tests_fill_excel_choices.py` : PASS
+- `node -c script.js` : PASS
+- `node -c study-app/script.js` : PASS
+- `! rg -n "getSavedUpload|saveUpload|openUploadDatabase|UPLOADED_WORDS|loadStoredUploaded|clearStoredUploaded|保存済みアップロード|アップロード・保存済み" study-app script.js index.html README.md docs/architecture.md docs/project_status.md docs/next_tasks.md` : PASS（廃止対象の保存済みアップロード優先コードが残っていないことを確認）
+
+## 注意点
+- CSV/Excelアップロードは削除せず、一時確認用として残しています。ページ再読み込みやモード切替後は標準CSVに戻ります。
+- `localStorage` はルートRPG本体の Gold 保存など問題データ本体ではない用途では引き続き使っています。
+- 今回は静的アプリ前提の方針Aです。管理者画面からのアップロードを全端末へ即時反映するには、将来的に共有バックエンド方式の追加が必要です。
+- UI文言変更がありますが、この環境では実ブラウザスクリーンショット取得までは実施していません。
+
+## 次にやるべきこと
+- GitHub Pages 配信後、PC/iPhone/別ブラウザで `study-app/` を開き、同じ標準CSVの問題数・内容が読み込まれることを実機確認する。
+- 過去に端末へ保存された IndexedDB データがあっても、今回のコードでは読み出されないことを実機ブラウザで確認する。
+- 実教材CSV/Excelを一時アップロードし、問題形式・選択肢不足行のスキップ・音声読み上げに影響がないことを確認する。
+
+## チャッピーに相談すべき点
+- 将来の方針Bとして、Render / Vercel / Supabase / Firebase などのどれを共有バックエンドにするか。
+- 標準CSVへ反映するための管理者運用（PRでCSV更新、管理画面からバックエンド更新など）をどうするか。
+
+---
+
+## 今回やったこと
 - ルートRPG本体で、アプリ起動時に保存済みアップロードCSV/Excelを優先し、なければ `./data/default-words.csv` を fetch で自動読み込みするようにしました。
 - fetch 失敗時は既存の内蔵サンプル10語へフォールバックする読み込み優先順位にしました。
 - CSVアップロード時に同じ端末・同じブラウザの `localStorage` へCSV本文（Excelは先頭シートをCSV化した内容）を保存し、次回起動時もアップロード済みデータを優先するようにしました。

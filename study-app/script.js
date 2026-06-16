@@ -35,9 +35,6 @@ const COMMON_ALIASES = {
   note: ['L note', 'note', '備考', 'メモ'],
 };
 
-const UPLOAD_DB_NAME = 'english-study-app';
-const UPLOAD_DB_VERSION = 1;
-const UPLOAD_STORE_NAME = 'uploaded-files';
 
 const state = {
   mode: 'word',
@@ -74,67 +71,6 @@ const els = {
   startQuizButton: document.getElementById('startQuizButton'),
   settingsStatus: document.getElementById('settingsStatus'),
 };
-
-function openUploadDatabase() {
-  return new Promise((resolve, reject) => {
-    if (!('indexedDB' in window)) {
-      reject(new Error('このブラウザではアップロードファイルを保存できません。'));
-      return;
-    }
-
-    const request = indexedDB.open(UPLOAD_DB_NAME, UPLOAD_DB_VERSION);
-    request.onupgradeneeded = () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(UPLOAD_STORE_NAME)) {
-        database.createObjectStore(UPLOAD_STORE_NAME, { keyPath: 'mode' });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('保存領域を開けませんでした。'));
-  });
-}
-
-async function getSavedUpload(mode) {
-  const database = await openUploadDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(UPLOAD_STORE_NAME, 'readonly');
-    const request = transaction.objectStore(UPLOAD_STORE_NAME).get(mode);
-
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = () => reject(request.error || new Error('保存済みファイルを読み込めませんでした。'));
-    transaction.oncomplete = () => database.close();
-    transaction.onerror = () => {
-      database.close();
-      reject(transaction.error || new Error('保存済みファイルを読み込めませんでした。'));
-    };
-  });
-}
-
-async function saveUpload(mode, rows, fileName) {
-  const database = await openUploadDatabase();
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(UPLOAD_STORE_NAME, 'readwrite');
-    transaction.objectStore(UPLOAD_STORE_NAME).put({
-      mode,
-      rows,
-      fileName,
-      savedAt: new Date().toISOString(),
-    });
-
-    transaction.oncomplete = () => {
-      database.close();
-      resolve();
-    };
-    transaction.onerror = () => {
-      database.close();
-      reject(transaction.error || new Error('アップロードファイルを保存できませんでした。'));
-    };
-    transaction.onabort = () => {
-      database.close();
-      reject(transaction.error || new Error('アップロードファイルの保存が中断されました。'));
-    };
-  });
-}
 
 function parseCsv(text) {
   const rows = [];
@@ -343,17 +279,6 @@ async function loadMode(mode) {
   updateModeUi();
 
   try {
-    const savedUpload = await getSavedUpload(mode);
-    if (loadToken !== state.loadToken || state.mode !== mode) return;
-    if (savedUpload && Array.isArray(savedUpload.rows) && savedUpload.rows.length > 0) {
-      applyQuestions(savedUpload.rows, `${savedUpload.fileName}（保存済みアップロード）`);
-      return;
-    }
-  } catch (error) {
-    console.warn('保存済みアップロードの読み込みに失敗しました。', error);
-  }
-
-  try {
     const response = await fetch(MODES[mode].file);
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     const rows = parseCsv(await response.text());
@@ -382,16 +307,15 @@ async function handleUpload(event) {
       ? parseWorkbookRows(await file.arrayBuffer())
       : parseCsv(await file.text());
 
-    await saveUpload(uploadMode, rows, file.name);
     state.mode = uploadMode;
     updateModeUi();
-    applyQuestions(rows, `${file.name}（アップロード・保存済み）`);
+    applyQuestions(rows, `${file.name}（一時確認用アップロード）`);
   } catch (error) {
-    els.questionText.textContent = 'アップロードファイルの読み込みまたは保存に失敗しました。';
+    els.questionText.textContent = 'アップロードファイルの読み込みに失敗しました。';
     els.feedback.textContent = error.message;
     els.feedback.className = 'feedback wrong';
     els.feedback.hidden = false;
-    els.uploadStatus.textContent = 'アップロードに失敗しました。以前の保存済みファイルは保持されています。';
+    els.uploadStatus.textContent = 'アップロードに失敗しました。標準CSVへ戻すにはモードを切り替えるかページを再読み込みしてください。';
   } finally {
     event.target.value = '';
   }
@@ -399,7 +323,7 @@ async function handleUpload(event) {
 
 function updateModeUi() {
   els.modeButtons.forEach((button) => button.classList.toggle('active', button.dataset.mode === state.mode));
-  els.modeDescription.textContent = `${MODES[state.mode].description} 標準CSVまたは手元のCSV/Excelを読み込めます。`;
+  els.modeDescription.textContent = `${MODES[state.mode].description} 起動時・モード切替時は常に標準CSVを読み込みます。アップロードはこの端末での一時確認用です。`;
   els.modeLabel.textContent = state.reviewMode ? `${MODES[state.mode].label}（復習）` : MODES[state.mode].label;
 }
 
