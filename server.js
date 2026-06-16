@@ -78,13 +78,17 @@ function writeStore(store) {
 function sendJson(res, status, data) { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); }
 function getMode(url) { return url.searchParams.get('mode') || 'word'; }
 
+function getCurrentEntry(store, mode) {
+  if (mode) return store.modes?.[mode] || null;
+  return store.current || store.modes?.word || null;
+}
 function handleCurrent(req, res, url) {
-  const mode = getMode(url); const store = readStore(); const entry = store.modes?.[mode];
+  const requestedMode = url.searchParams.get('mode'); const mode = requestedMode || 'current'; const store = readStore(); const entry = getCurrentEntry(store, requestedMode);
   if (!entry) return sendJson(res, 404, { ok: false, error: '共通問題データは未保存です。', mode });
-  return sendJson(res, 200, { ok: true, mode, rows: entry.rows, count: entry.count, updatedAt: entry.updatedAt, filename: entry.filename });
+  return sendJson(res, 200, { ok: true, mode: requestedMode || entry.mode || 'current', rows: entry.rows, count: entry.count, updatedAt: entry.updatedAt, filename: entry.filename });
 }
 function handleStatus(req, res, url) {
-  const mode = getMode(url); const store = readStore(); const entry = store.modes?.[mode];
+  const requestedMode = url.searchParams.get('mode'); const mode = requestedMode || 'current'; const store = readStore(); const entry = getCurrentEntry(store, requestedMode);
   return sendJson(res, 200, { ok: true, mode, saved: Boolean(entry), count: entry?.count || 0, updatedAt: entry?.updatedAt || null, filename: entry?.filename || null, path: DATA_FILE });
 }
 function handleUpload(req, res) {
@@ -108,7 +112,9 @@ function handleUpload(req, res) {
       const mode = fields.mode || 'word';
       const rows = parseUploadedRows(file.buffer);
       const now = new Date().toISOString(); const store = readStore();
-      store.modes = store.modes || {}; store.modes[mode] = { rows, count: rows.length, updatedAt: now, filename: file.filename };
+      const entry = { mode, rows, count: rows.length, updatedAt: now, filename: file.filename };
+      store.modes = store.modes || {}; store.modes[mode] = entry;
+      store.current = entry;
       store.updatedAt = now;
       writeStore(store);
       return sendJson(res, 200, { ok: true, mode, count: rows.length, updatedAt: now, filename: file.filename });
@@ -117,7 +123,8 @@ function handleUpload(req, res) {
 }
 
 function serveStatic(req, res, pathname) {
-  const decoded = decodeURIComponent(pathname === '/' ? '/index.html' : pathname);
+  const rawPath = pathname.endsWith('/') ? `${pathname}index.html` : pathname;
+  const decoded = decodeURIComponent(rawPath === '/' ? '/index.html' : rawPath);
   const target = path.resolve(PUBLIC_DIR, `.${decoded}`);
   if (!target.startsWith(PUBLIC_DIR) || !fs.existsSync(target) || fs.statSync(target).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
   res.writeHead(200, { 'content-type': MIME_TYPES[path.extname(target)] || 'application/octet-stream' }); fs.createReadStream(target).pipe(res);

@@ -5,6 +5,8 @@ const AUTO_NEXT_MAX_MS = 3000;
 const REVIEW_START_DELAY_MS = 3000;
 const GAME_VERSION = "v0.9.8";
 const DEFAULT_WORDS_PATH = "./data/default-words.csv";
+const QUESTIONS_API_CURRENT = "/api/questions/current";
+const QUESTIONS_API_UPLOAD = "/api/questions/upload";
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 const QUESTION_MODES = {
   meaning: {
@@ -327,6 +329,36 @@ function parseCsv(text) {
   };
 
   return dataRows.map(toWord).filter((item) => item.word && item.word !== "#VALUE!");
+}
+
+
+function rowsToCsv(rows) {
+  if (!rows.length) return "";
+  const headers = [...rows.reduce((set, row) => {
+    Object.keys(row || {}).forEach((key) => set.add(key));
+    return set;
+  }, new Set())];
+  const escapeCell = (value) => {
+    const text = String(value ?? "");
+    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  return [headers, ...rows.map((row) => headers.map((header) => row?.[header] ?? ""))]
+    .map((row) => row.map(escapeCell).join(","))
+    .join("\n");
+}
+
+function objectsToGameWords(rows) {
+  return parseCsv(rowsToCsv(rows));
+}
+
+async function saveSharedQuestionsCsv(csvText, filename = "rpg-upload.csv") {
+  const formData = new FormData();
+  formData.append("mode", "word");
+  formData.append("file", new File([csvText], filename.replace(/\.xlsx?$/i, ".csv"), { type: "text/csv" }));
+  const response = await fetch(QUESTIONS_API_UPLOAD, { method: "POST", body: formData });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+  return result;
 }
 
 function shuffle(arr) {
@@ -842,6 +874,22 @@ function loadWordsFromCsv(csvText, messageBuilder) {
   el.startBtn.disabled = false;
 }
 
+async function loadSharedQuestions() {
+  setDataSourceStatus("共通問題データを読み込み中");
+  const response = await fetch(QUESTIONS_API_CURRENT, { cache: "no-store" });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const payload = await response.json();
+  if (!payload.ok || !Array.isArray(payload.rows)) throw new Error(payload.error || "共通問題データの形式が不正です。");
+  const parsed = objectsToGameWords(payload.rows);
+  if (parsed.length < 4) throw new Error("共通問題データにRPGで使える行が4問未満です。");
+  words = parsed;
+  loadWordsFromCsv(rowsToCsv(payload.rows), ({ count, definitionText, chunkText }) => {
+    const message = `共通問題データから${count}問を読み込みました`;
+    setDataSourceStatus(message);
+    return `${message}。現在Gold: ${gold}${definitionText}${chunkText}`;
+  });
+}
+
 async function loadDefaultWords() {
   setDataSourceStatus("標準問題ファイルを読み込み中");
   try {
@@ -864,7 +912,12 @@ async function loadDefaultWords() {
 }
 
 async function loadInitialWords() {
-  await loadDefaultWords();
+  try {
+    await loadSharedQuestions();
+  } catch (error) {
+    console.warn("Failed to load shared questions; falling back to standard CSV:", error);
+    await loadDefaultWords();
+  }
 }
 
 async function readUploadedFileAsCsv(file) {
@@ -888,15 +941,16 @@ el.csvFile.addEventListener("change", async (event) => {
   if (!file) return;
   try {
     const text = await readUploadedFileAsCsv(file);
+    await saveSharedQuestionsCsv(text, file.name || "rpg-upload.csv");
     loadWordsFromCsv(text, ({ count, definitionText, chunkText }) => {
-      const message = `アップロードデータを一時確認中：${count}問`;
+      const message = `共通問題データを保存しました：${count}問`;
       setDataSourceStatus(message);
-      return `${message}。全端末で共通利用する問題は標準CSVに反映してください。現在Gold: ${gold}${definitionText}${chunkText}`;
+      return `${message}。PC・iPhone共通でRPG/学習アプリから利用できます。現在Gold: ${gold}${definitionText}${chunkText}`;
     });
   } catch (error) {
     console.error("Failed to read uploaded word file:", error);
     el.homeMessage.textContent = error.message || "アップロードファイルの読み込みに失敗しました。";
-    setDataSourceStatus("アップロードファイルの読み込みに失敗しました");
+    setDataSourceStatus("共通問題データの保存に失敗しました");
   }
 });
 

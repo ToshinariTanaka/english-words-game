@@ -20,3 +20,11 @@
 - PCでCSV/Excelをアップロードし、iPhoneの同じRender URLで共通問題データが表示されることを確認する。
 - アップロードAPIに管理者認証を付けるか検討する。
 - `/var/data/english_words_game/current-questions.json` のバックアップ手順を決める。
+
+## Render統一後の実機確認
+
+- Renderへデプロイし、Persistent Diskが `/var/data` にマウントされていることを確認する。
+- PCでRPG本体 `/` からCSV/Excelをアップロードし、iPhoneで `/` を開いて「共通問題データから○問を読み込みました」と表示されることを確認する。
+- PCで学習アプリ `/study-app/` からCSV/Excelをアップロードし、iPhoneで `/study-app/` を開いて同じ問題セットが読まれることを確認する。
+- `GET /api/questions/status` で件数・最終更新日時・ファイル名が想定どおり更新されることを確認する。
+- アップロードAPIを一般公開したままにするか、管理者トークンを追加するか判断する。

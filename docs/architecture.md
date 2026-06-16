@@ -76,3 +76,31 @@ Render版は `server.js` が静的ファイルとAPIを同一オリジンで提�
 - `GET /api/questions/status?mode=word|chunk|definition`: 保存状態、問題数、最終更新日時を返す。
 
 `study-app` は共通問題データAPIを正本として扱い、localStorageは取得済みデータの補助キャッシュに限定します。API取得失敗時のみ標準CSVを読み込みます。
+
+## Render統一後のURLとデータ正本
+
+Render版では `server.js` が静的ファイルとAPIを同一オリジンで提供します。URLは以下のまま利用します。
+
+- `/` → RPG本体（`/index.html`）
+- `/study-app/` → 学習アプリ（`/study-app/index.html`）
+- `/admin/wordbook-batch/` → 管理ツール（`/admin/wordbook-batch/index.html`）
+
+ディレクトリURLでアクセスされた場合は、サーバー側で末尾の `index.html` を自動解決します。
+
+共通問題データの正本はRender APIです。
+
+- `GET /api/questions/current`: RPG本体が起動時に読む現在の共通問題データ。保存済みデータがなければ404。
+- `GET /api/questions/current?mode=word|chunk|definition`: 学習アプリがモード別に読む共通問題データ。従来のRender API利用を維持。
+- `POST /api/questions/upload`: RPG本体・学習アプリのどちらからアップロードしてもPersistent Disk上の同じJSONを更新する。
+- `GET /api/questions/status`: 現在の共通問題データの保存状態を返す。`?mode=...` 指定も可能。
+
+保存先JSONには、互換性維持のためモード別データ（`modes`）と、最後にアップロードされた現在データ（`current`）を保持します。RPG本体は `current` を優先し、未保存時は `modes.word` をフォールバックとして扱います。学習アプリは従来どおり `?mode=...` を使います。
+
+RPG本体の起動順は以下です。
+
+1. `GET /api/questions/current` を取得する。
+2. 取得成功かつRPGで使える行が4問以上なら「共通問題データから○問を読み込みました」を表示する。
+3. 取得失敗時のみ `data/default-words.csv` を読み込む。
+4. 標準CSVも失敗した場合だけ内蔵サンプルを利用する。
+
+RPG本体のアップロードは、CSV/ExcelをブラウザでCSV化して `POST /api/questions/upload` に送信します。保存成功後、同じ内容をRPG画面にも読み込みます。
