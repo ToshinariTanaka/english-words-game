@@ -450,3 +450,24 @@ h1 {
   margin-top: 0;
   padding: 10px 14px;
 }
+
+
+.quiz-card.mode-word #questionText,
+.quiz-card.mode-chunk #questionText {
+  font-size: clamp(1.8rem, 7.2vw, 2.64rem);
+}
+
+.quiz-card.mode-word .choice-button,
+.quiz-card.mode-chunk .choice-button {
+  font-size: 1.2em;
+}
+
+.quiz-card.mode-word .quiz-topline,
+.quiz-card.mode-chunk .quiz-topline {
+  font-size: 1.2em;
+}
+
+.quiz-card.mode-word .speak-question-button,
+.quiz-card.mode-chunk .speak-question-button {
+  font-size: 1.08em;
+}

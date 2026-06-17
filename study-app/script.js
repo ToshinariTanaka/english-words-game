@@ -29,6 +29,9 @@ const IS_GITHUB_PAGES = HOSTNAME.endsWith('github.io');
 const IS_RENDER = HOSTNAME.endsWith('onrender.com') || HOSTNAME === 'localhost' || HOSTNAME === '127.0.0.1';
 const SHARED_CACHE_PREFIX = 'englishWordsGame.sharedQuestions.';
 const SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
+const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
+const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
+const DEFAULT_QUESTION_COUNT = '10';
 
 
 
@@ -117,6 +120,7 @@ const els = {
   autoSpeak: document.getElementById('autoSpeak'),
   soundEffects: document.getElementById('soundEffects'),
   speakQuestionButton: document.getElementById('speakQuestionButton'),
+  voiceSelect: document.getElementById('voiceSelect'),
 };
 
 let audioContext = null;
@@ -142,6 +146,95 @@ function saveStoredBoolean(key, value) {
   } catch (error) {
     console.warn('Failed to save boolean setting:', error);
   }
+}
+
+
+function loadStoredString(key, defaultValue = '') {
+  try {
+    if (typeof localStorage === 'undefined') return defaultValue;
+    const stored = localStorage.getItem(key);
+    return stored === null ? defaultValue : stored;
+  } catch (error) {
+    console.warn('Failed to load string setting:', error);
+    return defaultValue;
+  }
+}
+
+function saveStoredString(key, value) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn('Failed to save string setting:', error);
+  }
+}
+
+function sanitizeQuestionCountValue(value) {
+  const allowedValues = Array.from(els.questionCount?.options || []).map((option) => option.value);
+  if (value === 'all') return 'all';
+  if (allowedValues.includes(String(value))) return String(value);
+  return DEFAULT_QUESTION_COUNT;
+}
+
+function setupQuestionCountSetting() {
+  if (!els.questionCount) return;
+  els.questionCount.value = sanitizeQuestionCountValue(loadStoredString(QUESTION_COUNT_STORAGE_KEY, DEFAULT_QUESTION_COUNT));
+  if (els.questionCount.value === 'all') {
+    els.questionCount.value = DEFAULT_QUESTION_COUNT;
+  }
+  els.questionCount.addEventListener('change', () => {
+    const value = sanitizeQuestionCountValue(els.questionCount.value);
+    els.questionCount.value = value;
+    saveStoredString(QUESTION_COUNT_STORAGE_KEY, value);
+  });
+}
+
+function getAvailableVoices() {
+  const synthesis = getSpeechSynthesis();
+  return synthesis?.getVoices?.() || [];
+}
+
+function getDisplayVoices(voices) {
+  const englishVoices = voices.filter((voice) => /^en[-_]/i.test(voice.lang || ''));
+  return englishVoices.length > 0 ? englishVoices : voices;
+}
+
+function getVoiceOptionValue(voice) {
+  return voice.voiceURI || `${voice.name}|${voice.lang}`;
+}
+
+function populateVoiceSelect() {
+  if (!els.voiceSelect) return;
+  const storedVoice = loadStoredString(VOICE_STORAGE_KEY, '');
+  const voices = getDisplayVoices(getAvailableVoices());
+  els.voiceSelect.innerHTML = '';
+  const autoOption = document.createElement('option');
+  autoOption.value = '';
+  autoOption.textContent = '自動選択';
+  els.voiceSelect.appendChild(autoOption);
+  voices.forEach((voice) => {
+    const option = document.createElement('option');
+    option.value = getVoiceOptionValue(voice);
+    option.textContent = `${voice.name} / ${voice.lang}`;
+    els.voiceSelect.appendChild(option);
+  });
+  els.voiceSelect.value = voices.some((voice) => getVoiceOptionValue(voice) === storedVoice) ? storedVoice : '';
+}
+
+function setupVoiceSelect() {
+  if (!els.voiceSelect) return;
+  populateVoiceSelect();
+  els.voiceSelect.addEventListener('change', () => saveStoredString(VOICE_STORAGE_KEY, els.voiceSelect.value));
+  const synthesis = getSpeechSynthesis();
+  if (synthesis) {
+    synthesis.onvoiceschanged = populateVoiceSelect;
+  }
+}
+
+function getSelectedVoice() {
+  const selectedValue = els.voiceSelect?.value || loadStoredString(VOICE_STORAGE_KEY, '');
+  if (!selectedValue) return null;
+  return getAvailableVoices().find((voice) => getVoiceOptionValue(voice) === selectedValue) || null;
 }
 
 function getAudioContext() {
@@ -302,6 +395,11 @@ function speakCurrentQuestion() {
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-US';
+  const selectedVoice = getSelectedVoice();
+  if (selectedVoice) {
+    utterance.voice = selectedVoice;
+    utterance.lang = selectedVoice.lang || utterance.lang;
+  }
   utterance.rate = 0.9;
   utterance.pitch = 1.0;
 
@@ -489,7 +587,8 @@ function updateQuestionCountOptions(availableCount) {
 
   const selectedOption = els.questionCount.selectedOptions[0];
   if (!selectedOption || selectedOption.disabled) {
-    els.questionCount.value = 'all';
+    els.questionCount.value = DEFAULT_QUESTION_COUNT;
+    saveStoredString(QUESTION_COUNT_STORAGE_KEY, DEFAULT_QUESTION_COUNT);
   }
 }
 
@@ -515,7 +614,7 @@ function beginConfiguredSession() {
   const orderedPool = random ? shuffle(state.questionPool) : [...state.questionPool];
   state.questions = orderedPool.slice(0, requestedCount).map(cloneQuestionForSession);
 
-  const countLabel = requestedCount === state.questionPool.length ? '全問' : `${requestedCount}問`;
+  const countLabel = els.questionCount.value === 'all' ? '全問' : `${requestedCount}問`;
   const orderLabel = random ? 'ランダム' : '元の順番';
   els.settingsStatus.textContent = `全${state.questionPool.length}問から、${orderLabel}で${countLabel}を出題します。`;
   showQuestion();
@@ -674,6 +773,9 @@ function updateModeUi() {
   const hostingMessage = IS_GITHUB_PAGES ? `現在はGitHub Pages版です。サーバー保存不可のため、共通保存は ${renderStudyAppUrlText()} を使ってください。` : 'Render版では共通問題データを優先し、取得失敗時のみ標準CSVを読み込みます。';
   els.modeDescription.textContent = `${MODES[state.mode].description} ${hostingMessage}`;
   els.modeLabel.textContent = state.reviewMode ? `${MODES[state.mode].label}（復習）` : MODES[state.mode].label;
+  getQuizCardElement()?.classList.toggle('mode-word', state.mode === 'word');
+  getQuizCardElement()?.classList.toggle('mode-chunk', state.mode === 'chunk');
+  getQuizCardElement()?.classList.toggle('mode-definition', state.mode === 'definition');
 }
 
 function updateStats() {
@@ -790,7 +892,9 @@ els.fileInput.addEventListener('change', handleUpload);
 els.startQuizButton.addEventListener('click', handleStartQuizClick);
 els.speakQuestionButton.addEventListener('click', speakCurrentQuestion);
 
+setupQuestionCountSetting();
 setupSoundSetting();
+setupVoiceSelect();
 setupAudioUnlock();
 updateHostingStatus();
 loadMode(state.mode);
