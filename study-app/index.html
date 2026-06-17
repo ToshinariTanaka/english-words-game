@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>英語学習アプリ</title>
-  <link rel="stylesheet" href="./style.css?v=20260617-speech1">
+  <link rel="stylesheet" href="./style.css?v=20260617-speech2">
 </head>
 <body>
   <main class="app-shell">
@@ -37,7 +37,7 @@
               <option value="70">70問</option>
               <option value="100">100問</option>
               <option value="150">150問</option>
-              <option value="all" selected>全て</option>
+              <option value="all">全て</option>
             </select>
           </label>
           <label class="random-toggle" for="randomOrder">
@@ -47,6 +47,12 @@
           <label class="random-toggle" for="autoSpeak">
             <input id="autoSpeak" type="checkbox" checked>
             <span>自動読み上げ</span>
+          </label>
+          <label class="setting-field" for="voiceSelect">
+            <span>音声選択</span>
+            <select id="voiceSelect">
+              <option value="">自動選択</option>
+            </select>
           </label>
           <label class="random-toggle" for="soundEffects">
             <input id="soundEffects" type="checkbox">
@@ -70,7 +76,7 @@
       <div><span id="accuracyRate">0%</span><small>正答率</small></div>
     </section>
 
-    <section class="quiz-card" aria-live="polite">
+    <section class="quiz-card mode-word" aria-live="polite">
       <div class="quiz-topline">
         <span id="modeLabel">英単語モード</span>
         <span id="progressLabel">0 / 0</span>

@@ -18,3 +18,5 @@
 - 2026-06-17: RPG本体とstudy-appの効果音ON/OFF設定を `englishWordsGame.soundEnabled` に統一し、Web Audio APIによる正解上昇音・不正解下降音を追加。初回ユーザー操作後のAudioContext resumeにも対応。
 
 - 2026-06-17: 出題数設定の反映を確認・補強。study-app は選択件数で `state.questions` を slice する仕様をテストで固定し、RPG本体はランダム出題ON/OFFと選択件数 slice、実出題数ベースの進捗表示に対応。
+
+- 2026-06-17: study-appの出題数デフォルトを10問に固定し、保存済みの不正値や `all` は10問にフォールバックするよう変更。音声選択プルダウンを追加し、Web Speech APIの英語系音声優先表示・保存復元・`voiceschanged` 対応を実装。英単語/チャンクモードのみ主要文字を拡大。
