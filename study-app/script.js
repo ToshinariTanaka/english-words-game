@@ -113,8 +113,11 @@ const els = {
   settingsStatus: document.getElementById('settingsStatus'),
   hostingStatus: document.getElementById('hostingStatus'),
   autoSpeak: document.getElementById('autoSpeak'),
+  soundEffects: document.getElementById('soundEffects'),
   speakQuestionButton: document.getElementById('speakQuestionButton'),
 };
+
+let audioContext = null;
 
 function getSpeechSynthesis() {
   return typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
@@ -151,6 +154,66 @@ function initializeSpeech() {
   // iPhone Safariでは、ユーザー操作の中でspeechSynthesisへ触れておくと
   // 以後の手動再生が安定しやすい。音声は出さず、既存キューだけを止める。
   synthesis.cancel();
+}
+
+
+function getAudioContext() {
+  if (typeof window === 'undefined') return null;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+
+  if (!audioContext) {
+    audioContext = new AudioContextClass();
+  }
+
+  if (audioContext.state === 'suspended') {
+    audioContext.resume().catch(() => {});
+  }
+
+  return audioContext;
+}
+
+function initializeAudio() {
+  getAudioContext();
+}
+
+function playTone(frequency, startTime, duration, volume = 0.08, type = 'sine') {
+  const context = getAudioContext();
+  if (!context) return;
+
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration + 0.02);
+}
+
+function playCorrectSound() {
+  const context = getAudioContext();
+  if (!context) return;
+
+  const now = context.currentTime;
+  playTone(659.25, now, 0.10, 0.07);
+  playTone(880.00, now + 0.11, 0.14, 0.08);
+}
+
+function playWrongSound() {
+  const context = getAudioContext();
+  if (!context) return;
+
+  const now = context.currentTime;
+  playTone(220.00, now, 0.16, 0.08, 'square');
+  playTone(164.81, now + 0.14, 0.18, 0.07, 'square');
 }
 
 function updateSpeakButton() {
@@ -344,6 +407,7 @@ function cloneQuestionForSession(question) {
 
 function beginConfiguredSession() {
   initializeSpeech();
+  initializeAudio();
   if (state.questionPool.length === 0) return;
 
   resetSessionStats();
@@ -561,6 +625,14 @@ function answer(choice) {
   const current = state.questions[state.index];
   const isCorrect = choice === current.correct;
   state.answered += 1;
+
+  if (els.soundEffects?.checked) {
+    if (isCorrect) {
+      playCorrectSound();
+    } else {
+      playWrongSound();
+    }
+  }
 
   if (isCorrect) {
     state.correct += 1;
