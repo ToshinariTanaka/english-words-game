@@ -112,8 +112,51 @@ const els = {
   startQuizButton: document.getElementById('startQuizButton'),
   settingsStatus: document.getElementById('settingsStatus'),
   hostingStatus: document.getElementById('hostingStatus'),
+  autoSpeak: document.getElementById('autoSpeak'),
+  speakQuestionButton: document.getElementById('speakQuestionButton'),
 };
 
+function getSpeechSynthesis() {
+  return typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
+}
+
+function getCurrentQuestionText() {
+  const current = state.questions[state.index];
+  return current?.question ? String(current.question).trim() : '';
+}
+
+function cancelSpeech() {
+  const synthesis = getSpeechSynthesis();
+  if (synthesis) synthesis.cancel();
+}
+
+function speakCurrentQuestion() {
+  const synthesis = getSpeechSynthesis();
+  const text = getCurrentQuestionText();
+  if (!synthesis || !text || typeof SpeechSynthesisUtterance === 'undefined') return;
+
+  synthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.9;
+  utterance.pitch = 1.0;
+
+  synthesis.speak(utterance);
+}
+
+function initializeSpeech() {
+  const synthesis = getSpeechSynthesis();
+  if (!synthesis) return;
+  // iPhone Safariでは、ユーザー操作の中でspeechSynthesisへ触れておくと
+  // 以後の手動再生が安定しやすい。音声は出さず、既存キューだけを止める。
+  synthesis.cancel();
+}
+
+function updateSpeakButton() {
+  if (!els.speakQuestionButton) return;
+  els.speakQuestionButton.disabled = !getCurrentQuestionText();
+}
 
 function renderStudyAppLinkText() {
   return RENDER_STUDY_APP_URL
@@ -257,6 +300,7 @@ function resetSessionStats() {
 }
 
 function setLoadingState(message) {
+  cancelSpeech();
   state.questionPool = [];
   state.questions = [];
   resetSessionStats();
@@ -268,6 +312,7 @@ function setLoadingState(message) {
   els.nextButton.textContent = '次の問題へ';
   els.startQuizButton.disabled = true;
   els.settingsStatus.textContent = '問題を読み込むと出題設定を利用できます。';
+  updateSpeakButton();
 }
 
 function updateQuestionCountOptions(availableCount) {
@@ -298,6 +343,7 @@ function cloneQuestionForSession(question) {
 }
 
 function beginConfiguredSession() {
+  initializeSpeech();
   if (state.questionPool.length === 0) return;
 
   resetSessionStats();
@@ -313,6 +359,7 @@ function beginConfiguredSession() {
 }
 
 function showEmptyState() {
+  cancelSpeech();
   state.questions = [];
   state.index = 0;
   els.progressLabel.textContent = '0 / 0';
@@ -325,6 +372,7 @@ function showEmptyState() {
   els.startQuizButton.disabled = true;
   els.settingsStatus.textContent = '出題可能な行がありません。';
   updateModeUi();
+  updateSpeakButton();
 }
 
 function applyQuestions(rows, sourceLabel, options = {}) {
@@ -474,6 +522,7 @@ function updateStats() {
 }
 
 function showQuestion() {
+  cancelSpeech();
   state.selected = false;
   els.feedback.hidden = true;
   els.nextButton.disabled = true;
@@ -500,6 +549,10 @@ function showQuestion() {
   });
   els.nextButton.textContent = state.index === state.questions.length - 1 ? '結果を見る' : '次の問題へ';
   updateModeUi();
+  updateSpeakButton();
+  if (els.autoSpeak?.checked) {
+    speakCurrentQuestion();
+  }
 }
 
 function answer(choice) {
@@ -528,6 +581,7 @@ function answer(choice) {
 }
 
 function finishSession() {
+  cancelSpeech();
   const rate = state.answered === 0 ? 0 : Math.round((state.correct / state.answered) * 100);
   els.progressLabel.textContent = `${state.questions.length} / ${state.questions.length}`;
   els.questionText.textContent = state.reviewMode ? '復習が終わりました。' : '学習が終わりました。';
@@ -538,6 +592,7 @@ function finishSession() {
   els.nextButton.disabled = true;
   els.nextButton.textContent = '次の問題へ';
   updateModeUi();
+  updateSpeakButton();
 }
 
 function nextQuestion() {
@@ -566,6 +621,7 @@ els.nextButton.addEventListener('click', nextQuestion);
 els.reviewButton.addEventListener('click', startReview);
 els.fileInput.addEventListener('change', handleUpload);
 els.startQuizButton.addEventListener('click', beginConfiguredSession);
+els.speakQuestionButton.addEventListener('click', speakCurrentQuestion);
 
 updateHostingStatus();
 loadMode(state.mode);

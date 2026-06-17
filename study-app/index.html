@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>英語学習アプリ</title>
-  <link rel="stylesheet" href="./style.css?v=20260616-rpg1">
+  <link rel="stylesheet" href="./style.css?v=20260617-speech1">
 </head>
 <body>
   <main class="app-shell">
@@ -44,6 +44,10 @@
             <input id="randomOrder" type="checkbox">
             <span>ランダム出題</span>
           </label>
+          <label class="random-toggle" for="autoSpeak">
+            <input id="autoSpeak" type="checkbox" checked>
+            <span>自動読み上げ</span>
+          </label>
         </div>
         <button id="startQuizButton" class="secondary-button settings-start-button" type="button" disabled>この設定で出題開始</button>
         <p id="settingsStatus" class="settings-status">問題を読み込むと出題設定を利用できます。</p>
@@ -68,6 +72,9 @@
         <span id="progressLabel">0 / 0</span>
       </div>
       <h2 id="questionText">CSVを読み込み中...</h2>
+      <div class="question-tools">
+        <button id="speakQuestionButton" class="secondary-button speak-question-button" type="button" disabled>🔊 もう一度聞く</button>
+      </div>
       <div id="choices" class="choices"></div>
       <div id="feedback" class="feedback" hidden></div>
       <button id="nextButton" class="primary-button" type="button" disabled>次の問題へ</button>

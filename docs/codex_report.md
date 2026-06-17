@@ -1,37 +1,37 @@
 ## 今回やったこと
-- 誤ったRender URLとして報告された `https://english-words-game.onrender.com/study-app/` を、アプリ内の固定リンク・誘導文・README/設計メモから使わないようにしました。
-- `script.js` と `study-app/script.js` の `RENDER_STUDY_APP_URL` は空文字にし、正しいRender Web Service URLが確認できるまでGitHub Pages等から誤URLへ誘導しないようにしました。
-- Render上で同一オリジンから開いている場合は、引き続き現在のオリジンの `/study-app/` を使うため、正しいRenderサービス上ではリンクが自動で同じサービス内の学習アプリへ向きます。
-- `render.yaml` と `package.json` を確認し、このリポジトリ側のRender定義は Web Service名 `english-words-game`、Start Command相当 `npm start`、実体 `node server.js` になっていることを確認しました。
-- 公開URL `https://english-words-game.onrender.com/study-app/` と `https://english-words-game.onrender.com/api/questions/current?mode=word` は、この環境からの確認ではどちらも `403 Forbidden` でした。Render Dashboardにはアクセスできないため、GitHub連携リポジトリ・mainブランチ参照・実機でのヘブライ語UI非表示・iPhone共有までは未確認です。
+- `study-app/` に、現在表示中の C列相当 `question` の英語だけを Web Speech API で読み上げる機能を追加しました。
+- 新しい問題を表示したとき、出題設定の「自動読み上げ」がONなら自動で発音するようにしました。初期値はONです。
+- 問題カード付近に「🔊 もう一度聞く」ボタンを追加し、自動読み上げOFFでも手動再生できるようにしました。
+- 次の問題、読み込み状態、空状態、終了状態へ移る前に `speechSynthesis.cancel()` を呼び、前の音声が残りにくいようにしました。
+- 初回の「この設定で出題開始」ボタン押下時に `speechSynthesis.cancel()` で音声機能へ触れ、iPhone Safariの手動再生が安定しやすいようにしました。
+- 音声機能がないブラウザでは何もせず戻るガードを入れ、学習アプリ本体が壊れないようにしました。
+- READMEに `study-app/` の音声読み上げ仕様を追記しました。
 
 ## 変更ファイル
-- `script.js`
+- `study-app/index.html`
 - `study-app/script.js`
-- `index.html`
+- `study-app/style.css`
 - `README.md`
-- `docs/architecture.md`
-- `docs/project_status.md`
 - `docs/codex_report.md`
+- `docs/project_status.md`
 
 ## テスト結果
+- `node --check study-app/script.js`: PASS
 - `npm test`: PASS
-- `PORT=3131 DATA_DIR=/tmp/ewg-render-url-check node server.js`: PASS（ローカルサーバー起動）
-- `curl -I http://127.0.0.1:3131/study-app/`: PASS（ローカルで `study-app/index.html` が返ることを確認）
-- `curl -F mode=word -F file=@/tmp/ewg-upload.csv http://127.0.0.1:3131/api/questions/upload`: PASS（ローカルAPIでアップロード保存成功）
-- `curl -i https://english-words-game.onrender.com/study-app/`: WARN（外部公開URLは `403 Forbidden`。別アプリ表示の直接再現や正しいRender URL特定は不可）
+- `python3 -m http.server 4173`: PASS（ローカル静的サーバー起動）
+- `curl -I http://127.0.0.1:4173/study-app/`: PASS（`study-app/` がローカルで配信されることを確認）
+- `npx playwright --version`: WARN（npm registry が 403 Forbidden のためPlaywrightを取得できず、ブラウザスクリーンショットは未取得）
 
 ## 注意点
-- 正しいRender Web Service URLは、このリポジトリ内だけでは確定できません。Render Dashboardで対象サービスのURL、Repository、Branch、Start Commandを確認してください。
-- `RENDER_STUDY_APP_URL` は意図的に未設定です。正しいURLが確定したら `script.js` と `study-app/script.js` に `/study-app/` まで含めたURLを設定し、READMEも同じURLに更新してください。
-- `https://english-words-game.onrender.com/study-app/` は、ユーザー報告ではヘブライ語アプリが表示されるため、正しいURLとして扱わないでください。
+- Web Speech APIの自動再生はブラウザ・端末のポリシーに左右されます。特にiPhone Safariでは自動読み上げがブロックされる可能性があるため、手動の「🔊 もう一度聞く」ボタンを併用してください。
+- この環境では実機のPC Chrome音声出力、iPhone Safari音声出力までは確認できません。ブラウザ上のUI表示とコード上の再生処理・ガードを確認しました。
+- 外部音声APIは使用していないため、利用できる英語音声・品質はブラウザ/OSに依存します。
 
 ## 次にやるべきこと
-- Render Dashboardで、GitHub Repository が `ToshinariTanaka/english-words-game`、Branch が `main`、Start Command が `npm start` または `node server.js` であることを確認する。
-- 正しいRender Web Service URLの `/study-app/` で「英語学習アプリ」が表示され、ヘブライ語アプリが表示されないことを確認する。
-- 正しいRender Web Service URLで `/api/questions/upload` が存在し、CSVアップロード後にサーバー保存が成功することを確認する。
-- PCアップロード後、iPhoneで同じ問題数が表示されることを実機確認する。
+- 実機のPC Chromeで、英単語・チャンク・英文和訳の3モードそれぞれが `question` の英語だけを読み上げることを確認する。
+- 実機のiPhone Safariで、少なくとも「🔊 もう一度聞く」ボタンによる手動再生が動くことを確認する。
+- 必要に応じて、ユーザーが選べる読み上げ速度や英語音声の種類を追加するか検討する。
 
 ## チャッピーに相談すべき点
-- Render Dashboard上で正しいサービスURLが複数候補ある場合、どのURLを本番導線に採用するか。
-- 正しいURL確定後、GitHub Pages版アクセス時にリンク表示だけにするか、自動リダイレクトにするか。
+- iPhone Safariで自動読み上げをどこまで重視するか（自動再生が不安定な場合、初回だけ案内文や「音声を有効化」ボタンを出すべきか）。
+- 英語音声のアクセント（en-US固定のままか、en-GBなどを選べるようにするか）。

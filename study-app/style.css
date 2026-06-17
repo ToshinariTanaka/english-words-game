@@ -433,3 +433,16 @@ h1 {
   background: rgba(246, 208, 111, 0.14);
   color: #fff4cf;
 }
+
+.question-tools {
+  display: flex;
+  justify-content: flex-start;
+  margin: -6px 0 16px;
+}
+
+.speak-question-button {
+  width: auto;
+  min-height: 44px;
+  margin-top: 0;
+  padding: 10px 14px;
+}
