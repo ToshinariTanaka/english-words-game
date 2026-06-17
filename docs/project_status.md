@@ -14,3 +14,5 @@
 - 2026-06-17: study-appにWeb Speech APIによるC列 question の英語読み上げを追加。自動読み上げは初期ONで、手動の「🔊 もう一度聞く」ボタンも利用可能。
 
 - 2026-06-17: RPG本体に音声ランダム設定、現在の声表示、効果音ON/OFF、正解/不正解効果音の複数ランダムパターンを追加。
+
+- 2026-06-17: RPG本体とstudy-appの効果音ON/OFF設定を `englishWordsGame.soundEnabled` に統一し、Web Audio APIによる正解上昇音・不正解下降音を追加。初回ユーザー操作後のAudioContext resumeにも対応。

@@ -1,31 +1,34 @@
 ## 今回やったこと
-- `study-app/` の「この設定で出題開始」ボタン押下時に、既存の出題開始処理を維持したまま短い開始効果音を鳴らす処理を追加しました。
-- 効果音は外部ファイルを使わず、Web Audio API の oscillator で 523.25Hz → 659.25Hz → 783.99Hz の控えめな上昇音にしました。
-- iPhone Safari などで AudioContext が `suspended` になる場合を考慮し、クリック直後に `resume()` を試みます。効果音再生に失敗しても出題開始は止めません。
-- 出題開始後、問題表示エリアである `.quiz-card` まで `scrollIntoView({ behavior: 'smooth', block: 'start' })` で自動スクロールする処理を追加しました。
-- 問題カード描画後にスクロールされるよう `requestAnimationFrame` を使い、さらに少し上余白を取る `window.scrollTo` を追加しました。
-- `.quiz-card` に `scroll-margin-top` を追加し、スクロール後にカード上部が詰まりすぎないようにしました。
+- RPG本体 `/` と学習アプリ `/study-app/` の両方に、Web Audio API（Oscillator）による正解音・不正解音を追加しました。
+- 正解時は 523Hz → 659Hz → 784Hz の明るい上昇音、不正解時は 220Hz → 147Hz の低い下降音を控えめな音量で鳴らすようにしました。
+- 効果音ON/OFFチェックボックスは、RPG本体の既存ホーム画面設定を新しい保存キーに対応させ、学習アプリでは出題設定付近へ追加しました。
+- 効果音設定は `englishWordsGame.soundEnabled` に保存し、初期値ON・次回アクセス時も維持するようにしました。
+- iPhone Safariのユーザー操作制限に対応するため、最初のクリック/タップまたはキー操作後に `AudioContext.resume()` を試みる処理を追加しました。
+- 効果音OFFの場合は正解音・不正解音・学習アプリの開始音が鳴らないようにしました。
+- 音声再生に失敗しても学習/ゲーム進行を止めないよう、効果音処理は try/catch で保護しました。
 
 ## 変更ファイル
+- `script.js`
 - `study-app/script.js`
-- `study-app/style.css`
+- `study-app/index.html`
 - `docs/codex_report.md`
+- `docs/project_status.md`
 
 ## テスト結果
+- `node --check script.js`: PASS
 - `node --check study-app/script.js`: PASS
 - `npm test`: PASS（npm の `Unknown env config "http-proxy"` 警告は表示されましたが、テスト自体は成功しました）
 
 ## 注意点
-- この作業環境ではブラウザ実機の音声出力やスムーズスクロール挙動は直接確認できていません。
-- PC Chrome と iPhone Safari では、実機で「音が控えめに鳴ること」「問題カードへ自然に下へ移動すること」の最終確認が必要です。
-- 音声再生がブラウザ設定やサイレントモードでブロックされても、出題開始とスクロールは継続する設計です。
-- UI変更は挙動追加のみで、静的な見た目の大きな変更はありません。スクリーンショットは未取得です。
+- この作業環境ではブラウザ実機の音声出力確認はできていません。PC Chrome と iPhone Safari で、ON時に正解/不正解で別の音が鳴り、OFF時に一切鳴らないことの実機確認が必要です。
+- UIにチェックボックスを追加しましたが、この環境ではブラウザのスクリーンショット取得手段がないため画像確認は未実施です。表示上は既存の設定エリアにラベル付きチェックボックスを追加する軽微な変更です。
+- RPG本体の既存効果音設定キーは、要件に合わせて `englishWordsGame.soundEnabled` に統一しました。旧キー `englishWordsGameSoundEffects` の値は引き継いでいません。
 
 ## 次にやるべきこと
-- PC Chromeで「この設定で出題開始」を押し、開始音と `.quiz-card` へのスクロールを確認する。
-- iPhone Safariで同じ操作を行い、音声制限下でも出題開始が止まらず、問題表示エリアへスクロールすることを確認する。
-- 音量やスクロール位置が学習体験に合っているか、必要に応じて微調整する。
+- PC ChromeでRPG本体と学習アプリを開き、効果音ON/OFF、正解/不正解音、リロード後の設定維持を確認する。
+- iPhone Safariで初回タップ後に効果音が鳴ること、サイレントモードやブラウザ制限時にも画面操作が止まらないことを確認する。
+- 必要に応じて音量・音色・UIラベル文言を調整する。
 
 ## チャッピーに相談すべき点
-- 開始音の音色・音量が学習アプリとして適切か、実機確認後に調整要否を相談してください。
-- スクロール先を現在の `.quiz-card` のままにするか、将来的に問題文直前や成績表示エリアへ切り替えるか相談してください。
+- RPG本体の旧localStorageキー `englishWordsGameSoundEffects` から新キー `englishWordsGame.soundEnabled` へ移行処理を追加するべきか相談してください。
+- 学習アプリの開始音も「効果音ON/OFF」の対象として無音化しましたが、開始音自体を残す/削除する方針を相談してください。
