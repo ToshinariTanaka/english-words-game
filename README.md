@@ -2,6 +2,18 @@
 
 英単語を倒してgoldを稼ぐ英語学習RPGです。既存のRPG本体は `index.html` / `style.css` / `script.js` で維持しています。
 
+## RPG本体の音声・効果音設定（2026-06-17）
+
+ルートのRPG本体（`index.html` / `script.js` / `style.css`）に、読み上げ音声と効果音の設定を追加しました。
+
+- 「音声ランダム」ON時は、`speechSynthesis.getVoices()` で取得した英語系音声（`en-US`, `en-GB`, `en-AU`, `en-CA` など `en-*`）から毎回ランダムに読み上げます。
+- 「音声ランダム」OFF時は、取得できた英語系音声の先頭を優先音声として固定利用します。
+- 英語音声が取得できない場合は、`utterance.lang = "en-US"` のみ指定し、ブラウザ標準の音声にフォールバックします。
+- iPhone/Safariで初回の音声候補が空になる場合に備え、`speechSynthesis.onvoiceschanged` で候補を再読み込みします。
+- 「現在の声：○○」で最後に使った声、ランダム/固定モード、候補数を確認できます。
+- 「効果音ON」ON時は、正解音・不正解音をそれぞれ複数パターンからランダムにWeb Audio APIのoscillatorで再生します。外部音声ファイルは使いません。
+- 「音声ランダム」と「効果音ON」は `localStorage` に保存されます。
+
 ## 新規: 英語学習アプリ（最小構成）
 
 ゲーム要素を削除した英語学習アプリを `study-app/` に追加しました。PC・iPhone共通保存を使う本番導線はRender版 （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） に統一します。GitHub Pages版は標準CSVの閲覧・一時確認のみで、サーバー保存はできません。

@@ -63,6 +63,36 @@ input[type="file"] {
   margin-bottom: 8px;
 }
 
+.settings-panel {
+  margin-top: 14px;
+  border: 1px solid rgba(110, 200, 255, 0.32);
+  border-radius: 10px;
+  padding: 10px 12px 12px;
+}
+
+.settings-panel legend {
+  padding: 0 6px;
+  color: #dff4ff;
+  font-weight: 700;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 14px;
+}
+
+.checkbox-label input {
+  margin: 0;
+}
+
+.voice-status {
+  margin: 8px 0 0;
+  color: #cfd8ef;
+  font-size: 0.82rem;
+}
+
 select {
   border: 0;
   border-radius: 8px;

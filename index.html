@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>英単語RPG MVP</title>
-    <link rel="stylesheet" href="style.css?v=20260616" />
+    <link rel="stylesheet" href="style.css?v=20260617" />
   </head>
   <body>
     <main class="container">
@@ -38,6 +38,18 @@
             <option value="definition">英英辞典モード</option>
             <option value="chunk">チャンクモード</option>
           </select>
+          <fieldset class="settings-panel">
+            <legend>音声設定</legend>
+            <label class="checkbox-label" for="voice-random-toggle">
+              <input id="voice-random-toggle" type="checkbox" />
+              音声ランダム
+            </label>
+            <label class="checkbox-label" for="sound-effects-toggle">
+              <input id="sound-effects-toggle" type="checkbox" />
+              効果音ON
+            </label>
+            <p id="current-voice-label" class="voice-status" aria-live="polite">現在の声：確認中</p>
+          </fieldset>
           <button id="start-btn" type="button" disabled>ゲーム開始</button>
           <p id="home-message" class="message"></p>
         </div>
@@ -90,6 +102,6 @@
       </section>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="script.js?v=20260616"></script>
+    <script src="script.js?v=20260617"></script>
   </body>
 </html>
