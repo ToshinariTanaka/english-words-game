@@ -10,7 +10,7 @@ const QUESTIONS_API_UPLOAD = "/api/questions/upload";
 const RENDER_STUDY_APP_URL = ""; // 未確認のRender URLは設定しない。確定後に /study-app/ まで含めて設定する。
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 const VOICE_RANDOM_STORAGE_KEY = "englishWordsGameVoiceRandom";
-const SOUND_EFFECTS_STORAGE_KEY = "englishWordsGameSoundEffects";
+const SOUND_EFFECTS_STORAGE_KEY = "englishWordsGame.soundEnabled";
 const ENGLISH_VOICE_LANG_PATTERN = /^en(?:-|_|$)/i;
 const QUESTION_MODES = {
   meaning: {
@@ -224,14 +224,24 @@ function saveGold() {
 }
 
 function loadStoredBoolean(key, defaultValue) {
-  const stored = localStorage.getItem(key);
-  if (stored === "true") return true;
-  if (stored === "false") return false;
+  try {
+    if (typeof localStorage === "undefined") return defaultValue;
+    const stored = localStorage.getItem(key);
+    if (stored === "true") return true;
+    if (stored === "false") return false;
+  } catch (error) {
+    console.warn("Failed to load boolean setting:", error);
+  }
   return defaultValue;
 }
 
 function saveStoredBoolean(key, value) {
-  localStorage.setItem(key, value ? "true" : "false");
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(key, value ? "true" : "false");
+  } catch (error) {
+    console.warn("Failed to save boolean setting:", error);
+  }
 }
 
 function normalizeHeader(value) {
@@ -602,6 +612,25 @@ function getAudioContext() {
   return audioContext;
 }
 
+function resumeAudioContextAfterUserGesture() {
+  try {
+    const ctx = getAudioContext();
+    if (ctx?.state === "suspended") {
+      ctx.resume?.().catch((error) => {
+        console.warn("AudioContext resume failed:", error);
+      });
+    }
+  } catch (error) {
+    console.warn("AudioContext resume failed:", error);
+  }
+}
+
+function setupAudioUnlock() {
+  const unlock = () => resumeAudioContextAfterUserGesture();
+  window.addEventListener("pointerdown", unlock, { once: true });
+  window.addEventListener("keydown", unlock, { once: true });
+}
+
 function playTone(frequency, startTime, duration, type = "sine", volume = 0.24) {
   const ctx = getAudioContext();
   if (!ctx) return;
@@ -622,6 +651,7 @@ function playSoundPattern(pattern, type = "sine", volume = 0.12) {
   try {
     const ctx = getAudioContext();
     if (!ctx) return;
+    resumeAudioContextAfterUserGesture();
     const now = ctx.currentTime;
     pattern.forEach((frequency, index) => {
       playTone(frequency, now + index * 0.09, 0.18, type, volume);
@@ -632,21 +662,11 @@ function playSoundPattern(pattern, type = "sine", volume = 0.12) {
 }
 
 function playCorrectSound() {
-  const patterns = [
-    [523.25, 659.25, 783.99],
-    [659.25, 783.99, 1046.5],
-    [392, 523.25, 659.25],
-  ];
-  playSoundPattern(chooseRandomItem(patterns), "triangle", 0.11);
+  playSoundPattern([523, 659, 784], "triangle", 0.08);
 }
 
 function playWrongSound() {
-  const patterns = [
-    [220, 165],
-    [196, 146.83],
-    [246.94, 196, 165],
-  ];
-  playSoundPattern(chooseRandomItem(patterns), "sawtooth", 0.08);
+  playSoundPattern([220, 147], "sawtooth", 0.06);
 }
 
 function speakWord(word) {
@@ -1109,6 +1129,7 @@ el.clearRetryBtn.addEventListener("click", () => {
 });
 
 setupVoiceSettings();
+setupAudioUnlock();
 updateStudyAppRenderLink();
 populateCategorySelect();
 el.wordbookCategory.value = "standard";

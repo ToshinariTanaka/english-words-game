@@ -28,6 +28,8 @@ const HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : '';
 const IS_GITHUB_PAGES = HOSTNAME.endsWith('github.io');
 const IS_RENDER = HOSTNAME.endsWith('onrender.com') || HOSTNAME === 'localhost' || HOSTNAME === '127.0.0.1';
 const SHARED_CACHE_PREFIX = 'englishWordsGame.sharedQuestions.';
+const SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
+
 
 
 const STANDARD_COLUMNS = [
@@ -113,24 +115,118 @@ const els = {
   settingsStatus: document.getElementById('settingsStatus'),
   hostingStatus: document.getElementById('hostingStatus'),
   autoSpeak: document.getElementById('autoSpeak'),
+  soundEffects: document.getElementById('soundEffects'),
   speakQuestionButton: document.getElementById('speakQuestionButton'),
 };
+
+let audioContext = null;
+let soundEnabled = loadStoredBoolean(SOUND_ENABLED_STORAGE_KEY, true);
+
+
+function loadStoredBoolean(key, defaultValue) {
+  try {
+    if (typeof localStorage === 'undefined') return defaultValue;
+    const stored = localStorage.getItem(key);
+    if (stored === 'true') return true;
+    if (stored === 'false') return false;
+  } catch (error) {
+    console.warn('Failed to load boolean setting:', error);
+  }
+  return defaultValue;
+}
+
+function saveStoredBoolean(key, value) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(key, value ? 'true' : 'false');
+  } catch (error) {
+    console.warn('Failed to save boolean setting:', error);
+  }
+}
+
+function getAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!audioContext) audioContext = new AudioContextClass();
+  return audioContext;
+}
+
+function resumeAudioContextAfterUserGesture() {
+  try {
+    const ctx = getAudioContext();
+    if (ctx?.state === 'suspended') {
+      ctx.resume?.().catch((error) => {
+        console.warn('AudioContext resume failed:', error);
+      });
+    }
+  } catch (error) {
+    console.warn('AudioContext resume failed:', error);
+  }
+}
+
+function setupAudioUnlock() {
+  const unlock = () => resumeAudioContextAfterUserGesture();
+  window.addEventListener('pointerdown', unlock, { once: true });
+  window.addEventListener('keydown', unlock, { once: true });
+}
+
+function playTone(frequency, startTime, duration, type, volume) {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+  gain.gain.setValueAtTime(volume, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  oscillator.connect(gain);
+  gain.connect(ctx.destination);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration);
+}
+
+function playSoundPattern(pattern, type, volume) {
+  if (!soundEnabled) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    resumeAudioContextAfterUserGesture();
+    const now = ctx.currentTime;
+    pattern.forEach((frequency, index) => {
+      playTone(frequency, now + index * 0.09, 0.18, type, volume);
+    });
+  } catch (error) {
+    console.warn('Sound effect failed:', error);
+  }
+}
+
+function playCorrectSound() {
+  playSoundPattern([523, 659, 784], 'triangle', 0.08);
+}
+
+function playWrongSound() {
+  playSoundPattern([220, 147], 'sawtooth', 0.06);
+}
+
+function setupSoundSetting() {
+  if (!els.soundEffects) return;
+  els.soundEffects.checked = soundEnabled;
+  els.soundEffects.addEventListener('change', (event) => {
+    soundEnabled = event.target.checked;
+    saveStoredBoolean(SOUND_ENABLED_STORAGE_KEY, soundEnabled);
+  });
+}
 
 function getQuizCardElement() {
   return document.querySelector('.quiz-card');
 }
 
 function playStartSound() {
+  if (!soundEnabled) return;
   try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-
-    const ctx = new AudioContextClass();
-    if (ctx.state === 'suspended') {
-      ctx.resume?.().catch((error) => {
-        console.warn('Start sound resume failed:', error);
-      });
-    }
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    resumeAudioContextAfterUserGesture();
 
     const now = ctx.currentTime;
     const notes = [523.25, 659.25, 783.99];
@@ -151,7 +247,6 @@ function playStartSound() {
       osc.stop(startTime + 0.16);
     });
 
-    setTimeout(() => ctx.close?.(), 800);
   } catch (error) {
     console.warn('Start sound failed:', error);
   }
@@ -631,9 +726,13 @@ function answer(choice) {
   state.answered += 1;
 
   if (isCorrect) {
+    playCorrectSound();
     state.correct += 1;
-  } else if (!state.reviewMode) {
-    state.mistakes.push(current);
+  } else {
+    playWrongSound();
+    if (!state.reviewMode) {
+      state.mistakes.push(current);
+    }
   }
 
   document.querySelectorAll('.choice-button').forEach((button) => {
@@ -691,5 +790,7 @@ els.fileInput.addEventListener('change', handleUpload);
 els.startQuizButton.addEventListener('click', handleStartQuizClick);
 els.speakQuestionButton.addEventListener('click', speakCurrentQuestion);
 
+setupSoundSetting();
+setupAudioUnlock();
 updateHostingStatus();
 loadMode(state.mode);
