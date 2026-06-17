@@ -3,12 +3,15 @@ const HOSPITAL_GOLD_PENALTY = 200;
 const AUTO_NEXT_MIN_MS = 100;
 const AUTO_NEXT_MAX_MS = 3000;
 const REVIEW_START_DELAY_MS = 3000;
-const GAME_VERSION = "v0.9.8";
+const GAME_VERSION = "v0.9.9";
 const DEFAULT_WORDS_PATH = "./data/default-words.csv";
 const QUESTIONS_API_CURRENT = "/api/questions/current";
 const QUESTIONS_API_UPLOAD = "/api/questions/upload";
 const RENDER_STUDY_APP_URL = ""; // 未確認のRender URLは設定しない。確定後に /study-app/ まで含めて設定する。
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
+const VOICE_RANDOM_STORAGE_KEY = "englishWordsGameVoiceRandom";
+const SOUND_EFFECTS_STORAGE_KEY = "englishWordsGameSoundEffects";
+const ENGLISH_VOICE_LANG_PATTERN = /^en(?:-|_|$)/i;
 const QUESTION_MODES = {
   meaning: {
     label: "日本語訳モード",
@@ -128,6 +131,9 @@ const el = {
   startBtn: document.getElementById("start-btn"),
   questionCount: document.getElementById("question-count"),
   questionMode: document.getElementById("question-mode"),
+  voiceRandomToggle: document.getElementById("voice-random-toggle"),
+  soundEffectsToggle: document.getElementById("sound-effects-toggle"),
+  currentVoiceLabel: document.getElementById("current-voice-label"),
   homeMessage: document.getElementById("home-message"),
   versionLabel: document.getElementById("version-label"),
   hp: document.getElementById("hp"),
@@ -177,6 +183,11 @@ let reviewWrongCount = 0;
 let autoNextTimer = null;
 let audioContext = null;
 let currentHintUsed = false;
+let englishVoices = [];
+let preferredEnglishVoice = null;
+let lastSpokenVoiceName = "ブラウザ標準";
+let isVoiceRandomEnabled = loadStoredBoolean(VOICE_RANDOM_STORAGE_KEY, true);
+let areSoundEffectsEnabled = loadStoredBoolean(SOUND_EFFECTS_STORAGE_KEY, true);
 
 function showScreen(name) {
   Object.values(screens).forEach((screen) => screen.classList.remove("active"));
@@ -210,6 +221,17 @@ function loadStoredGold() {
 
 function saveGold() {
   localStorage.setItem(GOLD_STORAGE_KEY, String(gold));
+}
+
+function loadStoredBoolean(key, defaultValue) {
+  const stored = localStorage.getItem(key);
+  if (stored === "true") return true;
+  if (stored === "false") return false;
+  return defaultValue;
+}
+
+function saveStoredBoolean(key, value) {
+  localStorage.setItem(key, value ? "true" : "false");
 }
 
 function normalizeHeader(value) {
@@ -509,6 +531,68 @@ function getSelectedQuestionMode() {
   return QUESTION_MODES[selected] ? selected : "meaning";
 }
 
+function chooseRandomItem(items) {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+function updateVoiceStatusLabel() {
+  if (!el.currentVoiceLabel) return;
+  const mode = isVoiceRandomEnabled ? "ランダム" : "固定";
+  const countText = englishVoices.length > 0 ? `${englishVoices.length}候補` : "候補なし";
+  el.currentVoiceLabel.textContent = `現在の声：${lastSpokenVoiceName}（${mode} / ${countText}）`;
+}
+
+function refreshEnglishVoices() {
+  if (!("speechSynthesis" in window)) {
+    englishVoices = [];
+    preferredEnglishVoice = null;
+    lastSpokenVoiceName = "非対応";
+    updateVoiceStatusLabel();
+    return;
+  }
+
+  try {
+    const voices = window.speechSynthesis.getVoices();
+    englishVoices = voices.filter((voice) => ENGLISH_VOICE_LANG_PATTERN.test(voice.lang || ""));
+    preferredEnglishVoice = englishVoices[0] || null;
+    if (!preferredEnglishVoice && !lastSpokenVoiceName) lastSpokenVoiceName = "ブラウザ標準";
+    updateVoiceStatusLabel();
+  } catch (error) {
+    console.warn("Failed to load speech synthesis voices:", error);
+  }
+}
+
+function setupVoiceSettings() {
+  if (el.voiceRandomToggle) {
+    el.voiceRandomToggle.checked = isVoiceRandomEnabled;
+    el.voiceRandomToggle.addEventListener("change", (event) => {
+      isVoiceRandomEnabled = event.target.checked;
+      saveStoredBoolean(VOICE_RANDOM_STORAGE_KEY, isVoiceRandomEnabled);
+      updateVoiceStatusLabel();
+    });
+  }
+
+  if (el.soundEffectsToggle) {
+    el.soundEffectsToggle.checked = areSoundEffectsEnabled;
+    el.soundEffectsToggle.addEventListener("change", (event) => {
+      areSoundEffectsEnabled = event.target.checked;
+      saveStoredBoolean(SOUND_EFFECTS_STORAGE_KEY, areSoundEffectsEnabled);
+    });
+  }
+
+  refreshEnglishVoices();
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.onvoiceschanged = refreshEnglishVoices;
+  }
+}
+
+function getVoiceForUtterance() {
+  if (englishVoices.length === 0) return null;
+  if (isVoiceRandomEnabled && englishVoices.length > 1) return chooseRandomItem(englishVoices);
+  return preferredEnglishVoice || englishVoices[0];
+}
+
 function getAudioContext() {
   if (!window.AudioContext && !window.webkitAudioContext) return null;
   if (!audioContext) {
@@ -533,22 +617,36 @@ function playTone(frequency, startTime, duration, type = "sine", volume = 0.24) 
   oscillator.stop(startTime + duration);
 }
 
+function playSoundPattern(pattern, type = "sine", volume = 0.12) {
+  if (!areSoundEffectsEnabled) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    pattern.forEach((frequency, index) => {
+      playTone(frequency, now + index * 0.09, 0.18, type, volume);
+    });
+  } catch (error) {
+    console.warn("Sound effect failed:", error);
+  }
+}
+
 function playCorrectSound() {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const now = ctx.currentTime;
-  playTone(523.25, now, 0.18, "sine", 0.28);
-  playTone(659.25, now + 0.08, 0.2, "triangle", 0.24);
-  playTone(783.99, now + 0.16, 0.24, "sine", 0.28);
-  playTone(1046.5, now + 0.28, 0.35, "triangle", 0.18);
+  const patterns = [
+    [523.25, 659.25, 783.99],
+    [659.25, 783.99, 1046.5],
+    [392, 523.25, 659.25],
+  ];
+  playSoundPattern(chooseRandomItem(patterns), "triangle", 0.11);
 }
 
 function playWrongSound() {
-  const ctx = getAudioContext();
-  if (!ctx) return;
-  const now = ctx.currentTime;
-  playTone(220, now, 0.15, "sawtooth", 0.18);
-  playTone(146.83, now + 0.12, 0.2, "sawtooth", 0.18);
+  const patterns = [
+    [220, 165],
+    [196, 146.83],
+    [246.94, 196, 165],
+  ];
+  playSoundPattern(chooseRandomItem(patterns), "sawtooth", 0.08);
 }
 
 function speakWord(word) {
@@ -558,6 +656,15 @@ function speakWord(word) {
     const utterance = new SpeechSynthesisUtterance(word);
     utterance.lang = "en-US";
     utterance.rate = 0.85;
+    const voice = getVoiceForUtterance();
+    if (voice) {
+      utterance.voice = voice;
+      utterance.lang = voice.lang || "en-US";
+      lastSpokenVoiceName = voice.name || voice.lang || "英語音声";
+    } else {
+      lastSpokenVoiceName = "ブラウザ標準";
+    }
+    updateVoiceStatusLabel();
     window.speechSynthesis.speak(utterance);
   } catch (error) {
     console.warn("Speech synthesis failed:", error);
@@ -1001,6 +1108,7 @@ el.clearRetryBtn.addEventListener("click", () => {
   showScreen("home");
 });
 
+setupVoiceSettings();
 updateStudyAppRenderLink();
 populateCategorySelect();
 el.wordbookCategory.value = "standard";

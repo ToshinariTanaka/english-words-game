@@ -12,3 +12,5 @@
 - 2026-06-16: UpTra/RPG本体から開く学習アプリ導線をRender版 （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） に統一し、GitHub Pages版では「サーバー保存不可」とRender版への誘導を表示する。
 
 - 2026-06-17: study-appにWeb Speech APIによるC列 question の英語読み上げを追加。自動読み上げは初期ONで、手動の「🔊 もう一度聞く」ボタンも利用可能。
+
+- 2026-06-17: RPG本体に音声ランダム設定、現在の声表示、効果音ON/OFF、正解/不正解効果音の複数ランダムパターンを追加。

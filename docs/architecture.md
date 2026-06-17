@@ -6,7 +6,16 @@
 - `index.html`: 画面構成（home/battle/result/gameclear/gameover）。
 - `style.css`: 共通UI + `feedbackOverlay`演出。
 
-既存RPG本体は今回の学習アプリ追加では変更しない方針です。
+既存RPG本体はゲームロジックを維持しつつ、音声・効果音など学習体験に関わる小規模設定を追加する方針です。
+
+### RPG本体の音声・効果音
+
+- `script.js` はWeb Speech APIで英単語の読み上げを行う。英語系音声候補は `speechSynthesis.getVoices()` から `en-*` の `voice.lang` を持つ音声だけを抽出する。
+- 音声候補が複数あり「音声ランダム」がONの場合は毎回ランダムに選ぶ。OFFの場合は取得できた英語音声の先頭を優先音声として固定する。
+- iPhone/Safariなど初回に音声候補が空になる環境向けに `speechSynthesis.onvoiceschanged` で再取得する。候補がない場合は `utterance.lang = "en-US"` のみ指定してブラウザ標準に任せる。
+- 正解/不正解の効果音はWeb Audio APIのoscillatorで生成し、それぞれ複数の周波数パターンからランダムに選ぶ。外部音声ファイルは使わない。
+- 音声ランダム設定と効果音ON/OFFは `localStorage` に保存する。
+
 
 ## 新規: study-app
 
