@@ -16,3 +16,5 @@
 - 2026-06-17: RPG本体に音声ランダム設定、現在の声表示、効果音ON/OFF、正解/不正解効果音の複数ランダムパターンを追加。
 
 - 2026-06-17: RPG本体とstudy-appの効果音ON/OFF設定を `englishWordsGame.soundEnabled` に統一し、Web Audio APIによる正解上昇音・不正解下降音を追加。初回ユーザー操作後のAudioContext resumeにも対応。
+
+- 2026-06-17: 出題数設定の反映を確認・補強。study-app は選択件数で `state.questions` を slice する仕様をテストで固定し、RPG本体はランダム出題ON/OFFと選択件数 slice、実出題数ベースの進捗表示に対応。

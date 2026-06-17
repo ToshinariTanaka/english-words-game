@@ -1,0 +1,63 @@
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+
+{
+  const source = fs.readFileSync('study-app/script.js', 'utf8');
+  const start = source.indexOf('function shuffle');
+  const end = source.indexOf('function showEmptyState');
+  const snippet = source.slice(start, end);
+  const sandbox = {
+    state: {
+      questionPool: Array.from({ length: 400 }, (_, index) => ({ id: index + 1, choices: ['A', 'B', 'C', 'D'] })),
+      questions: [],
+    },
+    els: {
+      questionCount: { value: '10' },
+      randomOrder: { checked: false },
+      settingsStatus: { textContent: '' },
+    },
+    initializeSpeech() {},
+    resetSessionStats() {},
+    showQuestion() {},
+    updateStats() {},
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(`${snippet}; beginConfiguredSession();`, sandbox);
+  assert.strictEqual(sandbox.state.questions.length, 10);
+  assert.strictEqual(sandbox.state.questions[0].id, 1);
+  assert.strictEqual(sandbox.els.settingsStatus.textContent, '全400問から、元の順番で10問を出題します。');
+
+  sandbox.els.questionCount.value = '20';
+  sandbox.els.randomOrder.checked = true;
+  vm.runInContext('beginConfiguredSession();', sandbox);
+  assert.strictEqual(sandbox.state.questions.length, 20);
+  assert.strictEqual(sandbox.els.settingsStatus.textContent, '全400問から、ランダムで20問を出題します。');
+}
+
+{
+  const source = fs.readFileSync('script.js', 'utf8');
+  const start = source.indexOf('function getSelectedQuestionCount');
+  const end = source.indexOf('function chooseRandomItem(');
+  const snippet = source.slice(start, end);
+  const sandbox = {
+    Math,
+    el: { questionCount: { value: '10' }, randomOrderToggle: { checked: false } },
+    words: [],
+    currentQuestionMode: 'meaning',
+    QUESTION_MODES: { meaning: { promptKey: 'word', answerKey: 'meaning' } },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(snippet, sandbox);
+  const playableWords = Array.from({ length: 400 }, (_, index) => ({ word: `word${index + 1}`, meaning: `meaning${index + 1}` }));
+  sandbox.playableWords = playableWords;
+  vm.runInContext('this.deck = buildQuestionDeck(playableWords, getSelectedQuestionCount(playableWords), isRandomOrderEnabled());', sandbox);
+  assert.strictEqual(sandbox.deck.length, 10);
+  assert.strictEqual(sandbox.deck[0].word, 'word1');
+
+  sandbox.el.questionCount.value = 'all';
+  vm.runInContext('this.allDeck = buildQuestionDeck(playableWords, getSelectedQuestionCount(playableWords), false);', sandbox);
+  assert.strictEqual(sandbox.allDeck.length, 400);
+}
+
+console.log('tests_question_count: OK');
