@@ -121,10 +121,12 @@ const els = {
   soundEffects: document.getElementById('soundEffects'),
   speakQuestionButton: document.getElementById('speakQuestionButton'),
   voiceSelect: document.getElementById('voiceSelect'),
+  voiceStatus: document.getElementById('voiceStatus'),
 };
 
 let audioContext = null;
 let soundEnabled = loadStoredBoolean(SOUND_ENABLED_STORAGE_KEY, true);
+let lastRandomVoiceURI = '';
 
 
 function loadStoredBoolean(key, defaultValue) {
@@ -203,6 +205,19 @@ function getVoiceOptionValue(voice) {
   return voice.voiceURI || `${voice.name}|${voice.lang}`;
 }
 
+function formatVoiceName(voice) {
+  return voice ? `${voice.name} / ${voice.lang}` : 'ブラウザ自動選択';
+}
+
+function updateVoiceStatus(voice, label = '現在の音声') {
+  if (!els.voiceStatus) return;
+  els.voiceStatus.textContent = `${label}：${formatVoiceName(voice)}`;
+}
+
+function getSelectedVoiceValue() {
+  return els.voiceSelect?.value ?? loadStoredString(VOICE_STORAGE_KEY, '');
+}
+
 function populateVoiceSelect() {
   if (!els.voiceSelect) return;
   const storedVoice = loadStoredString(VOICE_STORAGE_KEY, '');
@@ -212,19 +227,31 @@ function populateVoiceSelect() {
   autoOption.value = '';
   autoOption.textContent = '自動選択';
   els.voiceSelect.appendChild(autoOption);
+  const randomOption = document.createElement('option');
+  randomOption.value = 'random';
+  randomOption.textContent = 'ランダム';
+  els.voiceSelect.appendChild(randomOption);
   voices.forEach((voice) => {
     const option = document.createElement('option');
     option.value = getVoiceOptionValue(voice);
-    option.textContent = `${voice.name} / ${voice.lang}`;
+    option.textContent = formatVoiceName(voice);
     els.voiceSelect.appendChild(option);
   });
-  els.voiceSelect.value = voices.some((voice) => getVoiceOptionValue(voice) === storedVoice) ? storedVoice : '';
+  const storedVoiceObject = voices.find((voice) => getVoiceOptionValue(voice) === storedVoice) || null;
+  const hasStoredVoice = storedVoice === 'random' || Boolean(storedVoiceObject);
+  els.voiceSelect.value = hasStoredVoice ? storedVoice : '';
+  if (storedVoice && !hasStoredVoice && voices.length > 0) saveStoredString(VOICE_STORAGE_KEY, '');
+  updateVoiceStatus(storedVoiceObject, els.voiceSelect.value === 'random' ? '今回の音声' : '現在の音声');
 }
 
 function setupVoiceSelect() {
   if (!els.voiceSelect) return;
   populateVoiceSelect();
-  els.voiceSelect.addEventListener('change', () => saveStoredString(VOICE_STORAGE_KEY, els.voiceSelect.value));
+  els.voiceSelect.addEventListener('change', () => {
+    saveStoredString(VOICE_STORAGE_KEY, els.voiceSelect.value);
+    if (els.voiceSelect.value !== 'random') lastRandomVoiceURI = '';
+    updateVoiceStatus(null, els.voiceSelect.value === 'random' ? '今回の音声' : '現在の音声');
+  });
   const synthesis = getSpeechSynthesis();
   if (synthesis) {
     synthesis.onvoiceschanged = populateVoiceSelect;
@@ -232,9 +259,27 @@ function setupVoiceSelect() {
 }
 
 function getSelectedVoice() {
-  const selectedValue = els.voiceSelect?.value || loadStoredString(VOICE_STORAGE_KEY, '');
-  if (!selectedValue) return null;
+  const selectedValue = getSelectedVoiceValue();
+  if (!selectedValue || selectedValue === 'random') return null;
   return getAvailableVoices().find((voice) => getVoiceOptionValue(voice) === selectedValue) || null;
+}
+
+function getAvailableVoiceCandidates() {
+  return getDisplayVoices(getAvailableVoices());
+}
+
+function pickRandomVoice() {
+  const voices = getAvailableVoiceCandidates();
+  if (voices.length === 0) return null;
+  if (voices.length === 1) {
+    lastRandomVoiceURI = getVoiceOptionValue(voices[0]);
+    return voices[0];
+  }
+  const candidates = voices.filter((voice) => getVoiceOptionValue(voice) !== lastRandomVoiceURI);
+  const pool = candidates.length > 0 ? candidates : voices;
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  lastRandomVoiceURI = getVoiceOptionValue(picked);
+  return picked;
 }
 
 function getAudioContext() {
@@ -395,11 +440,13 @@ function speakCurrentQuestion() {
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-US';
-  const selectedVoice = getSelectedVoice();
+  const isRandomVoice = getSelectedVoiceValue() === 'random';
+  const selectedVoice = isRandomVoice ? pickRandomVoice() : getSelectedVoice();
   if (selectedVoice) {
     utterance.voice = selectedVoice;
     utterance.lang = selectedVoice.lang || utterance.lang;
   }
+  updateVoiceStatus(selectedVoice, isRandomVoice ? '今回の音声' : '現在の音声');
   utterance.rate = 0.9;
   utterance.pitch = 1.0;
 
