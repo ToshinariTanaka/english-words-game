@@ -94,6 +94,10 @@ h1 {
   margin-top: 14px;
 }
 
+.quiz-card {
+  scroll-margin-top: 16px;
+}
+
 .mode-card h2,
 .review-card h2,
 .quiz-settings h3 {

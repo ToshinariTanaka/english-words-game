@@ -116,6 +116,74 @@ const els = {
   speakQuestionButton: document.getElementById('speakQuestionButton'),
 };
 
+function getQuizCardElement() {
+  return document.querySelector('.quiz-card');
+}
+
+function playStartSound() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const ctx = new AudioContextClass();
+    if (ctx.state === 'suspended') {
+      ctx.resume?.().catch((error) => {
+        console.warn('Start sound resume failed:', error);
+      });
+    }
+
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99];
+
+    notes.forEach((freq, index) => {
+      const startTime = now + index * 0.08;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, startTime);
+      gain.gain.setValueAtTime(0.06, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.16);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + 0.16);
+    });
+
+    setTimeout(() => ctx.close?.(), 800);
+  } catch (error) {
+    console.warn('Start sound failed:', error);
+  }
+}
+
+function scrollToQuestionArea() {
+  const target = getQuizCardElement() || els.questionText;
+  if (!target) return;
+
+  requestAnimationFrame(() => {
+    target.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+
+    requestAnimationFrame(() => {
+      const margin = 16;
+      const top = target.getBoundingClientRect().top + window.scrollY - margin;
+      window.scrollTo({
+        top: Math.max(top, 0),
+        behavior: 'smooth',
+      });
+    });
+  });
+}
+
+function handleStartQuizClick() {
+  playStartSound();
+  beginConfiguredSession();
+  scrollToQuestionArea();
+}
+
 function getSpeechSynthesis() {
   return typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
 }
@@ -620,7 +688,7 @@ els.modeButtons.forEach((button) => button.addEventListener('click', () => loadM
 els.nextButton.addEventListener('click', nextQuestion);
 els.reviewButton.addEventListener('click', startReview);
 els.fileInput.addEventListener('change', handleUpload);
-els.startQuizButton.addEventListener('click', beginConfiguredSession);
+els.startQuizButton.addEventListener('click', handleStartQuizClick);
 els.speakQuestionButton.addEventListener('click', speakCurrentQuestion);
 
 updateHostingStatus();
