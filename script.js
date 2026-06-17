@@ -131,6 +131,7 @@ const el = {
   startBtn: document.getElementById("start-btn"),
   questionCount: document.getElementById("question-count"),
   questionMode: document.getElementById("question-mode"),
+  randomOrderToggle: document.getElementById("random-order-toggle"),
   voiceRandomToggle: document.getElementById("voice-random-toggle"),
   soundEffectsToggle: document.getElementById("sound-effects-toggle"),
   currentVoiceLabel: document.getElementById("current-voice-label"),
@@ -528,12 +529,25 @@ function setDataSourceStatus(message) {
   if (el.dataSourceStatus) el.dataSourceStatus.textContent = message;
 }
 
-function getSelectedQuestionCount() {
-  const playableWords = getPlayableWords();
-  if (!el.questionCount || el.questionCount.value === "all") return playableWords.length;
+function getSelectedQuestionCount(playableWords = getPlayableWords()) {
+  const availableCount = playableWords.length;
+  if (!el.questionCount || el.questionCount.value === "all") return availableCount;
   const selected = Number(el.questionCount.value);
-  if (!Number.isFinite(selected) || selected <= 0) return playableWords.length;
-  return Math.min(selected, playableWords.length);
+  if (!Number.isFinite(selected) || selected <= 0) return availableCount;
+  return Math.min(selected, availableCount);
+}
+
+function isRandomOrderEnabled() {
+  return Boolean(el.randomOrderToggle?.checked);
+}
+
+function buildQuestionDeck(playableWords, selectedCount, randomOrder) {
+  const orderedWords = randomOrder ? shuffle(playableWords) : [...playableWords];
+  return orderedWords.slice(0, selectedCount);
+}
+
+function getQuestionCountLabel(selectedCount, availableCount) {
+  return selectedCount === availableCount ? "全問" : `${selectedCount}問`;
 }
 
 function getSelectedQuestionMode() {
@@ -774,7 +788,10 @@ function nextQuestion() {
   const reviewPrefix = isReviewMode ? "復習: " : "";
   resetHintState();
   const currentPrompt = getPromptValue(current);
-  el.encounter.textContent = `${reviewPrefix}${currentPrompt} が現れた！（${getModeConfig().label}）`;
+  const progressText = isReviewMode
+    ? `復習 ${reviewAnsweredCount + 1} / ${reviewDeck.length + 1}`
+    : `${normalAnsweredCount + 1} / ${targetQuestionCount}`;
+  el.encounter.textContent = `${reviewPrefix}${currentPrompt} が現れた！（${getModeConfig().label} / ${progressText}）`;
   el.targetWord.textContent = currentPrompt;
   if (getModeConfig().promptKey === "word") speakWord(currentPrompt);
   el.choices.innerHTML = "";
@@ -893,8 +910,12 @@ function startGame() {
   isReviewMode = false;
   previousWord = null;
   resetHintState();
-  targetQuestionCount = getSelectedQuestionCount();
-  gameDeck = shuffle(playableWords).slice(0, targetQuestionCount);
+  targetQuestionCount = getSelectedQuestionCount(playableWords);
+  const randomOrder = isRandomOrderEnabled();
+  gameDeck = buildQuestionDeck(playableWords, targetQuestionCount, randomOrder);
+  const countLabel = getQuestionCountLabel(targetQuestionCount, playableWords.length);
+  const orderLabel = randomOrder ? "ランダム" : "元の順番";
+  el.homeMessage.textContent = `全${playableWords.length}問から、${orderLabel}で${countLabel}を出題します。`;
   updateStatus();
   nextQuestion();
 }
