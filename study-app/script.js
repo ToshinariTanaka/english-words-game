@@ -30,8 +30,13 @@ const IS_RENDER = HOSTNAME.endsWith('onrender.com') || HOSTNAME === 'localhost' 
 const SHARED_CACHE_PREFIX = 'englishWordsGame.sharedQuestions.';
 const SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
 const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
+const LEVEL_RANGE_START_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeStart';
+const LEVEL_RANGE_END_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeEnd';
 const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
 const DEFAULT_QUESTION_COUNT = '10';
+const LEVEL_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+const DEFAULT_LEVEL_START = 'A1';
+const DEFAULT_LEVEL_END = 'C2';
 const ALLOWED_STUDY_VOICES = [
   { name: 'Junior', lang: 'en-US' },
   { name: 'Kathy', lang: 'en-US' },
@@ -144,6 +149,8 @@ const els = {
   fileInput: document.getElementById('fileInput'),
   uploadStatus: document.getElementById('uploadStatus'),
   questionCount: document.getElementById('questionCount'),
+  levelStart: document.getElementById('levelStart'),
+  levelEnd: document.getElementById('levelEnd'),
   randomOrder: document.getElementById('randomOrder'),
   startQuizButton: document.getElementById('startQuizButton'),
   settingsStatus: document.getElementById('settingsStatus'),
@@ -210,6 +217,7 @@ function sanitizeQuestionCountValue(value) {
   if (allowedValues.includes(String(value))) return String(value);
   return DEFAULT_QUESTION_COUNT;
 }
+
 
 function setupQuestionCountSetting() {
   if (!els.questionCount) return;
@@ -679,6 +687,75 @@ function shuffle(items) {
   return result;
 }
 
+
+function normalizeLevelRangeValue(value, fallback) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return LEVEL_ORDER.includes(normalized) ? normalized : fallback;
+}
+
+function getSelectedLevelRange() {
+  const start = normalizeLevelRangeValue(els.levelStart?.value, DEFAULT_LEVEL_START);
+  const end = normalizeLevelRangeValue(els.levelEnd?.value, DEFAULT_LEVEL_END);
+  const startIndex = LEVEL_ORDER.indexOf(start);
+  const endIndex = LEVEL_ORDER.indexOf(end);
+
+  if (startIndex <= endIndex) return { start, end, startIndex, endIndex };
+  return { start: DEFAULT_LEVEL_START, end: DEFAULT_LEVEL_END, startIndex: 0, endIndex: LEVEL_ORDER.length - 1 };
+}
+
+function isQuestionInSelectedLevelRange(question) {
+  const level = String(question?.level || '').trim().toUpperCase();
+  const levelIndex = LEVEL_ORDER.indexOf(level);
+  if (levelIndex < 0) return false;
+
+  const { startIndex, endIndex } = getSelectedLevelRange();
+  return levelIndex >= startIndex && levelIndex <= endIndex;
+}
+
+function getFilteredQuestionPool() {
+  return state.questionPool.filter(isQuestionInSelectedLevelRange);
+}
+
+function syncLevelRangeUiWithState() {
+  if (!els.levelStart || !els.levelEnd) return;
+  const range = getSelectedLevelRange();
+  els.levelStart.value = range.start;
+  els.levelEnd.value = range.end;
+}
+
+function updateStartButtonForFilteredCount(filteredCount) {
+  els.startQuizButton.disabled = filteredCount === 0;
+  if (filteredCount === 0) {
+    els.settingsStatus.textContent = '選択したレベル範囲に出題できる問題がありません。';
+  }
+}
+
+function refreshQuestionCountOptionsForLevelRange() {
+  syncLevelRangeUiWithState();
+  const filteredCount = getFilteredQuestionPool().length;
+  updateQuestionCountOptions(filteredCount);
+  updateStartButtonForFilteredCount(filteredCount);
+  return filteredCount;
+}
+
+function setupLevelRangeSetting() {
+  if (!els.levelStart || !els.levelEnd) return;
+  els.levelStart.value = normalizeLevelRangeValue(loadStoredString(LEVEL_RANGE_START_STORAGE_KEY, DEFAULT_LEVEL_START), DEFAULT_LEVEL_START);
+  els.levelEnd.value = normalizeLevelRangeValue(loadStoredString(LEVEL_RANGE_END_STORAGE_KEY, DEFAULT_LEVEL_END), DEFAULT_LEVEL_END);
+  syncLevelRangeUiWithState();
+
+  const handleLevelRangeChange = () => {
+    syncLevelRangeUiWithState();
+    saveStoredString(LEVEL_RANGE_START_STORAGE_KEY, els.levelStart.value);
+    saveStoredString(LEVEL_RANGE_END_STORAGE_KEY, els.levelEnd.value);
+    const filteredCount = refreshQuestionCountOptionsForLevelRange();
+    if (filteredCount > 0) beginConfiguredSession();
+  };
+
+  els.levelStart.addEventListener('change', handleLevelRangeChange);
+  els.levelEnd.addEventListener('change', handleLevelRangeChange);
+}
+
 function stripBom(value) {
   return String(value || '').replace(/^\uFEFF/, '');
 }
@@ -784,14 +861,16 @@ function updateQuestionCountOptions(availableCount) {
 
   const selectedOption = els.questionCount.selectedOptions[0];
   if (!selectedOption || selectedOption.disabled) {
-    els.questionCount.value = DEFAULT_QUESTION_COUNT;
-    saveStoredString(QUESTION_COUNT_STORAGE_KEY, DEFAULT_QUESTION_COUNT);
+    const fallback = availableCount >= Number(DEFAULT_QUESTION_COUNT) ? DEFAULT_QUESTION_COUNT : 'all';
+    els.questionCount.value = fallback;
+    saveStoredString(QUESTION_COUNT_STORAGE_KEY, fallback);
   }
 }
 
 function getConfiguredQuestionCount() {
-  if (els.questionCount.value === 'all') return state.questionPool.length;
-  return Math.min(Number(els.questionCount.value), state.questionPool.length);
+  const filteredCount = getFilteredQuestionPool().length;
+  if (els.questionCount.value === 'all') return filteredCount;
+  return Math.min(Number(els.questionCount.value), filteredCount);
 }
 
 function cloneQuestionForSession(question) {
@@ -804,17 +883,21 @@ function cloneQuestionForSession(question) {
 function beginConfiguredSession() {
   initializeSpeech();
   hideBackToSettingsButton();
-  if (state.questionPool.length === 0) return;
+  if (getFilteredQuestionPool().length === 0) {
+    updateStartButtonForFilteredCount(0);
+    return;
+  }
 
   resetSessionStats();
   const random = els.randomOrder.checked;
   const requestedCount = getConfiguredQuestionCount();
-  const orderedPool = random ? shuffle(state.questionPool) : [...state.questionPool];
+  const filteredPool = getFilteredQuestionPool();
+  const orderedPool = random ? shuffle(filteredPool) : [...filteredPool];
   state.questions = orderedPool.slice(0, requestedCount).map(cloneQuestionForSession);
 
   const countLabel = els.questionCount.value === 'all' ? '全問' : `${requestedCount}問`;
   const orderLabel = random ? 'ランダム' : '元の順番';
-  els.settingsStatus.textContent = `全${state.questionPool.length}問から、${orderLabel}で${countLabel}を出題します。`;
+  els.settingsStatus.textContent = `選択範囲の全${filteredPool.length}問から、${orderLabel}で${countLabel}を出題します。`;
   showQuestion();
 }
 
@@ -842,10 +925,24 @@ function applyQuestions(rows, sourceLabel, options = {}) {
   const skippedCount = Math.max(rows.length - state.questionPool.length, 0);
   const skippedMessage = skippedCount > 0 ? ` 選択肢などが不足している${skippedCount}行は出題しません。` : '';
   els.uploadStatus.textContent = options.message || `${sourceLabel} から ${state.questionPool.length}問を読み込みました。${skippedMessage}`;
-  updateQuestionCountOptions(state.questionPool.length);
+  const filteredCount = refreshQuestionCountOptionsForLevelRange();
 
   if (state.questionPool.length === 0) {
     showEmptyState();
+    return;
+  }
+
+  if (filteredCount === 0) {
+    state.questions = [];
+    els.progressLabel.textContent = '0 / 0';
+    els.questionText.textContent = '選択したレベル範囲に出題できる問題がありません。';
+    els.choices.innerHTML = '';
+    els.feedback.hidden = true;
+    els.nextButton.disabled = true;
+    hideBackToSettingsButton();
+    updateStartButtonForFilteredCount(0);
+    updateModeUi();
+    updateSpeakButton();
     return;
   }
 
@@ -1138,6 +1235,7 @@ els.speakQuestionButton.addEventListener('click', speakCurrentQuestion);
 els.backToSettingsButton?.addEventListener('click', scrollToQuizSettings);
 
 setupQuestionCountSetting();
+setupLevelRangeSetting();
 setupSoundSetting();
 setupVoiceSelect();
 setupAudioUnlock();

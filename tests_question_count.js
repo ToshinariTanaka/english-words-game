@@ -32,32 +32,37 @@ const assert = require('assert');
   const start = source.indexOf('function shuffle');
   const end = source.indexOf('function showEmptyState');
   const snippet = source.slice(start, end);
+  const prefix = `const LEVEL_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']; const DEFAULT_LEVEL_START = 'A1'; const DEFAULT_LEVEL_END = 'C2'; const DEFAULT_QUESTION_COUNT = '10'; const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';`;
   const sandbox = {
     state: {
-      questionPool: Array.from({ length: 400 }, (_, index) => ({ id: index + 1, choices: ['A', 'B', 'C', 'D'] })),
+      questionPool: Array.from({ length: 400 }, (_, index) => ({ id: index + 1, level: 'A1', choices: ['A', 'B', 'C', 'D'] })),
       questions: [],
     },
     els: {
       questionCount: { value: '10' },
+      levelStart: { value: 'A1' },
+      levelEnd: { value: 'C2' },
       randomOrder: { checked: false },
       settingsStatus: { textContent: '' },
+      startQuizButton: { disabled: false },
     },
     initializeSpeech() {},
     resetSessionStats() {},
     showQuestion() {},
+    saveStoredString() {},
     updateStats() {},
   };
   vm.createContext(sandbox);
-  vm.runInContext(`${snippet}; beginConfiguredSession();`, sandbox);
+  vm.runInContext(`${prefix}${snippet}; beginConfiguredSession();`, sandbox);
   assert.strictEqual(sandbox.state.questions.length, 10);
   assert.strictEqual(sandbox.state.questions[0].id, 1);
-  assert.strictEqual(sandbox.els.settingsStatus.textContent, '全400問から、元の順番で10問を出題します。');
+  assert.strictEqual(sandbox.els.settingsStatus.textContent, '選択範囲の全400問から、元の順番で10問を出題します。');
 
   sandbox.els.questionCount.value = '20';
   sandbox.els.randomOrder.checked = true;
   vm.runInContext('beginConfiguredSession();', sandbox);
   assert.strictEqual(sandbox.state.questions.length, 20);
-  assert.strictEqual(sandbox.els.settingsStatus.textContent, '全400問から、ランダムで20問を出題します。');
+  assert.strictEqual(sandbox.els.settingsStatus.textContent, '選択範囲の全400問から、ランダムで20問を出題します。');
 }
 
 {
