@@ -32,7 +32,7 @@ const SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
 const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
 const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
 const DEFAULT_QUESTION_COUNT = '10';
-const MAX_DISPLAY_VOICE_COUNT = 10;
+const MAX_RECOMMENDED_VOICE_COUNT = 10;
 const MAX_VOICES_PER_GENDER = 5;
 const SPECIAL_VOICE_KEYWORDS = [
   'song',
@@ -161,6 +161,7 @@ const els = {
   speakQuestionButton: document.getElementById('speakQuestionButton'),
   voiceSelect: document.getElementById('voiceSelect'),
   voiceStatus: document.getElementById('voiceStatus'),
+  voiceCandidateCount: document.getElementById('voiceCandidateCount'),
 };
 
 let audioContext = null;
@@ -290,25 +291,53 @@ function limitBalancedNarrationVoices(voices) {
   const selected = [];
   const counts = { female: 0, male: 0, unknown: 0 };
   voices.forEach((voice) => {
-    if (selected.length >= MAX_DISPLAY_VOICE_COUNT) return;
+    if (selected.length >= MAX_RECOMMENDED_VOICE_COUNT) return;
     const gender = inferNarrationVoiceGender(voice);
     if ((gender === 'female' || gender === 'male') && counts[gender] >= MAX_VOICES_PER_GENDER) return;
     selected.push(voice);
     counts[gender] += 1;
   });
-  if (selected.length >= MAX_DISPLAY_VOICE_COUNT) return selected;
+  if (selected.length >= MAX_RECOMMENDED_VOICE_COUNT) return selected;
   voices.forEach((voice) => {
-    if (selected.length >= MAX_DISPLAY_VOICE_COUNT) return;
+    if (selected.length >= MAX_RECOMMENDED_VOICE_COUNT) return;
     if (!selected.includes(voice)) selected.push(voice);
   });
   return selected;
 }
 
-function getDisplayVoices(voices) {
+function getRecommendedVoices(voices) {
   const narrationVoices = filterNarrationVoices(voices);
   const englishVoices = narrationVoices.filter(isEnglishVoice);
   const displayPool = englishVoices.length > 0 ? englishVoices : narrationVoices;
   return limitBalancedNarrationVoices(sortNarrationVoices(displayPool));
+}
+
+function getDisplayVoicePriority(voice) {
+  const lang = String(voice?.lang || '').toLowerCase().replace('_', '-');
+  if (lang === 'en-us' || lang.startsWith('en-us-')) return 0;
+  if (lang === 'en-gb' || lang.startsWith('en-gb-')) return 1;
+  if (lang === 'en-au' || lang.startsWith('en-au-')) return 2;
+  if (lang === 'en-ca' || lang.startsWith('en-ca-')) return 3;
+  if (lang.startsWith('en-') || lang === 'en') return 4;
+  return 5;
+}
+
+function sortDisplayVoices(voices) {
+  return voices
+    .map((voice, index) => ({ voice, index, priority: getDisplayVoicePriority(voice) }))
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      const langCompare = String(a.voice?.lang || '').localeCompare(String(b.voice?.lang || ''), 'en', { sensitivity: 'base' });
+      if (langCompare !== 0) return langCompare;
+      const nameCompare = String(a.voice?.name || '').localeCompare(String(b.voice?.name || ''), 'en', { sensitivity: 'base' });
+      if (nameCompare !== 0) return nameCompare;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.voice);
+}
+
+function getDisplayVoices(voices) {
+  return sortDisplayVoices(voices);
 }
 
 function getVoiceOptionValue(voice) {
@@ -348,6 +377,9 @@ function populateVoiceSelect() {
     option.textContent = formatVoiceName(voice);
     els.voiceSelect.appendChild(option);
   });
+  if (els.voiceCandidateCount) {
+    els.voiceCandidateCount.textContent = `音声候補：${voices.length}件`;
+  }
   const storedVoiceObject = voices.find((voice) => getVoiceOptionValue(voice) === storedVoice) || null;
   const hasStoredVoice = storedVoice === 'random' || Boolean(storedVoiceObject);
   els.voiceSelect.value = hasStoredVoice ? storedVoice : '';
@@ -372,11 +404,11 @@ function setupVoiceSelect() {
 function getSelectedVoice() {
   const selectedValue = getSelectedVoiceValue();
   if (!selectedValue || selectedValue === 'random') return null;
-  return getAvailableVoiceCandidates().find((voice) => getVoiceOptionValue(voice) === selectedValue) || null;
+  return getDisplayVoices(getAvailableVoices()).find((voice) => getVoiceOptionValue(voice) === selectedValue) || null;
 }
 
 function getAvailableVoiceCandidates() {
-  return getDisplayVoices(getAvailableVoices());
+  return getRecommendedVoices(getAvailableVoices());
 }
 
 function getAutoVoiceCandidate() {

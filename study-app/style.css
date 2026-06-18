@@ -179,6 +179,19 @@ h1 {
   font-weight: 800;
 }
 
+.voice-candidate-count,
+.voice-select-help {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.voice-select-help {
+  color: #d6e5ff;
+  font-weight: 650;
+}
+
 .random-toggle {
   display: flex;
   align-items: center;
