@@ -1,4 +1,5 @@
 # Project Status
+- 2026-06-18: study-appで指定3シートを含むExcelブックをアップロードした場合、英単語・チャンク・英文和訳の3モードへ自動振り分けして読み込む処理を追加。
 
 - 2026-06-16: Render本番運用向けにNodeサーバーを追加し、共通問題データAPIを実装。
 - 2026-06-16: RPG本体もRender APIの `GET /api/questions/current` を起動時に優先し、成功時は共通問題データ、失敗時のみ `data/default-words.csv` へフォールバックする構成へ変更。

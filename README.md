@@ -98,6 +98,19 @@ Render版では起動時・モード切替時に共通問題データAPIを優�
 - 中学英単語・高校/大学受験・英検・TOEIC・教科書/定期テスト・カスタムの用途選択を追加。
 - 既存のCSV列仕様、50行抽出、指定範囲抽出、貼り戻し、CSV出力の基本機能は維持。
 
+
+### study-app: 3シートExcelブックのモード別アップロード
+
+`study-app/` のアップロードでは、従来の単一CSV・単一Excelシートに加えて、次の3シートをすべて含むExcelブックを自動的に3モードへ振り分けて読み込めます。
+
+| シート名 | 読み込み先モード | 画面表示 |
+| --- | --- | --- |
+| `★英単語テスト_001_生成` | `word` | 英単語 |
+| `★チャンク_001_生成` | `chunk` | チャンク |
+| `★英文和訳_001_生成` | `definition` | 英文和訳 |
+
+各シートは1行目をヘッダーとして扱い、A〜L列（`row_number`, `level`, `question`, `correct`, `choice1`, `choice2`, `choice3`, `total_correct`, `total_wrong`, `accuracy`, `current_streak`, `note`）だけを読み込みます。C列 `question`、D列 `correct`、E〜G列 `choice1`〜`choice3` がそろった行だけを出題対象にし、H〜L列の空欄、A列 `row_number` の空欄、M列以降の余分な列、空白行はエラーにしません。読み込み後は「Excelブックから読み込みました：英単語 360問、チャンク 272問、英文和訳 116問」のように3モードの件数を表示します。
+
 ## ローカルPythonツール: study-app用Excelの選択肢自動補完
 
 `tools/fill_excel_choices.py` は、study-app用の `.xlsx` を読み込み、`choice1`〜`choice3` がすべて空欄の行だけをOpenAI APIで50行ずつ補完するローカル実行用ツールです。既存の英単語RPG本体や `study-app/` の画面は変更しません。
