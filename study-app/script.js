@@ -56,21 +56,61 @@ const SPECIAL_VOICE_KEYWORDS = [
 const PREFERRED_VOICE_VENDOR_KEYWORDS = ['microsoft', 'google', 'apple'];
 const PREFERRED_NARRATION_VOICE_NAMES = [
   'google us english',
+  'ava',
   'jenny',
   'aria',
-  'guy',
-  'ava',
-  'andrew',
   'emma',
   'brian',
+  'andrew',
+  'guy',
+  'davis',
+  'jane',
+  'sara',
+  'nancy',
+  'steffan',
+  'christopher',
+  'cora',
+  'ashley',
+  'jason',
+  'tony',
+  'brandon',
+  'elizabeth',
+  'eric',
   'ryan',
   'libby',
   'sonia',
   'natasha',
   'william',
 ];
-const FEMALE_NARRATION_VOICE_NAMES = ['jenny', 'aria', 'ava', 'emma', 'libby', 'sonia', 'natasha'];
-const MALE_NARRATION_VOICE_NAMES = ['guy', 'andrew', 'brian', 'ryan', 'william'];
+const FEMALE_NARRATION_VOICE_NAMES = [
+  'ava',
+  'jenny',
+  'aria',
+  'emma',
+  'jane',
+  'sara',
+  'nancy',
+  'cora',
+  'ashley',
+  'elizabeth',
+  'libby',
+  'sonia',
+  'natasha',
+];
+const MALE_NARRATION_VOICE_NAMES = [
+  'brian',
+  'andrew',
+  'guy',
+  'davis',
+  'steffan',
+  'christopher',
+  'jason',
+  'tony',
+  'brandon',
+  'eric',
+  'ryan',
+  'william',
+];
 
 
 
@@ -276,7 +316,7 @@ function scoreNarrationVoice(voice, index) {
   if (searchableText.includes('natural')) score += 300;
   if (includesAnyKeyword(searchableText, PREFERRED_VOICE_VENDOR_KEYWORDS)) score += 250;
   const preferredNameIndex = PREFERRED_NARRATION_VOICE_NAMES.findIndex((keyword) => searchableText.includes(keyword));
-  if (preferredNameIndex >= 0) score += 5000 - preferredNameIndex * 500;
+  if (preferredNameIndex >= 0) score += 5000 - preferredNameIndex * 50;
   return score - index / 1000;
 }
 

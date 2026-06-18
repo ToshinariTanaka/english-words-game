@@ -35,7 +35,7 @@
 - 音声選択は「自動選択」「ランダム」「各音声」の順に表示します。選択値は `englishWordsGame.studyApp.voiceURI` に保存され、再読み込み後も復元されます。
 - 手動の固定音声プルダウンは最大10件制限をせず、`speechSynthesis.getVoices()` で取得できる音声を可能な限り広く表示します。表示順は `en-US`、`en-GB`、`en-AU`、`en-CA`、その他 `en-*`、その他言語の優先順です。
 - 音声選択欄には候補数と「固定音声は全候補から選べます。ランダム・自動選択では特殊音声を避けます。」という説明を表示します。
-- 「ランダム」選択時と自動選択時は、`good news` / `bubbles` / 歌声・特殊効果系キーワードを除外した最大10件のおすすめ候補から選びます。候補が複数ある場合は直前と同じ音声を避け、候補が0件の場合は `utterance.voice` を指定せずブラウザ既定音声に任せます。
+- 「ランダム」選択時と自動選択時は、`good news` / `bubbles` / 歌声・特殊効果系キーワードを除外したうえで、Ava / Jenny / Aria / Emma / Brian / Andrew / Guy / Davis / Jane / Sara / Nancy / Steffan / Christopher / Cora / Ashley / Jason / Tony / Brandon / Elizabeth / Eric / Ryan などの `en-US` 系ナレーション音声を優先した最大10件のおすすめ候補から選びます。候補が複数ある場合は直前と同じ音声を避け、候補が0件の場合は `utterance.voice` を指定せずブラウザ既定音声に任せます。
 - 「現在の音声」または「今回の音声」として、固定音声・ランダムで実際に使った音声・ブラウザ自動選択を表示します。
 - 次の問題や読み込み状態へ移る前に `speechSynthesis.cancel()` で前の音声を停止します。
 - iPhone Safariなどで自動再生が制限されても、手動ボタンで再生できるように外部音声APIやAPIキーは使いません。
