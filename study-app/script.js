@@ -32,19 +32,45 @@ const SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
 const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
 const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
 const DEFAULT_QUESTION_COUNT = '10';
-const SINGING_VOICE_KEYWORDS = [
+const MAX_DISPLAY_VOICE_COUNT = 10;
+const MAX_VOICES_PER_GENDER = 5;
+const SPECIAL_VOICE_KEYWORDS = [
   'song',
   'sing',
   'singing',
   'singer',
   'music',
   'musical',
+  'good news',
+  'bubbles',
+  'whisper',
+  'novelty',
+  'effect',
+  'character',
   '歌',
   '歌声',
   '歌唱',
   'うた',
   'ミュージック',
 ];
+const PREFERRED_VOICE_VENDOR_KEYWORDS = ['microsoft', 'google', 'apple'];
+const PREFERRED_NARRATION_VOICE_NAMES = [
+  'google us english',
+  'jenny',
+  'aria',
+  'guy',
+  'ava',
+  'andrew',
+  'emma',
+  'brian',
+  'ryan',
+  'libby',
+  'sonia',
+  'natasha',
+  'william',
+];
+const FEMALE_NARRATION_VOICE_NAMES = ['jenny', 'aria', 'ava', 'emma', 'libby', 'sonia', 'natasha'];
+const MALE_NARRATION_VOICE_NAMES = ['guy', 'andrew', 'brian', 'ryan', 'william'];
 
 
 
@@ -209,19 +235,80 @@ function getAvailableVoices() {
   return synthesis?.getVoices?.() || [];
 }
 
+function getVoiceSearchableText(voice) {
+  return `${voice?.name || ''} ${voice?.lang || ''}`.toLowerCase();
+}
+
+function isEnglishVoice(voice) {
+  return /^en([-_]|$)/i.test(voice?.lang || '');
+}
+
+function isSpecialVoice(voice) {
+  const searchableText = getVoiceSearchableText(voice);
+  return SPECIAL_VOICE_KEYWORDS.some((keyword) => searchableText.includes(keyword.toLowerCase()));
+}
+
 function isSingingVoice(voice) {
-  const searchableText = `${voice?.name || ''} ${voice?.lang || ''}`.toLowerCase();
-  return SINGING_VOICE_KEYWORDS.some((keyword) => searchableText.includes(keyword.toLowerCase()));
+  return isSpecialVoice(voice);
 }
 
 function filterNarrationVoices(voices) {
-  return voices.filter((voice) => !isSingingVoice(voice));
+  return voices.filter((voice) => !isSpecialVoice(voice));
+}
+
+function includesAnyKeyword(text, keywords) {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function inferNarrationVoiceGender(voice) {
+  const searchableText = getVoiceSearchableText(voice);
+  if (includesAnyKeyword(searchableText, FEMALE_NARRATION_VOICE_NAMES)) return 'female';
+  if (includesAnyKeyword(searchableText, MALE_NARRATION_VOICE_NAMES)) return 'male';
+  return 'unknown';
+}
+
+function scoreNarrationVoice(voice, index) {
+  const searchableText = getVoiceSearchableText(voice);
+  let score = 0;
+  if (/^en[-_]us$/i.test(voice?.lang || '')) score += 1000;
+  else if (isEnglishVoice(voice)) score += 800;
+  if (searchableText.includes('natural')) score += 300;
+  if (includesAnyKeyword(searchableText, PREFERRED_VOICE_VENDOR_KEYWORDS)) score += 250;
+  const preferredNameIndex = PREFERRED_NARRATION_VOICE_NAMES.findIndex((keyword) => searchableText.includes(keyword));
+  if (preferredNameIndex >= 0) score += 5000 - preferredNameIndex * 500;
+  return score - index / 1000;
+}
+
+function sortNarrationVoices(voices) {
+  return voices
+    .map((voice, index) => ({ voice, score: scoreNarrationVoice(voice, index) }))
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.voice);
+}
+
+function limitBalancedNarrationVoices(voices) {
+  const selected = [];
+  const counts = { female: 0, male: 0, unknown: 0 };
+  voices.forEach((voice) => {
+    if (selected.length >= MAX_DISPLAY_VOICE_COUNT) return;
+    const gender = inferNarrationVoiceGender(voice);
+    if ((gender === 'female' || gender === 'male') && counts[gender] >= MAX_VOICES_PER_GENDER) return;
+    selected.push(voice);
+    counts[gender] += 1;
+  });
+  if (selected.length >= MAX_DISPLAY_VOICE_COUNT) return selected;
+  voices.forEach((voice) => {
+    if (selected.length >= MAX_DISPLAY_VOICE_COUNT) return;
+    if (!selected.includes(voice)) selected.push(voice);
+  });
+  return selected;
 }
 
 function getDisplayVoices(voices) {
   const narrationVoices = filterNarrationVoices(voices);
-  const englishVoices = narrationVoices.filter((voice) => /^en[-_]/i.test(voice.lang || ''));
-  return englishVoices.length > 0 ? englishVoices : narrationVoices;
+  const englishVoices = narrationVoices.filter(isEnglishVoice);
+  const displayPool = englishVoices.length > 0 ? englishVoices : narrationVoices;
+  return limitBalancedNarrationVoices(sortNarrationVoices(displayPool));
 }
 
 function getVoiceOptionValue(voice) {
