@@ -22,8 +22,8 @@
 - `study-app/index.html`: ゲーム要素を含まない英語学習アプリの画面。モード選択、成績、4択、復習導線を持つ。
 - `study-app/script.js`: 標準CSV読み込み、アップロードCSV/Excel読み込み、簡易CSVパース、SheetJS連携、モード切り替え、正誤判定、正答数/出題数/正答率、誤答復習を担当。
 - `study-app/style.css`: スマホ優先のカード型UI。HP/Gold/敵/バトル演出などのゲーム表現は含めない。
-- `study-app/script.js` の音声選択はWeb Speech APIの `speechSynthesis.getVoices()` を使い、「自動選択」「ランダム」「各音声」を `VOICE_STORAGE_KEY` で保存・復元する。`random` 選択時は `en-*` の英語系音声を優先候補にし、候補がなければ全音声、0件なら `utterance.voice` 未指定でブラウザに任せる。
-- `speechSynthesis.onvoiceschanged` は維持し、Safariなどで音声一覧が遅延取得されても保存済みの `random` や固定音声の復元機会を残す。固定音声が取得済み一覧に存在しない場合は自動選択へフォールバックする。
+- `study-app/script.js` の音声選択はWeb Speech APIの `speechSynthesis.getVoices()` を使い、「自動選択」「ランダム」「各音声」を `VOICE_STORAGE_KEY` で保存・復元する。固定音声・`random`・自動選択はいずれも `ALLOWED_STUDY_VOICES` の10種類（Junior/Kathy/Ralph/Samantha/Daniel/Karen/Moria/Rishi/Tessa/Fred）に `voice.name` と `voice.lang` が大文字小文字を区別せず一致する取得済み音声だけを対象にし、0件なら `utterance.voice` 未指定でブラウザに任せる。
+- `speechSynthesis.onvoiceschanged` は維持し、Safariなどで音声一覧が遅延取得されても保存済みの `random` や固定音声の復元機会を残す。保存済み固定音声が指定10種類以外、または現在の取得済み一覧に存在しない場合は自動選択へフォールバックして保存値をクリアする。
 - `study-app/data/word_mode.csv`: 英単語モード用CSV。
 - `study-app/data/chunk_mode.csv`: チャンクモード用CSV。
 - `study-app/data/definition_mode.csv`: 英文和訳モード用CSV。内部IDとファイル名は互換性維持のため `definition` のまま。
