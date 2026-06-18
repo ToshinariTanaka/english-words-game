@@ -99,17 +99,19 @@ Render版では起動時・モード切替時に共通問題データAPIを優�
 - 既存のCSV列仕様、50行抽出、指定範囲抽出、貼り戻し、CSV出力の基本機能は維持。
 
 
-### study-app: 3シートExcelブックのモード別アップロード
+### study-app: Excelブックのモード別アップロード
 
-`study-app/` のアップロードでは、従来の単一CSV・単一Excelシートに加えて、次の3シートをすべて含むExcelブックを自動的に3モードへ振り分けて読み込めます。
+`study-app/` のExcelアップロードでは、現在選択中のモードに対応するシートをシート名で探して読み込みます。ファイル名だけで読み込み先モードを判定しません。複数シートExcelで現在モードに対応するシートが見つからない場合は、別モードの先頭シートを代用せず、エラーを表示します。
 
-| シート名 | 読み込み先モード | 画面表示 |
+| 読み込み先モード | 対応シート名 | C列 `question` の内容 |
 | --- | --- | --- |
-| `★英単語テスト_001_生成` | `word` | 英単語 |
-| `★チャンク_001_生成` | `chunk` | チャンク |
-| `★英文和訳_001_生成` | `definition` | 英文和訳 |
+| `word`（英単語モード） | `英単語`, `英単語テスト`, `word`, `word_mode`, `単語`, `★英単語テスト_001_生成` | 英単語 |
+| `chunk`（チャンクモード） | `チャンク`, `chunk`, `chunk_mode`, `★チャンク_001_生成` | チャンク |
+| `definition`（英文和訳モード） | `英文和訳`, `英文`, `和訳`, `definition`, `definition_mode`, `★英文和訳_001_生成` | 英文 |
 
-各シートは1行目をヘッダーとして扱い、A〜L列（`row_number`, `level`, `question`, `correct`, `choice1`, `choice2`, `choice3`, `total_correct`, `total_wrong`, `accuracy`, `current_streak`, `note`）だけを読み込みます。C列 `question`、D列 `correct`、E〜G列 `choice1`〜`choice3` がそろった行だけを出題対象にし、H〜L列の空欄、A列 `row_number` の空欄、M列以降の余分な列、空白行はエラーにしません。読み込み後は「Excelブックから読み込みました：英単語 360問、チャンク 272問、英文和訳 116問」のように3モードの件数を表示します。
+複数シートExcel内に複数モードの対応シートがある場合は、見つかったシートを `word` / `chunk` / `definition` の別々の rows として保持し、Render版では `/api/questions/upload` へモード別CSVとして個別保存します。これにより `/api/questions/current?mode=word`、`?mode=chunk`、`?mode=definition` は、それぞれ該当モードの問題だけを返します。
+
+各シートは1行目をヘッダーとして扱い、A〜L列（`row_number`, `level`, `question`, `correct`, `choice1`, `choice2`, `choice3`, `total_correct`, `total_wrong`, `accuracy`, `current_streak`, `note`）だけを読み込みます。C列 `question`、D列 `correct`、E〜G列 `choice1`〜`choice3` がそろった行だけを出題対象にし、H〜L列の空欄、A列 `row_number` の空欄、M列以降の余分な列、空白行はエラーにしません。
 
 ## ローカルPythonツール: study-app用Excelの選択肢自動補完
 

@@ -35,10 +35,10 @@ const DEFAULT_QUESTION_COUNT = '10';
 
 
 
-const WORKBOOK_SHEET_MODES = {
-  '★英単語テスト_001_生成': 'word',
-  '★チャンク_001_生成': 'chunk',
-  '★英文和訳_001_生成': 'definition',
+const WORKBOOK_SHEET_ALIASES = {
+  word: ['英単語', '英単語テスト', 'word', 'word_mode', '単語', '★英単語テスト_001_生成'],
+  chunk: ['チャンク', 'chunk', 'chunk_mode', '★チャンク_001_生成'],
+  definition: ['英文和訳', '英文', '和訳', 'definition', 'definition_mode', '★英文和訳_001_生成'],
 };
 
 const STANDARD_COLUMNS = [
@@ -54,13 +54,6 @@ function normalizeStandardRow(row) {
 function normalizeMatrixRows(matrix) {
   if (!matrix.length) return [];
   return matrix.slice(1).map(normalizeStandardRow);
-}
-
-function detectModeFromFilename(filename, fallbackMode) {
-  if (/英単語|英単語テスト/.test(filename)) return 'word';
-  if (/チャンク/.test(filename)) return 'chunk';
-  if (/英文和訳/.test(filename)) return 'definition';
-  return fallbackMode;
 }
 
 function decodeText(buffer) {
@@ -543,8 +536,14 @@ function getWorkbookSummaryText(modeRows) {
   return `英単語 ${normalizeQuestionsForMode(modeRows.word || [], 'word').length}問、チャンク ${normalizeQuestionsForMode(modeRows.chunk || [], 'chunk').length}問、英文和訳 ${normalizeQuestionsForMode(modeRows.definition || [], 'definition').length}問`;
 }
 
-function findWorkbookSheetName(workbook, targetName) {
-  return workbook.SheetNames.find((sheetName) => sheetName.trim() === targetName);
+function normalizeSheetName(sheetName) {
+  return String(sheetName || '').trim().toLowerCase();
+}
+
+function findWorkbookSheetNameForMode(workbook, mode) {
+  const aliases = WORKBOOK_SHEET_ALIASES[mode] || [];
+  const normalizedAliases = aliases.map(normalizeSheetName);
+  return workbook.SheetNames.find((sheetName) => normalizedAliases.includes(normalizeSheetName(sheetName)));
 }
 
 function parseSheetRows(workbook, sheetName) {
@@ -552,7 +551,7 @@ function parseSheetRows(workbook, sheetName) {
   return normalizeMatrixRows(matrix);
 }
 
-function parseWorkbookModeRows(arrayBuffer) {
+function parseWorkbookModeRows(arrayBuffer, selectedMode = state.mode) {
   if (!window.XLSX) {
     throw new Error('Excel読み込みライブラリの読み込みに失敗しました。ネットワーク接続またはCDN設定を確認してください。');
   }
@@ -561,21 +560,28 @@ function parseWorkbookModeRows(arrayBuffer) {
   if (!firstSheetName) throw new Error('Excelファイルにシートがありません。');
 
   const modeRows = {};
-  for (const [sheetName, mode] of Object.entries(WORKBOOK_SHEET_MODES)) {
-    const actualSheetName = findWorkbookSheetName(workbook, sheetName);
+  for (const mode of Object.keys(WORKBOOK_SHEET_ALIASES)) {
+    const actualSheetName = findWorkbookSheetNameForMode(workbook, mode);
     if (actualSheetName) modeRows[mode] = parseSheetRows(workbook, actualSheetName);
   }
 
-  if (Object.keys(modeRows).length === Object.keys(WORKBOOK_SHEET_MODES).length) {
-    return { type: 'multiMode', modeRows };
+  if (workbook.SheetNames.length > 1) {
+    if (!modeRows[selectedMode]) {
+      throw new Error(`${MODES[selectedMode].label}に対応するシートが見つかりません。シート名を「${WORKBOOK_SHEET_ALIASES[selectedMode].slice(0, -1).join('」「')}」のいずれかにしてください。`);
+    }
+    return { type: 'multiMode', modeRows, activeMode: selectedMode };
   }
 
-  return { type: 'single', rows: parseSheetRows(workbook, firstSheetName) };
+  if (modeRows[selectedMode]) {
+    return { type: 'multiMode', modeRows, activeMode: selectedMode };
+  }
+
+  return { type: 'single', rows: parseSheetRows(workbook, firstSheetName), activeMode: selectedMode };
 }
 
 function parseWorkbookRows(arrayBuffer) {
-  const parsed = parseWorkbookModeRows(arrayBuffer);
-  return parsed.type === 'multiMode' ? parsed.modeRows.word : parsed.rows;
+  const parsed = parseWorkbookModeRows(arrayBuffer, state.mode);
+  return parsed.type === 'multiMode' ? parsed.modeRows[state.mode] : parsed.rows;
 }
 
 function shuffle(items) {
@@ -831,7 +837,7 @@ async function handleMultiModeWorkbookUpload(file, parsed) {
   let savedCount = 0;
   let lastError = null;
 
-  for (const mode of Object.values(WORKBOOK_SHEET_MODES)) {
+  for (const mode of Object.keys(modeRows)) {
     try {
       await uploadRowsForMode(mode, modeRows[mode] || [], file.name || 'study-app-workbook.xlsx');
       savedCount += 1;
@@ -840,11 +846,11 @@ async function handleMultiModeWorkbookUpload(file, parsed) {
     }
   }
 
-  state.mode = modeRows[state.mode] ? state.mode : 'word';
+  state.mode = parsed.activeMode || state.mode;
   updateModeUi();
   const summary = getWorkbookSummaryText(modeRows);
-  const saveMessage = savedCount === Object.keys(WORKBOOK_SHEET_MODES).length
-    ? '共通問題データを3モード分保存しました。PC・iPhone共通で利用できます'
+  const saveMessage = savedCount === Object.keys(modeRows).length
+    ? '共通問題データをモード別に保存しました。PC・iPhone共通で利用できます'
     : `${serverSaveUnavailableMessage()}サーバー保存には一部または全部失敗しましたが、一時確認用に読み込みました。${lastError ? `理由: ${lastError.message}` : ''}`;
   applyQuestions(modeRows[state.mode] || [], 'アップロードExcelブック', { message: `Excelブックから読み込みました：${summary}。${saveMessage}` });
 }
@@ -852,7 +858,7 @@ async function handleMultiModeWorkbookUpload(file, parsed) {
 async function handleUpload(event) {
   const [file] = event.target.files;
   if (!file) return;
-  const uploadMode = detectModeFromFilename(file.name || '', state.mode);
+  const uploadMode = state.mode;
   state.loadToken += 1;
   setLoadingState('ファイルを読み込み中...');
 
@@ -861,7 +867,7 @@ async function handleUpload(event) {
   try {
     const extension = file.name.split('.').pop().toLowerCase();
     const parsed = /^(xlsx|xls)$/i.test(extension)
-      ? parseWorkbookModeRows(await file.arrayBuffer())
+      ? parseWorkbookModeRows(await file.arrayBuffer(), uploadMode)
       : { type: 'single', rows: parseCsv(decodeText(await file.arrayBuffer())) };
 
     if (parsed.type === 'multiMode') {
