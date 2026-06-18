@@ -32,8 +32,18 @@ const SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
 const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
 const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
 const DEFAULT_QUESTION_COUNT = '10';
-const MAX_RECOMMENDED_VOICE_COUNT = 10;
-const MAX_VOICES_PER_GENDER = 5;
+const ALLOWED_STUDY_VOICES = [
+  { name: 'Junior', lang: 'en-US' },
+  { name: 'Kathy', lang: 'en-US' },
+  { name: 'Ralph', lang: 'en-US' },
+  { name: 'Samantha', lang: 'en-US' },
+  { name: 'Daniel', lang: 'en-GB' },
+  { name: 'Karen', lang: 'en-AU' },
+  { name: 'Moria', lang: 'en-IE' },
+  { name: 'Rishi', lang: 'en-IN' },
+  { name: 'Tessa', lang: 'en-ZA' },
+  { name: 'Fred', lang: 'en-US' },
+];
 const SPECIAL_VOICE_KEYWORDS = [
   'song',
   'sing',
@@ -52,64 +62,6 @@ const SPECIAL_VOICE_KEYWORDS = [
   '歌唱',
   'うた',
   'ミュージック',
-];
-const PREFERRED_VOICE_VENDOR_KEYWORDS = ['microsoft', 'google', 'apple'];
-const PREFERRED_NARRATION_VOICE_NAMES = [
-  'google us english',
-  'ava',
-  'jenny',
-  'aria',
-  'emma',
-  'brian',
-  'andrew',
-  'guy',
-  'davis',
-  'jane',
-  'sara',
-  'nancy',
-  'steffan',
-  'christopher',
-  'cora',
-  'ashley',
-  'jason',
-  'tony',
-  'brandon',
-  'elizabeth',
-  'eric',
-  'ryan',
-  'libby',
-  'sonia',
-  'natasha',
-  'william',
-];
-const FEMALE_NARRATION_VOICE_NAMES = [
-  'ava',
-  'jenny',
-  'aria',
-  'emma',
-  'jane',
-  'sara',
-  'nancy',
-  'cora',
-  'ashley',
-  'elizabeth',
-  'libby',
-  'sonia',
-  'natasha',
-];
-const MALE_NARRATION_VOICE_NAMES = [
-  'brian',
-  'andrew',
-  'guy',
-  'davis',
-  'steffan',
-  'christopher',
-  'jason',
-  'tony',
-  'brandon',
-  'eric',
-  'ryan',
-  'william',
 ];
 
 
@@ -281,8 +233,17 @@ function getVoiceSearchableText(voice) {
   return `${voice?.name || ''} ${voice?.lang || ''}`.toLowerCase();
 }
 
-function isEnglishVoice(voice) {
-  return /^en([-_]|$)/i.test(voice?.lang || '');
+function normalizeVoicePart(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isAllowedStudyVoiceMatch(voice, allowedVoice) {
+  return normalizeVoicePart(voice?.name) === normalizeVoicePart(allowedVoice?.name)
+    && normalizeVoicePart(voice?.lang) === normalizeVoicePart(allowedVoice?.lang);
+}
+
+function isAllowedStudyVoice(voice) {
+  return ALLOWED_STUDY_VOICES.some((allowedVoice) => isAllowedStudyVoiceMatch(voice, allowedVoice));
 }
 
 function isSpecialVoice(voice) {
@@ -295,90 +256,25 @@ function isSingingVoice(voice) {
 }
 
 function filterNarrationVoices(voices) {
-  return voices.filter((voice) => !isSpecialVoice(voice));
+  return voices.filter((voice) => isAllowedStudyVoice(voice) && !isSpecialVoice(voice));
 }
 
-function includesAnyKeyword(text, keywords) {
-  return keywords.some((keyword) => text.includes(keyword));
-}
-
-function inferNarrationVoiceGender(voice) {
-  const searchableText = getVoiceSearchableText(voice);
-  if (includesAnyKeyword(searchableText, FEMALE_NARRATION_VOICE_NAMES)) return 'female';
-  if (includesAnyKeyword(searchableText, MALE_NARRATION_VOICE_NAMES)) return 'male';
-  return 'unknown';
-}
-
-function scoreNarrationVoice(voice, index) {
-  const searchableText = getVoiceSearchableText(voice);
-  let score = 0;
-  if (/^en[-_]us$/i.test(voice?.lang || '')) score += 1000;
-  else if (isEnglishVoice(voice)) score += 800;
-  if (searchableText.includes('natural')) score += 300;
-  if (includesAnyKeyword(searchableText, PREFERRED_VOICE_VENDOR_KEYWORDS)) score += 250;
-  const preferredNameIndex = PREFERRED_NARRATION_VOICE_NAMES.findIndex((keyword) => searchableText.includes(keyword));
-  if (preferredNameIndex >= 0) score += 5000 - preferredNameIndex * 50;
-  return score - index / 1000;
-}
-
-function sortNarrationVoices(voices) {
-  return voices
-    .map((voice, index) => ({ voice, score: scoreNarrationVoice(voice, index) }))
-    .sort((a, b) => b.score - a.score)
-    .map((entry) => entry.voice);
-}
-
-function limitBalancedNarrationVoices(voices) {
-  const selected = [];
-  const counts = { female: 0, male: 0, unknown: 0 };
-  voices.forEach((voice) => {
-    if (selected.length >= MAX_RECOMMENDED_VOICE_COUNT) return;
-    const gender = inferNarrationVoiceGender(voice);
-    if ((gender === 'female' || gender === 'male') && counts[gender] >= MAX_VOICES_PER_GENDER) return;
-    selected.push(voice);
-    counts[gender] += 1;
+function getAllowedStudyVoices(voices) {
+  const remainingVoices = [...voices];
+  return ALLOWED_STUDY_VOICES.flatMap((allowedVoice) => {
+    const matchedIndex = remainingVoices.findIndex((voice) => isAllowedStudyVoiceMatch(voice, allowedVoice));
+    if (matchedIndex < 0) return [];
+    const [matchedVoice] = remainingVoices.splice(matchedIndex, 1);
+    return [matchedVoice];
   });
-  if (selected.length >= MAX_RECOMMENDED_VOICE_COUNT) return selected;
-  voices.forEach((voice) => {
-    if (selected.length >= MAX_RECOMMENDED_VOICE_COUNT) return;
-    if (!selected.includes(voice)) selected.push(voice);
-  });
-  return selected;
-}
-
-function getRecommendedVoices(voices) {
-  const narrationVoices = filterNarrationVoices(voices);
-  const englishVoices = narrationVoices.filter(isEnglishVoice);
-  const displayPool = englishVoices.length > 0 ? englishVoices : narrationVoices;
-  return limitBalancedNarrationVoices(sortNarrationVoices(displayPool));
-}
-
-function getDisplayVoicePriority(voice) {
-  const lang = String(voice?.lang || '').toLowerCase().replace('_', '-');
-  if (lang === 'en-us' || lang.startsWith('en-us-')) return 0;
-  if (lang === 'en-gb' || lang.startsWith('en-gb-')) return 1;
-  if (lang === 'en-au' || lang.startsWith('en-au-')) return 2;
-  if (lang === 'en-ca' || lang.startsWith('en-ca-')) return 3;
-  if (lang.startsWith('en-') || lang === 'en') return 4;
-  return 5;
-}
-
-function sortDisplayVoices(voices) {
-  return voices
-    .map((voice, index) => ({ voice, index, priority: getDisplayVoicePriority(voice) }))
-    .sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority;
-      const langCompare = String(a.voice?.lang || '').localeCompare(String(b.voice?.lang || ''), 'en', { sensitivity: 'base' });
-      if (langCompare !== 0) return langCompare;
-      const nameCompare = String(a.voice?.name || '').localeCompare(String(b.voice?.name || ''), 'en', { sensitivity: 'base' });
-      if (nameCompare !== 0) return nameCompare;
-      return a.index - b.index;
-    })
-    .map((entry) => entry.voice);
 }
 
 function getDisplayVoices(voices) {
-  return sortDisplayVoices(voices);
+  return getAllowedStudyVoices(voices);
+}
+
+function getRecommendedVoices(voices) {
+  return filterNarrationVoices(getAllowedStudyVoices(voices));
 }
 
 function getVoiceOptionValue(voice) {

@@ -1,5 +1,6 @@
 # Project Status
 
+- 2026-06-18: study-appの音声選択候補を Junior / en-US、Kathy / en-US、Ralph / en-US、Samantha / en-US、Daniel / en-GB、Karen / en-AU、Moria / en-IE、Rishi / en-IN、Tessa / en-ZA、Fred / en-US の固定許可リストに限定。手動選択・ランダム・自動選択はいずれも取得済み許可候補だけを使い、許可候補外の保存値は自動選択へ戻してクリアするよう更新。
 - 2026-06-18: study-appの全問終了画面と復習終了画面に「問題設定へ戻る」ボタンを追加。終了後だけ表示し、押すと出題設定見出しへスムーズスクロールする。
 - 2026-06-18: study-appのランダム/自動読み上げ向けおすすめ音声名に Ava / Jenny / Aria / Emma / Brian / Andrew / Guy / Davis / Jane / Sara / Nancy / Steffan / Christopher / Cora / Ashley / Jason / Tony / Brandon / Elizabeth / Eric / Ryan を重複なしで追加し、女性系・男性系の性別推定リストも更新。手動プルダウンは全候補表示のまま維持。
 - 2026-06-18: study-appのExcelアップロードを現在選択中モードのシート名優先に修正。複数シートExcelでは対応シートがない場合に先頭シートへフォールバックせず、モード別rowsとしてPersistent Diskへ個別保存する方針を固定。
@@ -29,7 +30,7 @@
 - 2026-06-17: study-appの音声選択にランダムを追加。既存の音声保存キーで `random` を保存復元し、読み上げごとに英語系音声を優先してランダム選択、使用音声名を表示するよう変更。
 
 ## 2026-06-18 study-app 音声選択仕様
-- 手動の音声選択プルダウンは最大10件制限を廃止し、Web Speech API で取得できる全音声を `en-US`、`en-GB`、`en-AU`、`en-CA`、その他 `en-*`、その他言語の順に整理して表示します。
-- 音声選択欄には候補数と、固定音声は全候補から選べる一方でランダム・自動選択では特殊音声を避ける説明を表示します。
-- ランダム選択と自動選択は、`good news` / `bubbles` / `song` / `sing` / `music` / `whisper` / `novelty` / `effect` / `character` / `歌` / `歌声` / `歌唱` / `うた` / `ミュージック` などを含む特殊音声を除外したうえで、Ava / Jenny / Aria / Emma / Brian / Andrew / Guy / Davis / Jane / Sara / Nancy / Steffan / Christopher / Cora / Ashley / Jason / Tony / Brandon / Elizabeth / Eric / Ryan などのおすすめ音声名を優先します。
-- 保存済み固定音声が候補内にあれば、特殊音声でもそのまま復元します。候補がすべて除外された場合のランダム・自動は Web Speech API の既定自動音声に任せます。
+- 手動の音声選択プルダウンは Web Speech API で取得できた音声のうち、Junior / en-US、Kathy / en-US、Ralph / en-US、Samantha / en-US、Daniel / en-GB、Karen / en-AU、Moria / en-IE、Rishi / en-IN、Tessa / en-ZA、Fred / en-US に一致するものだけを指定順で表示します。
+- 音声選択欄には、指定10種類のうち実際に取得できた候補数と、利用可能な指定音声だけを表示する説明を表示します。
+- ランダム選択と自動選択は、Junior / Kathy / Ralph / Samantha / Daniel / Karen / Moria / Rishi / Tessa / Fred の固定許可リストに一致する取得済み音声だけを使います。
+- 保存済み固定音声が固定許可リスト内かつ取得済み候補内にあれば復元し、それ以外は自動選択へ戻して保存値をクリアします。許可候補が0件の場合のランダム・自動は Web Speech API の既定自動音声に任せます。
