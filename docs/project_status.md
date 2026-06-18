@@ -1,5 +1,6 @@
 # Project Status
 
+- 2026-06-18: study-appのレベル範囲選択で、空白およびA1〜C2以外のlevelを出題対象外に変更。レベル範囲変更時・問題適用後は絞り込み後件数で出題数選択肢を更新し、対象0件時は開始ボタンを無効化して専用メッセージを表示。
 - 2026-06-18: study-appの音声選択候補を Junior / en-US、Kathy / en-US、Ralph / en-US、Samantha / en-US、Daniel / en-GB、Karen / en-AU、Moria / en-IE、Rishi / en-IN、Tessa / en-ZA、Fred / en-US の固定許可リストに限定。手動選択・ランダム・自動選択はいずれも取得済み許可候補だけを使い、許可候補外の保存値は自動選択へ戻してクリアするよう更新。
 - 2026-06-18: study-appの全問終了画面と復習終了画面に「問題設定へ戻る」ボタンを追加。終了後だけ表示し、押すと出題設定見出しへスムーズスクロールする。
 - 2026-06-18: study-appのランダム/自動読み上げ向けおすすめ音声名に Ava / Jenny / Aria / Emma / Brian / Andrew / Guy / Davis / Jane / Sara / Nancy / Steffan / Christopher / Cora / Ashley / Jason / Tony / Brandon / Elizabeth / Eric / Ryan を重複なしで追加し、女性系・男性系の性別推定リストも更新。手動プルダウンは全候補表示のまま維持。
