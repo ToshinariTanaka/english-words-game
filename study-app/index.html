@@ -101,6 +101,15 @@
       <div><span id="accuracyRate">0%</span><small>正答率</small></div>
     </section>
 
+    <section class="upload-box" aria-label="学習履歴">
+      <label class="random-toggle" for="weakChecked">
+        <input id="weakChecked" type="checkbox" disabled>
+        <span>苦手として復習対象にする</span>
+      </label>
+      <button id="clearLearningStatsButton" class="secondary-button" type="button">学習履歴をクリア</button>
+      <p class="hint">学習履歴はこの端末のlocalStorageに保存します。CSV/ExcelのH〜L列は互換性のため受け入れますが、学習履歴としては使いません。</p>
+    </section>
+
     <section class="quiz-card mode-word" aria-live="polite">
       <div class="quiz-topline">
         <span id="modeLabel">英単語モード</span>

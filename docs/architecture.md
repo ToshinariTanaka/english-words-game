@@ -41,8 +41,8 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - `correct`: 正解を入れます。英文和訳モードでは英文全体の正しい日本語訳を入れます。
 - `choice1`〜`choice3`: 不正解選択肢を入れます。英文和訳モードでは日本語の誤訳選択肢を入れます。
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
-- `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
-- `row_number` は問題IDとして扱います。学習履歴を将来保存する場合も、共通問題データ本体とは分離して設計します。
+- `total_correct` / `total_wrong` / `accuracy` / `current_streak` などのH〜L列は既存CSV/Excelとの互換性のため受け入れますが、学習履歴としては使いません。
+- 学習履歴は `localStorage` の `englishGameLearningStats` に保存し、キーは「モード名::固定シート名::問題文」です。`row_number` や読み込み元ラベル（例: 共通問題データ）は履歴キーに使いません。
 - 教材CSV/Excelは、元ヘッダーが `A row_number,B level,C question,...,L note` 形式でも、保存時は上記の標準ヘッダーへ正規化します。
 - 読み込み時は最初の12列（A〜L）だけを標準列として位置ベースで読み、M列以降は無視します。後方に重複ヘッダーがあってもA〜L列を上書きしません。
 - 出題対象は `question` / `correct` / `choice1`〜`choice3` がそろった行だけです。不足行はエラーにせずスキップします。

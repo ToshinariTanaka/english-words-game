@@ -73,8 +73,8 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - `correct`: 正解を入れます。英文和訳モードでは英文全体の正しい日本語訳を入れます。
 - `choice1`〜`choice3`: 不正解選択肢を入れます。英文和訳モードでは日本語の誤訳選択肢を入れます。
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
-- `total_correct` / `total_wrong` / `accuracy` / `current_streak` はCSVから読み込み、初期版では問題ごとのCSV成績として表示のみ行います。
-- `row_number` は問題IDとして扱います。学習履歴を将来保存する場合も、共通問題データ本体とは分離して設計します。
+- `total_correct` / `total_wrong` / `accuracy` / `current_streak` などのH〜L列は既存CSV/Excelとの互換性のため受け入れますが、学習履歴としては使いません。
+- 学習履歴は `localStorage` の `englishGameLearningStats` に保存し、キーは「モード名::固定シート名::問題文」です。`row_number` や読み込み元ラベル（例: 共通問題データ）は履歴キーに使いません。
 - `A row_number`〜`L note` 形式の教材CSV/Excelも受け入れます。読み込み時は最初の12列（A〜L）だけを標準列として扱い、M列以降の余分な列や後方の重複ヘッダーは無視します。
 - `question` / `correct` / `choice1`〜`choice3` がそろった行だけを出題し、選択肢不足行はエラーにせずスキップします。
 - Render版では各モードの起動時・モード切替時に `GET /api/questions/current?mode=...` を優先し、未保存・取得失敗時のみ標準の `study-app/data/*.csv` を読み込みます。画面から手元の `.csv` / `.xlsx` をアップロードすると `POST /api/questions/upload` でサーバー保存します。GitHub Pages版では `/api/questions/upload` が存在しないため、画面上に「サーバー保存不可」とRender版への誘導を表示します。
@@ -116,7 +116,7 @@ Render版では起動時・モード切替時に共通問題データAPIを優�
 
 複数シートExcel内に複数モードの対応シートがある場合は、見つかったシートを `word` / `chunk` / `definition` の別々の rows として保持し、Render版では `/api/questions/upload` へモード別CSVとして個別保存します。これにより `/api/questions/current?mode=word`、`?mode=chunk`、`?mode=definition` は、それぞれ該当モードの問題だけを返します。
 
-各シートは1行目をヘッダーとして扱い、A〜L列（`row_number`, `level`, `question`, `correct`, `choice1`, `choice2`, `choice3`, `total_correct`, `total_wrong`, `accuracy`, `current_streak`, `note`）だけを読み込みます。C列 `question`、D列 `correct`、E〜G列 `choice1`〜`choice3` がそろった行だけを出題対象にし、H〜L列の空欄、A列 `row_number` の空欄、M列以降の余分な列、空白行はエラーにしません。
+各シートは1行目をヘッダーとして扱い、A〜L列（`row_number`, `level`, `question`, `correct`, `choice1`, `choice2`, `choice3`, `total_correct`, `total_wrong`, `accuracy`, `current_streak`, `note`）だけを読み込みます。C列 `question`、D列 `correct`、E〜G列 `choice1`〜`choice3` がそろった行だけを出題対象にし、H〜L列の空欄、A列 `row_number` の空欄、M列以降の余分な列、空白行はエラーにしません。H〜L列に値があっても初期学習履歴としては読み込まず、localStorageの学習履歴とは分離します。
 
 ## ローカルPythonツール: study-app用Excelの選択肢自動補完
 

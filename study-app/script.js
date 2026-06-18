@@ -1,6 +1,8 @@
 const MODES = {
   word: {
     label: '英単語モード',
+    historyModeName: '英単語',
+    historySheetName: '★英単語テスト_001_生成',
     file: './data/word_mode.csv',
     description: '英単語を見て、日本語の意味を選びます。',
     questionAliases: ['C question', 'question', 'word', '英単語', '単語', '問題'],
@@ -8,6 +10,8 @@ const MODES = {
   },
   chunk: {
     label: 'チャンクモード',
+    historyModeName: 'チャンク',
+    historySheetName: '★チャンク_001_生成',
     file: './data/chunk_mode.csv',
     description: '英語のかたまり表現を見て、自然な意味を選びます。',
     questionAliases: ['C question', 'question', 'chunk', 'チャンク', '問題'],
@@ -15,6 +19,8 @@ const MODES = {
   },
   definition: {
     label: '英文和訳モード',
+    historyModeName: '英文和訳',
+    historySheetName: '★英文和訳_001_生成',
     file: './data/definition_mode.csv',
     description: '英文を読んで、正しい日本語訳を選びます。',
     questionAliases: ['C question', 'question', '英文', '英語', '問題', 'sentence', 'english', 'definition', '英語定義', '定義'],
@@ -33,6 +39,7 @@ const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
 const LEVEL_RANGE_START_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeStart';
 const LEVEL_RANGE_END_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeEnd';
 const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
+const LEARNING_STATS_STORAGE_KEY = 'englishGameLearningStats';
 const DEFAULT_QUESTION_COUNT = '10';
 const LEVEL_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const DEFAULT_LEVEL_START = 'A1';
@@ -76,6 +83,10 @@ const WORKBOOK_SHEET_ALIASES = {
   chunk: ['チャンク', 'chunk', 'chunk_mode', '★チャンク_001_生成'],
   definition: ['英文和訳', '英文', '和訳', 'definition', 'definition_mode', '★英文和訳_001_生成'],
 };
+
+const FIXED_HISTORY_SHEET_NAMES = Object.fromEntries(
+  Object.entries(MODES).map(([mode, config]) => [mode, config.historySheetName]),
+);
 
 const STANDARD_COLUMNS = [
   'row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3',
@@ -162,6 +173,8 @@ const els = {
   voiceStatus: document.getElementById('voiceStatus'),
   voiceCandidateCount: document.getElementById('voiceCandidateCount'),
   backToSettingsButton: document.getElementById('backToSettingsButton'),
+  weakChecked: document.getElementById('weakChecked'),
+  clearLearningStatsButton: document.getElementById('clearLearningStatsButton'),
 };
 
 let audioContext = null;
@@ -638,6 +651,103 @@ function findWorkbookSheetNameForMode(workbook, mode) {
   const aliases = WORKBOOK_SHEET_ALIASES[mode] || [];
   const normalizedAliases = aliases.map(normalizeSheetName);
   return workbook.SheetNames.find((sheetName) => normalizedAliases.includes(normalizeSheetName(sheetName)));
+}
+
+function normalizeHistorySheetName(modeOrSheetName) {
+  const normalized = normalizeSheetName(modeOrSheetName);
+  for (const [mode, aliases] of Object.entries(WORKBOOK_SHEET_ALIASES)) {
+    if (mode === modeOrSheetName || aliases.map(normalizeSheetName).includes(normalized)) {
+      return FIXED_HISTORY_SHEET_NAMES[mode];
+    }
+  }
+  return FIXED_HISTORY_SHEET_NAMES[state.mode] || FIXED_HISTORY_SHEET_NAMES.word;
+}
+
+function getLearningHistoryKey(question, mode = state.mode) {
+  const modeConfig = MODES[mode] || MODES.word;
+  const questionText = typeof question === 'string' ? question : question?.question;
+  return `${modeConfig.historyModeName}::${normalizeHistorySheetName(mode)}::${String(questionText || '').trim()}`;
+}
+
+function readLearningStats() {
+  try {
+    if (typeof localStorage === 'undefined') return {};
+    return JSON.parse(localStorage.getItem(LEARNING_STATS_STORAGE_KEY) || '{}') || {};
+  } catch (error) {
+    console.warn('Failed to load learning stats:', error);
+    return {};
+  }
+}
+
+function writeLearningStats(stats) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(LEARNING_STATS_STORAGE_KEY, JSON.stringify(stats));
+  } catch (error) {
+    console.warn('Failed to save learning stats:', error);
+  }
+}
+
+function calculateAccuracy(correct, wrong) {
+  const total = Number(correct || 0) + Number(wrong || 0);
+  return total === 0 ? 0 : Math.round((Number(correct || 0) / total) * 100);
+}
+
+function calculateRecent10Accuracy(recentResults) {
+  const recent = (Array.isArray(recentResults) ? recentResults : []).slice(-10);
+  if (recent.length === 0) return 0;
+  return Math.round((recent.filter(Boolean).length / recent.length) * 100);
+}
+
+function getLearningStat(question, mode = state.mode) {
+  const stats = readLearningStats();
+  return stats[getLearningHistoryKey(question, mode)] || {
+    total_correct: 0,
+    total_wrong: 0,
+    recent_results: [],
+    accuracy: 0,
+    recent10_accuracy: 0,
+    weak_checked: false,
+  };
+}
+
+function updateLearningStat(question, isCorrect, mode = state.mode) {
+  const stats = readLearningStats();
+  const key = getLearningHistoryKey(question, mode);
+  const current = stats[key] || getLearningStat(question, mode);
+  const recentResults = [...(Array.isArray(current.recent_results) ? current.recent_results : []), Boolean(isCorrect)].slice(-10);
+  const next = {
+    ...current,
+    total_correct: Number(current.total_correct || 0) + (isCorrect ? 1 : 0),
+    total_wrong: Number(current.total_wrong || 0) + (isCorrect ? 0 : 1),
+    recent_results: recentResults,
+    weak_checked: Boolean(current.weak_checked),
+  };
+  next.accuracy = calculateAccuracy(next.total_correct, next.total_wrong);
+  next.recent10_accuracy = calculateRecent10Accuracy(next.recent_results);
+  stats[key] = next;
+  writeLearningStats(stats);
+  return next;
+}
+
+function setWeakChecked(question, checked, mode = state.mode) {
+  const stats = readLearningStats();
+  const key = getLearningHistoryKey(question, mode);
+  const current = stats[key] || getLearningStat(question, mode);
+  stats[key] = { ...current, weak_checked: Boolean(checked) };
+  writeLearningStats(stats);
+  return stats[key];
+}
+
+function clearLearningStatsWithConfirm() {
+  if (typeof window !== 'undefined' && !window.confirm('学習履歴をすべて削除します。よろしいですか？')) return false;
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem(LEARNING_STATS_STORAGE_KEY);
+    return true;
+  } catch (error) {
+    console.warn('Failed to clear learning stats:', error);
+    return false;
+  }
 }
 
 function parseSheetRows(workbook, sheetName) {
@@ -1140,8 +1250,13 @@ function showQuestion() {
   }
 
   els.questionText.textContent = current.question;
+  const learningStat = getLearningStat(current);
+  if (els.weakChecked) {
+    els.weakChecked.checked = Boolean(learningStat.weak_checked);
+    els.weakChecked.disabled = false;
+  }
   els.feedback.className = 'feedback';
-  els.feedback.textContent = `問題ID: ${current.id} / レベル: ${current.level || '未設定'} / CSV成績: 正解 ${current.totalCorrect}・不正解 ${current.totalWrong}・正答率 ${current.csvAccuracy}・連続正解 ${current.currentStreak}`;
+  els.feedback.textContent = `問題ID: ${current.id} / レベル: ${current.level || '未設定'} / 学習履歴: 正解 ${learningStat.total_correct}・不正解 ${learningStat.total_wrong}・累計正解率 ${learningStat.accuracy}%・直近10回 ${learningStat.recent10_accuracy}%`;
   els.feedback.hidden = false;
   els.choices.innerHTML = '';
   current.choices.forEach((choice) => {
@@ -1176,6 +1291,7 @@ function answer(choice) {
       state.mistakes.push(current);
     }
   }
+  updateLearningStat(current, isCorrect);
 
   document.querySelectorAll('.choice-button').forEach((button) => {
     button.disabled = true;
@@ -1233,6 +1349,13 @@ els.fileInput.addEventListener('change', handleUpload);
 els.startQuizButton.addEventListener('click', handleStartQuizClick);
 els.speakQuestionButton.addEventListener('click', speakCurrentQuestion);
 els.backToSettingsButton?.addEventListener('click', scrollToQuizSettings);
+els.weakChecked?.addEventListener('change', () => {
+  const current = state.questions[state.index];
+  if (current) setWeakChecked(current, els.weakChecked.checked);
+});
+els.clearLearningStatsButton?.addEventListener('click', () => {
+  if (clearLearningStatsWithConfirm()) showQuestion();
+});
 
 setupQuestionCountSetting();
 setupLevelRangeSetting();
