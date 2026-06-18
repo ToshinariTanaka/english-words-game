@@ -2,6 +2,23 @@ const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
 
+
+{
+  const html = fs.readFileSync('study-app/index.html', 'utf8');
+  const firstQuestionCountOption = html.match(/<select id="questionCount">\s*<option value="([^"]+)">([^<]+)<\/option>/);
+  assert.ok(firstQuestionCountOption, 'questionCount select should have options');
+  assert.strictEqual(firstQuestionCountOption[1], '10');
+  assert.strictEqual(firstQuestionCountOption[2], '10問');
+
+  const source = fs.readFileSync('study-app/script.js', 'utf8');
+  assert.ok(source.includes("const DEFAULT_QUESTION_COUNT = '10';"));
+
+  const css = fs.readFileSync('study-app/style.css', 'utf8');
+  assert.ok(css.includes('.quiz-card.mode-word #questionText,'));
+  assert.ok(css.includes('.quiz-card.mode-chunk #questionText'));
+  assert.ok(css.includes('font-size: clamp(1.8rem, 7.2vw, 2.64rem);'));
+}
+
 {
   const source = fs.readFileSync('study-app/script.js', 'utf8');
   const start = source.indexOf('function shuffle');
