@@ -35,6 +35,12 @@ const DEFAULT_QUESTION_COUNT = '10';
 
 
 
+const WORKBOOK_SHEET_MODES = {
+  '★英単語テスト_001_生成': 'word',
+  '★チャンク_001_生成': 'chunk',
+  '★英文和訳_001_生成': 'definition',
+};
+
 const STANDARD_COLUMNS = [
   'row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3',
   'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note',
@@ -94,6 +100,7 @@ const state = {
   selected: false,
   sourceLabel: '',
   loadToken: 0,
+  localModeRows: {},
 };
 
 const els = {
@@ -532,15 +539,43 @@ function parseCsv(text) {
   return normalizeMatrixRows(rows);
 }
 
-function parseWorkbookRows(arrayBuffer) {
+function getWorkbookSummaryText(modeRows) {
+  return `英単語 ${normalizeQuestionsForMode(modeRows.word || [], 'word').length}問、チャンク ${normalizeQuestionsForMode(modeRows.chunk || [], 'chunk').length}問、英文和訳 ${normalizeQuestionsForMode(modeRows.definition || [], 'definition').length}問`;
+}
+
+function findWorkbookSheetName(workbook, targetName) {
+  return workbook.SheetNames.find((sheetName) => sheetName.trim() === targetName);
+}
+
+function parseSheetRows(workbook, sheetName) {
+  const matrix = window.XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false });
+  return normalizeMatrixRows(matrix);
+}
+
+function parseWorkbookModeRows(arrayBuffer) {
   if (!window.XLSX) {
     throw new Error('Excel読み込みライブラリの読み込みに失敗しました。ネットワーク接続またはCDN設定を確認してください。');
   }
   const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
   const firstSheetName = workbook.SheetNames[0];
   if (!firstSheetName) throw new Error('Excelファイルにシートがありません。');
-  const matrix = window.XLSX.utils.sheet_to_json(workbook.Sheets[firstSheetName], { header: 1, defval: '', raw: false });
-  return normalizeMatrixRows(matrix);
+
+  const modeRows = {};
+  for (const [sheetName, mode] of Object.entries(WORKBOOK_SHEET_MODES)) {
+    const actualSheetName = findWorkbookSheetName(workbook, sheetName);
+    if (actualSheetName) modeRows[mode] = parseSheetRows(workbook, actualSheetName);
+  }
+
+  if (Object.keys(modeRows).length === Object.keys(WORKBOOK_SHEET_MODES).length) {
+    return { type: 'multiMode', modeRows };
+  }
+
+  return { type: 'single', rows: parseSheetRows(workbook, firstSheetName) };
+}
+
+function parseWorkbookRows(arrayBuffer) {
+  const parsed = parseWorkbookModeRows(arrayBuffer);
+  return parsed.type === 'multiMode' ? parsed.modeRows.word : parsed.rows;
 }
 
 function shuffle(items) {
@@ -566,8 +601,8 @@ function pickField(row, aliases) {
   return '';
 }
 
-function normalizeQuestions(rows) {
-  const modeConfig = MODES[state.mode];
+function normalizeQuestionsForMode(rows, mode) {
+  const modeConfig = MODES[mode];
 
   return rows.map((row, index) => {
     const normalizedRow = Object.fromEntries(
@@ -595,6 +630,10 @@ function normalizeQuestions(rows) {
       note: pickField(normalizedRow, COMMON_ALIASES.note),
     };
   }).filter((item) => item.question && item.correct && item.choices.length === 4);
+}
+
+function normalizeQuestions(rows) {
+  return normalizeQuestionsForMode(rows, state.mode);
 }
 
 function resetSessionStats() {
@@ -747,6 +786,12 @@ async function loadMode(mode) {
   setLoadingState('問題を読み込み中...');
   updateModeUi();
 
+  const localRows = state.localModeRows[mode];
+  if (localRows) {
+    applyQuestions(localRows, 'アップロードExcelブック', { message: `Excelブックから読み込みました：${getWorkbookSummaryText(state.localModeRows)}` });
+    return;
+  }
+
   try {
     const shared = await fetchSharedQuestions(mode);
     if (loadToken !== state.loadToken || state.mode !== mode) return;
@@ -767,6 +812,43 @@ async function loadMode(mode) {
   }
 }
 
+async function uploadRowsForMode(mode, rows, filename) {
+  const formData = new FormData();
+  formData.append('mode', mode);
+  const normalizedCsv = rowsToCsv(rows);
+  const normalizedFile = new File([normalizedCsv], filename.replace(/\.xlsx?$/i, `-${mode}.csv`), { type: 'text/csv' });
+  formData.append('file', normalizedFile);
+  const response = await fetch(`${API_BASE}/api/questions/upload`, { method: 'POST', body: formData });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.ok) throw new Error(result.error || `${response.status} ${response.statusText}`);
+  cacheSharedQuestions(mode, { ok: true, mode, rows, count: rows.length, updatedAt: result.updatedAt, filename });
+  return result;
+}
+
+async function handleMultiModeWorkbookUpload(file, parsed) {
+  const modeRows = parsed.modeRows;
+  state.localModeRows = modeRows;
+  let savedCount = 0;
+  let lastError = null;
+
+  for (const mode of Object.values(WORKBOOK_SHEET_MODES)) {
+    try {
+      await uploadRowsForMode(mode, modeRows[mode] || [], file.name || 'study-app-workbook.xlsx');
+      savedCount += 1;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  state.mode = modeRows[state.mode] ? state.mode : 'word';
+  updateModeUi();
+  const summary = getWorkbookSummaryText(modeRows);
+  const saveMessage = savedCount === Object.keys(WORKBOOK_SHEET_MODES).length
+    ? '共通問題データを3モード分保存しました。PC・iPhone共通で利用できます'
+    : `${serverSaveUnavailableMessage()}サーバー保存には一部または全部失敗しましたが、一時確認用に読み込みました。${lastError ? `理由: ${lastError.message}` : ''}`;
+  applyQuestions(modeRows[state.mode] || [], 'アップロードExcelブック', { message: `Excelブックから読み込みました：${summary}。${saveMessage}` });
+}
+
 async function handleUpload(event) {
   const [file] = event.target.files;
   if (!file) return;
@@ -778,26 +860,26 @@ async function handleUpload(event) {
 
   try {
     const extension = file.name.split('.').pop().toLowerCase();
-    const rows = extension === 'xlsx'
-      ? parseWorkbookRows(await file.arrayBuffer())
-      : parseCsv(decodeText(await file.arrayBuffer()));
+    const parsed = /^(xlsx|xls)$/i.test(extension)
+      ? parseWorkbookModeRows(await file.arrayBuffer())
+      : { type: 'single', rows: parseCsv(decodeText(await file.arrayBuffer())) };
+
+    if (parsed.type === 'multiMode') {
+      await handleMultiModeWorkbookUpload(file, parsed);
+      return;
+    }
+
+    const rows = parsed.rows;
     parsedRows = rows;
+    state.localModeRows = {};
 
-    const formData = new FormData();
-    formData.append('mode', uploadMode);
-    const normalizedCsv = rowsToCsv(rows);
-    const normalizedFile = new File([normalizedCsv], file.name.replace(/\.xlsx?$/i, '.csv'), { type: 'text/csv' });
-    formData.append('file', normalizedFile);
-    const response = await fetch(`${API_BASE}/api/questions/upload`, { method: 'POST', body: formData });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.ok) throw new Error(result.error || `${response.status} ${response.statusText}`);
-
-    cacheSharedQuestions(uploadMode, { ok: true, mode: uploadMode, rows, count: rows.length, updatedAt: result.updatedAt, filename: file.name });
+    const result = await uploadRowsForMode(uploadMode, rows, file.name || 'study-app-upload.csv');
     state.mode = uploadMode;
     updateModeUi();
     applyQuestions(rows, '共通問題データ', { message: '共通問題データを保存しました。PC・iPhone共通で利用できます' });
   } catch (error) {
     if (parsedRows) {
+      state.localModeRows = {};
       state.mode = uploadMode;
       updateModeUi();
       applyQuestions(parsedRows, 'アップロードファイル', {
