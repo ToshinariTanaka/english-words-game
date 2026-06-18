@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>英語学習アプリ</title>
-  <link rel="stylesheet" href="./style.css?v=20260617-speech2">
+  <link rel="stylesheet" href="./style.css?v=20260618-voices1">
 </head>
 <body>
   <main class="app-shell">
@@ -48,12 +48,14 @@
             <input id="autoSpeak" type="checkbox" checked>
             <span>自動読み上げ</span>
           </label>
-          <label class="setting-field" for="voiceSelect">
+          <label class="setting-field voice-setting-field" for="voiceSelect">
             <span>音声選択</span>
             <select id="voiceSelect">
               <option value="">自動選択</option>
               <option value="random">ランダム</option>
             </select>
+            <small id="voiceCandidateCount" class="voice-candidate-count">音声候補：0件</small>
+            <small class="voice-select-help">固定音声は全候補から選べます。ランダム・自動選択では特殊音声を避けます。</small>
           </label>
           <label class="random-toggle" for="soundEffects">
             <input id="soundEffects" type="checkbox">

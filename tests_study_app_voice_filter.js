@@ -18,6 +18,7 @@ const voiceSelect = {
   addEventListener() {},
 };
 const voiceStatus = { textContent: '' };
+const voiceCandidateCount = { textContent: '' };
 let availableVoices = [];
 
 const sandbox = {
@@ -31,6 +32,7 @@ const sandbox = {
     getElementById: (id) => {
       if (id === 'voiceSelect') return voiceSelect;
       if (id === 'voiceStatus') return voiceStatus;
+      if (id === 'voiceCandidateCount') return voiceCandidateCount;
       return {};
     },
     createElement: (tag) => ({ tag, value: '', textContent: '' }),
@@ -43,7 +45,7 @@ const sandbox = {
   },
 };
 vm.createContext(sandbox);
-vm.runInContext(`${snippet}; this.VOICE_STORAGE_KEY = VOICE_STORAGE_KEY; this.isSingingVoice = isSingingVoice; this.filterNarrationVoices = filterNarrationVoices; this.getDisplayVoices = getDisplayVoices; this.getVoiceOptionValue = getVoiceOptionValue; this.populateVoiceSelect = populateVoiceSelect; this.getAvailableVoiceCandidates = getAvailableVoiceCandidates;`, sandbox);
+vm.runInContext(`${snippet}; this.VOICE_STORAGE_KEY = VOICE_STORAGE_KEY; this.isSingingVoice = isSingingVoice; this.filterNarrationVoices = filterNarrationVoices; this.getDisplayVoices = getDisplayVoices; this.getRecommendedVoices = getRecommendedVoices; this.getSelectedVoice = getSelectedVoice; this.getVoiceOptionValue = getVoiceOptionValue; this.populateVoiceSelect = populateVoiceSelect; this.getAvailableVoiceCandidates = getAvailableVoiceCandidates;`, sandbox);
 
 const voiceURIs = (voices) => Array.from(voices, (voice) => voice.voiceURI);
 
@@ -67,7 +69,7 @@ const filtered = sandbox.filterNarrationVoices([normalVoice, songVoice, japanese
 assert.deepStrictEqual(voiceURIs(filtered), ['normal', 'google'], '歌声・特殊効果系キーワードを含む音声だけ除外する');
 
 const displayVoices = sandbox.getDisplayVoices([normalVoice, songVoice, { name: 'Japanese Voice', lang: 'ja-JP', voiceURI: 'ja' }]);
-assert.deepStrictEqual(voiceURIs(displayVoices), ['normal'], '表示候補は特殊音声除外後の英語音声を優先する');
+assert.deepStrictEqual(voiceURIs(displayVoices), ['song', 'normal', 'ja'], '表示候補は全音声を優先言語順で広く表示する');
 
 const manyVoices = [
   normalVoice,
@@ -86,27 +88,52 @@ const manyVoices = [
   goodNewsVoice,
   bubblesVoice,
 ];
-assert.ok(sandbox.getDisplayVoices(manyVoices).length <= 10, '表示候補は最大10件以内にする');
-assert.ok(voiceURIs(sandbox.getDisplayVoices(manyVoices)).includes('normal'), 'Microsoft Jenny Online は通常音声として残る');
-assert.ok(voiceURIs(sandbox.getDisplayVoices(manyVoices)).includes('google'), 'Google US English は通常音声として残る');
+assert.ok(sandbox.getRecommendedVoices(manyVoices).length <= 10, 'おすすめ候補は最大10件以内にする');
+assert.ok(voiceURIs(sandbox.getRecommendedVoices(manyVoices)).includes('normal'), 'Microsoft Jenny Online は通常音声として残る');
+assert.ok(voiceURIs(sandbox.getRecommendedVoices(manyVoices)).includes('google'), 'Google US English は通常音声として残る');
 
 availableVoices = [normalVoice, songVoice, japaneseSongVoice, goodNewsVoice, bubblesVoice, googleVoice];
 stored.set(sandbox.VOICE_STORAGE_KEY, sandbox.getVoiceOptionValue(goodNewsVoice));
 sandbox.populateVoiceSelect();
-assert.strictEqual(stored.get(sandbox.VOICE_STORAGE_KEY), '', '保存済み固定音声が good news なら自動選択へ戻す');
-assert.strictEqual(voiceSelect.value, '', '除外済み保存音声の選択値は自動選択に戻る');
-assert.ok(options.every((option) => !/sing|歌声|good news|bubbles/i.test(option.textContent)), '音声選択プルダウンに特殊音声を表示しない');
+assert.strictEqual(stored.get(sandbox.VOICE_STORAGE_KEY), sandbox.getVoiceOptionValue(goodNewsVoice), '保存済み固定音声が good news でも保持する');
+assert.strictEqual(voiceSelect.value, sandbox.getVoiceOptionValue(goodNewsVoice), '候補内の保存済み固定音声を復元する');
+assert.ok(options.some((option) => /sing|歌声|good news|bubbles/i.test(option.textContent)), '音声選択プルダウンには特殊音声も表示する');
+assert.strictEqual(voiceCandidateCount.textContent, '音声候補：6件', '候補数を表示する');
+assert.strictEqual(sandbox.getSelectedVoice().voiceURI, 'good-news', '明示選択した特殊音声は固定音声として取得できる');
 
 stored.set(sandbox.VOICE_STORAGE_KEY, sandbox.getVoiceOptionValue(bubblesVoice));
 sandbox.populateVoiceSelect();
-assert.strictEqual(stored.get(sandbox.VOICE_STORAGE_KEY), '', '保存済み固定音声が bubbles なら自動選択へ戻す');
+assert.strictEqual(stored.get(sandbox.VOICE_STORAGE_KEY), sandbox.getVoiceOptionValue(bubblesVoice), '保存済み固定音声が bubbles でも保持する');
 
 availableVoices = manyVoices;
 const candidates = sandbox.getAvailableVoiceCandidates();
-assert.ok(candidates.length <= 10, 'ランダム候補も最大10件以内にする');
+assert.ok(candidates.length <= 10, 'ランダム候補はおすすめ候補として最大10件以内にする');
 assert.ok(candidates.every((voice) => !/sing|歌声|good news|bubbles/i.test(`${voice.name} ${voice.lang}`)), 'ランダム候補も特殊音声を含まない');
 
 availableVoices = [songVoice, japaneseSongVoice, goodNewsVoice, bubblesVoice];
 assert.deepStrictEqual(voiceURIs(sandbox.getAvailableVoiceCandidates()), [], 'すべて除外された場合は候補なしとして Web Speech API の自動音声に任せる');
+
+
+const twentyFiveVoices = Array.from({ length: 25 }, (_, index) => ({
+  name: `Manual Voice ${String(index + 1).padStart(2, '0')}`,
+  lang: index % 2 === 0 ? 'en-US' : 'en-GB',
+  voiceURI: `manual-${index + 1}`,
+}));
+availableVoices = twentyFiveVoices;
+sandbox.populateVoiceSelect();
+assert.strictEqual(options.length, 27, '20件以上の音声でも自動・ランダムを含めて10件に制限しない');
+assert.strictEqual(voiceCandidateCount.textContent, '音声候補：25件', '20件以上の候補数を表示する');
+
+const oneHundredThirtyVoices = Array.from({ length: 130 }, (_, index) => ({
+  name: `Large Voice ${String(index + 1).padStart(3, '0')}`,
+  lang: index < 30 ? 'en-US' : index < 55 ? 'en-GB' : index < 80 ? 'en-AU' : index < 100 ? 'en-CA' : index < 115 ? 'en-IN' : 'ja-JP',
+  voiceURI: `large-${index + 1}`,
+}));
+availableVoices = oneHundredThirtyVoices;
+sandbox.populateVoiceSelect();
+assert.strictEqual(options.length, 132, '100件以上の音声でも自動・ランダムを含めて候補として表示できる');
+assert.strictEqual(voiceCandidateCount.textContent, '音声候補：130件', '100件以上の候補数を表示する');
+assert.deepStrictEqual(options.slice(2, 7).map((option) => option.value), ['large-1', 'large-2', 'large-3', 'large-4', 'large-5'], 'en-US を最優先で表示する');
+assert.ok(options.findIndex((option) => option.value === 'large-31') > options.findIndex((option) => option.value === 'large-30'), 'en-GB は en-US の後に表示する');
 
 console.log('tests_study_app_voice_filter: OK');
