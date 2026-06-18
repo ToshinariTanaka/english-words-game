@@ -1,5 +1,6 @@
 # Project Status
 
+- 2026-06-18: study-appの全問終了画面と復習終了画面に「問題設定へ戻る」ボタンを追加。終了後だけ表示し、押すと出題設定見出しへスムーズスクロールする。
 - 2026-06-18: study-appのランダム/自動読み上げ向けおすすめ音声名に Ava / Jenny / Aria / Emma / Brian / Andrew / Guy / Davis / Jane / Sara / Nancy / Steffan / Christopher / Cora / Ashley / Jason / Tony / Brandon / Elizabeth / Eric / Ryan を重複なしで追加し、女性系・男性系の性別推定リストも更新。手動プルダウンは全候補表示のまま維持。
 - 2026-06-18: study-appのExcelアップロードを現在選択中モードのシート名優先に修正。複数シートExcelでは対応シートがない場合に先頭シートへフォールバックせず、モード別rowsとしてPersistent Diskへ個別保存する方針を固定。
 - 2026-06-18: study-appで指定3シートを含むExcelブックをアップロードした場合、英単語・チャンク・英文和訳の3モードへ自動振り分けして読み込む処理を追加。
