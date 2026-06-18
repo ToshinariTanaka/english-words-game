@@ -45,7 +45,7 @@ const sandbox = {
   },
 };
 vm.createContext(sandbox);
-vm.runInContext(`${snippet}; this.VOICE_STORAGE_KEY = VOICE_STORAGE_KEY; this.isSingingVoice = isSingingVoice; this.filterNarrationVoices = filterNarrationVoices; this.getDisplayVoices = getDisplayVoices; this.getRecommendedVoices = getRecommendedVoices; this.getSelectedVoice = getSelectedVoice; this.getVoiceOptionValue = getVoiceOptionValue; this.populateVoiceSelect = populateVoiceSelect; this.getAvailableVoiceCandidates = getAvailableVoiceCandidates;`, sandbox);
+vm.runInContext(`${snippet}; this.VOICE_STORAGE_KEY = VOICE_STORAGE_KEY; this.isSingingVoice = isSingingVoice; this.filterNarrationVoices = filterNarrationVoices; this.getDisplayVoices = getDisplayVoices; this.getRecommendedVoices = getRecommendedVoices; this.getSelectedVoice = getSelectedVoice; this.getVoiceOptionValue = getVoiceOptionValue; this.populateVoiceSelect = populateVoiceSelect; this.getAvailableVoiceCandidates = getAvailableVoiceCandidates; this.inferNarrationVoiceGender = inferNarrationVoiceGender;`, sandbox);
 
 const voiceURIs = (voices) => Array.from(voices, (voice) => voice.voiceURI);
 
@@ -104,6 +104,31 @@ assert.strictEqual(sandbox.getSelectedVoice().voiceURI, 'good-news', '明示選�
 stored.set(sandbox.VOICE_STORAGE_KEY, sandbox.getVoiceOptionValue(bubblesVoice));
 sandbox.populateVoiceSelect();
 assert.strictEqual(stored.get(sandbox.VOICE_STORAGE_KEY), sandbox.getVoiceOptionValue(bubblesVoice), '保存済み固定音声が bubbles でも保持する');
+
+
+const newlyPreferredVoices = [
+  { name: 'Plain English Voice', lang: 'en-US', voiceURI: 'plain' },
+  { name: 'English Singing Davis', lang: 'en-US', voiceURI: 'special-davis' },
+  { name: 'Microsoft Davis Natural Online', lang: 'en-US', voiceURI: 'davis' },
+  { name: 'Microsoft Jane Natural Online', lang: 'en-US', voiceURI: 'jane' },
+  { name: 'Microsoft Sara Natural Online', lang: 'en-US', voiceURI: 'sara' },
+  { name: 'Microsoft Nancy Natural Online', lang: 'en-US', voiceURI: 'nancy' },
+  { name: 'Microsoft Steffan Natural Online', lang: 'en-US', voiceURI: 'steffan' },
+  { name: 'Microsoft Christopher Natural Online', lang: 'en-US', voiceURI: 'christopher' },
+  { name: 'Microsoft Cora Natural Online', lang: 'en-US', voiceURI: 'cora' },
+  { name: 'Microsoft Ashley Natural Online', lang: 'en-US', voiceURI: 'ashley' },
+  { name: 'English Bubbles Jane', lang: 'en-US', voiceURI: 'special-jane' },
+];
+const newlyPreferredRecommended = sandbox.getRecommendedVoices(newlyPreferredVoices);
+const newlyPreferredURIs = voiceURIs(newlyPreferredRecommended);
+['davis', 'jane', 'sara', 'nancy', 'steffan', 'christopher', 'cora', 'ashley'].forEach((voiceURI) => {
+  assert.ok(newlyPreferredURIs.includes(voiceURI), `${voiceURI} をおすすめ優先候補に含める`);
+});
+assert.ok(newlyPreferredURIs.indexOf('davis') < newlyPreferredURIs.indexOf('plain'), 'Davis は通常の en-US 音声より優先する');
+assert.ok(!newlyPreferredURIs.includes('special-davis'), '名前が優先リストにあっても singing 系はランダム/自動候補から除外する');
+assert.ok(!newlyPreferredURIs.includes('special-jane'), '名前が優先リストにあっても bubbles 系はランダム/自動候補から除外する');
+assert.strictEqual(sandbox.inferNarrationVoiceGender({ name: 'Microsoft Jane Natural Online', lang: 'en-US' }), 'female', 'Jane は女性系として推定する');
+assert.strictEqual(sandbox.inferNarrationVoiceGender({ name: 'Microsoft Steffan Natural Online', lang: 'en-US' }), 'male', 'Steffan は男性系として推定する');
 
 availableVoices = manyVoices;
 const candidates = sandbox.getAvailableVoiceCandidates();
