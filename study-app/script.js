@@ -32,6 +32,19 @@ const SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
 const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
 const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
 const DEFAULT_QUESTION_COUNT = '10';
+const SINGING_VOICE_KEYWORDS = [
+  'song',
+  'sing',
+  'singing',
+  'singer',
+  'music',
+  'musical',
+  '歌',
+  '歌声',
+  '歌唱',
+  'うた',
+  'ミュージック',
+];
 
 
 
@@ -196,9 +209,19 @@ function getAvailableVoices() {
   return synthesis?.getVoices?.() || [];
 }
 
+function isSingingVoice(voice) {
+  const searchableText = `${voice?.name || ''} ${voice?.lang || ''}`.toLowerCase();
+  return SINGING_VOICE_KEYWORDS.some((keyword) => searchableText.includes(keyword.toLowerCase()));
+}
+
+function filterNarrationVoices(voices) {
+  return voices.filter((voice) => !isSingingVoice(voice));
+}
+
 function getDisplayVoices(voices) {
-  const englishVoices = voices.filter((voice) => /^en[-_]/i.test(voice.lang || ''));
-  return englishVoices.length > 0 ? englishVoices : voices;
+  const narrationVoices = filterNarrationVoices(voices);
+  const englishVoices = narrationVoices.filter((voice) => /^en[-_]/i.test(voice.lang || ''));
+  return englishVoices.length > 0 ? englishVoices : narrationVoices;
 }
 
 function getVoiceOptionValue(voice) {
@@ -221,7 +244,8 @@ function getSelectedVoiceValue() {
 function populateVoiceSelect() {
   if (!els.voiceSelect) return;
   const storedVoice = loadStoredString(VOICE_STORAGE_KEY, '');
-  const voices = getDisplayVoices(getAvailableVoices());
+  const allVoices = getAvailableVoices();
+  const voices = getDisplayVoices(allVoices);
   els.voiceSelect.innerHTML = '';
   const autoOption = document.createElement('option');
   autoOption.value = '';
@@ -240,7 +264,7 @@ function populateVoiceSelect() {
   const storedVoiceObject = voices.find((voice) => getVoiceOptionValue(voice) === storedVoice) || null;
   const hasStoredVoice = storedVoice === 'random' || Boolean(storedVoiceObject);
   els.voiceSelect.value = hasStoredVoice ? storedVoice : '';
-  if (storedVoice && !hasStoredVoice && voices.length > 0) saveStoredString(VOICE_STORAGE_KEY, '');
+  if (storedVoice && !hasStoredVoice && allVoices.length > 0) saveStoredString(VOICE_STORAGE_KEY, '');
   updateVoiceStatus(storedVoiceObject, els.voiceSelect.value === 'random' ? '今回の音声' : '現在の音声');
 }
 
@@ -261,11 +285,16 @@ function setupVoiceSelect() {
 function getSelectedVoice() {
   const selectedValue = getSelectedVoiceValue();
   if (!selectedValue || selectedValue === 'random') return null;
-  return getAvailableVoices().find((voice) => getVoiceOptionValue(voice) === selectedValue) || null;
+  return getAvailableVoiceCandidates().find((voice) => getVoiceOptionValue(voice) === selectedValue) || null;
 }
 
 function getAvailableVoiceCandidates() {
   return getDisplayVoices(getAvailableVoices());
+}
+
+function getAutoVoiceCandidate() {
+  const candidates = getAvailableVoiceCandidates();
+  return candidates.length > 0 ? candidates[0] : null;
 }
 
 function pickRandomVoice() {
@@ -440,8 +469,9 @@ function speakCurrentQuestion() {
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-US';
-  const isRandomVoice = getSelectedVoiceValue() === 'random';
-  const selectedVoice = isRandomVoice ? pickRandomVoice() : getSelectedVoice();
+  const selectedVoiceValue = getSelectedVoiceValue();
+  const isRandomVoice = selectedVoiceValue === 'random';
+  const selectedVoice = isRandomVoice ? pickRandomVoice() : (getSelectedVoice() || getAutoVoiceCandidate());
   if (selectedVoice) {
     utterance.voice = selectedVoice;
     utterance.lang = selectedVoice.lang || utterance.lang;
