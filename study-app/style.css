@@ -473,6 +473,10 @@ h1 {
   padding: 10px 14px;
 }
 
+.back-to-settings-button {
+  min-height: 52px;
+}
+
 
 .quiz-card.mode-word #questionText,
 .quiz-card.mode-chunk #questionText {

@@ -12,11 +12,19 @@ const assert = require('assert');
 
   const source = fs.readFileSync('study-app/script.js', 'utf8');
   assert.ok(source.includes("const DEFAULT_QUESTION_COUNT = '10';"));
+  assert.ok(source.includes("backToSettingsButton: document.getElementById('backToSettingsButton')"));
+  assert.ok(source.includes("target.scrollIntoView({ behavior: 'smooth', block: 'start' });"));
+  assert.ok(source.includes('showBackToSettingsButton();'));
+  assert.ok(html.includes('id="backToSettingsButton"'));
+  assert.ok(html.includes('問題設定へ戻る'));
+  assert.ok(html.includes('hidden>問題設定へ戻る</button>'));
 
   const css = fs.readFileSync('study-app/style.css', 'utf8');
   assert.ok(css.includes('.quiz-card.mode-word #questionText,'));
   assert.ok(css.includes('.quiz-card.mode-chunk #questionText'));
   assert.ok(css.includes('font-size: clamp(1.8rem, 7.2vw, 2.64rem);'));
+  assert.ok(css.includes('.back-to-settings-button'));
+  assert.ok(css.includes('min-height: 52px;'));
 }
 
 {

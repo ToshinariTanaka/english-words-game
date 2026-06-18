@@ -202,6 +202,7 @@ const els = {
   voiceSelect: document.getElementById('voiceSelect'),
   voiceStatus: document.getElementById('voiceStatus'),
   voiceCandidateCount: document.getElementById('voiceCandidateCount'),
+  backToSettingsButton: document.getElementById('backToSettingsButton'),
 };
 
 let audioContext = null;
@@ -841,6 +842,24 @@ function resetSessionStats() {
   updateStats();
 }
 
+function hideBackToSettingsButton() {
+  if (els.backToSettingsButton) {
+    els.backToSettingsButton.hidden = true;
+  }
+}
+
+function showBackToSettingsButton() {
+  if (els.backToSettingsButton) {
+    els.backToSettingsButton.hidden = false;
+  }
+}
+
+function scrollToQuizSettings() {
+  const target = document.getElementById('settingsTitle') || document.querySelector('.quiz-settings');
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function setLoadingState(message) {
   cancelSpeech();
   state.questionPool = [];
@@ -852,6 +871,7 @@ function setLoadingState(message) {
   els.progressLabel.textContent = '0 / 0';
   els.nextButton.disabled = true;
   els.nextButton.textContent = '次の問題へ';
+  hideBackToSettingsButton();
   els.startQuizButton.disabled = true;
   els.settingsStatus.textContent = '問題を読み込むと出題設定を利用できます。';
   updateSpeakButton();
@@ -887,6 +907,7 @@ function cloneQuestionForSession(question) {
 
 function beginConfiguredSession() {
   initializeSpeech();
+  hideBackToSettingsButton();
   if (state.questionPool.length === 0) return;
 
   resetSessionStats();
@@ -912,6 +933,7 @@ function showEmptyState() {
   els.feedback.className = 'feedback';
   els.feedback.hidden = false;
   els.nextButton.disabled = true;
+  hideBackToSettingsButton();
   els.startQuizButton.disabled = true;
   els.settingsStatus.textContent = '出題可能な行がありません。';
   updateModeUi();
@@ -1112,6 +1134,7 @@ function updateStats() {
 
 function showQuestion() {
   cancelSpeech();
+  hideBackToSettingsButton();
   state.selected = false;
   els.feedback.hidden = true;
   els.nextButton.disabled = true;
@@ -1184,6 +1207,7 @@ function finishSession() {
   els.feedback.hidden = false;
   els.nextButton.disabled = true;
   els.nextButton.textContent = '次の問題へ';
+  showBackToSettingsButton();
   updateModeUi();
   updateSpeakButton();
 }
@@ -1215,6 +1239,7 @@ els.reviewButton.addEventListener('click', startReview);
 els.fileInput.addEventListener('change', handleUpload);
 els.startQuizButton.addEventListener('click', handleStartQuizClick);
 els.speakQuestionButton.addEventListener('click', speakCurrentQuestion);
+els.backToSettingsButton?.addEventListener('click', scrollToQuizSettings);
 
 setupQuestionCountSetting();
 setupSoundSetting();
