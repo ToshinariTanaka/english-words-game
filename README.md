@@ -230,3 +230,24 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - M列 `question_key` を読み込み、学習履歴キーは `モード名::固定シート名::question_key` を優先します。例: `文節和訳::★文節和訳::p000001`。
 - localStorageの `englishGameLearningStats` は `schema_version: 2` と `items` を持つ形式です。`schema_version: 2` がない旧履歴は読み込み時に削除します。
 - 第1段階では既存のCSV/ExcelアップロードAPI互換を維持しています。`.xlsx` のみ許可、4シート必須チェック、一括アップロードAPI新設、既存API無効化、`question_key` の厳格検証や重複検証は第2段階・第3段階で実施予定です。
+
+## study-app 第2段階: 4シートExcel一括アップロードと保存形式v2（2026-06-19）
+
+第2段階から、study-appの正式アップロードは `.xlsx` の4シートExcelのみです。CSV単体アップロードは廃止し、旧API `POST /api/questions/upload` は使用不可（410）です。
+
+正式シート名は完全一致で次の4つです。旧シート名や別名（例: `英単語`, `definition`, `word_mode`）は正式アップロード導線では受け付けません。
+
+| 表示名 | 内部mode | 正式シート名 |
+| --- | --- | --- |
+| 英単語 | `word` | `★英単語` |
+| チャンク | `chunk` | `★チャンク` |
+| 文節和訳 | `phrase` | `★文節和訳` |
+| 英文和訳 | `definition` | `★英文和訳` |
+
+ブラウザ側でExcelを読み込み、各シートのA〜M列（`row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note,question_key`）をrowsへ変換し、4モードまとめて `POST /api/questions/upload-workbook` にJSON送信します。第2段階では、C列 `question`、D列 `correct`、E〜G列 `choice1`〜`choice3`、M列 `question_key` がそろう行だけを完成行として扱い、不足行はスキップします。各シートの完成行が0件の場合は保存しません。
+
+Render Persistent Diskの保存データは `schema_version: 2` をルートに持ち、`modes.word` / `modes.chunk` / `modes.phrase` / `modes.definition` の4つを必ず持つ形式です。4モードすべてが成功した場合のみ一時ファイル経由で `current-questions.json` を更新します。`schema_version: 2` がない旧保存データは無効扱いで読み込まず、study-appは標準CSVへフォールバックして警告を表示します。
+
+取得APIは `GET /api/questions/current?mode=word|chunk|phrase|definition` で各モードのrowsを返します。RPG互換のため、modeなし `GET /api/questions/current` は `word` と同じ扱いです。`GET /api/questions/status` は4モード全体の件数を返します。
+
+詳細バリデーション（`question_key` 形式・重複、level厳格チェック、選択肢重複、正規化、最大20件の詳細エラー、専用エラーボックス）は第3段階で実装予定です。

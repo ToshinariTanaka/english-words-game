@@ -129,3 +129,11 @@ RPG本体のアップロードは、CSV/ExcelをブラウザでCSV化して `POS
 複数シートExcelで現在選択中モードに対応するシートが存在しない場合、先頭シートへフォールバックせずエラーを表示します。これにより英単語モードが英文和訳シートを読み込む、チャンクモードが英単語シートを読み込む、といった混在を防ぎます。単一シートExcelは従来互換のため、現在モードの単一アップロードとして扱えます。
 
 ブラウザ上では、見つかったモード別シートを `state.localModeRows` に保持し、モード切替時は該当モードのシート由来データだけを `normalizeQuestions` に渡します。Render APIが利用できる場合は `/api/questions/upload` へモード別CSVとして個別送信し、サーバー側の保存形式は従来の `modes.{mode}` を維持します。
+
+
+## 共通問題データAPI v2
+- 正式アップロード: `POST /api/questions/upload-workbook`。ブラウザで `.xlsx` を解析し、4モード分のrowsをJSONで送信する。
+- 保存形式: `current-questions.json` のルートに `schema_version: 2`, `updatedAt`, `filename`, `modes` を持つ。`modes` には `word` / `chunk` / `phrase` / `definition` を必ず保存する。
+- 書き込み: 全モード検証後、一時ファイルへ書き出してからrenameするため部分保存しない。
+- 取得: `GET /api/questions/current?mode=...` は指定モード、modeなしはRPG互換で `word` を返す。
+- 旧形式: `schema_version: 2` がない保存データは読み込まず、クライアントは標準CSVへフォールバックする。

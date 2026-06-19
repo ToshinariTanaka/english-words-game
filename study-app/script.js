@@ -93,6 +93,7 @@ const WORKBOOK_SHEET_ALIASES = {
   phrase: ['★文節和訳', '文節和訳', '文節', '部分訳', 'phrase', 'phrase_mode'],
   definition: ['★英文和訳', '英文和訳', '英文', '和訳', 'definition', 'definition_mode', '★英文和訳_001_生成'],
 };
+const REQUIRED_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', phrase: '★文節和訳', definition: '★英文和訳' };
 
 const FIXED_HISTORY_SHEET_NAMES = Object.fromEntries(
   Object.entries(MODES).map(([mode, config]) => [mode, config.historySheetName]),
@@ -606,7 +607,7 @@ function updateHostingStatus() {
     els.hostingStatus.className = 'hosting-status hosting-status-ok';
     return;
   }
-  els.hostingStatus.textContent = `現在の配信元: ${API_BASE || 'ローカル/不明'}（/api/questions/upload がある環境のみ共通保存対応）`;
+  els.hostingStatus.textContent = `現在の配信元: ${API_BASE || 'ローカル/不明'}（/api/questions/upload-workbook がある環境のみ共通保存対応）`;
   els.hostingStatus.className = 'hosting-status';
 }
 
@@ -781,9 +782,14 @@ function clearLearningStatsWithConfirm() {
   }
 }
 
-function parseSheetRows(workbook, sheetName) {
+function isCompleteUploadRow(row) {
+  return ['question', 'correct', 'choice1', 'choice2', 'choice3', 'question_key'].every((key) => String(row?.[key] ?? '').trim() !== '');
+}
+
+function parseSheetRows(workbook, sheetName, options = {}) {
   const matrix = window.XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: '', raw: false });
-  return normalizeMatrixRows(matrix);
+  const rows = normalizeMatrixRows(matrix);
+  return options.completeOnly ? rows.filter(isCompleteUploadRow) : rows;
 }
 
 function parseWorkbookModeRows(arrayBuffer, selectedMode = state.mode) {
@@ -791,27 +797,17 @@ function parseWorkbookModeRows(arrayBuffer, selectedMode = state.mode) {
     throw new Error('Excel読み込みライブラリの読み込みに失敗しました。ネットワーク接続またはCDN設定を確認してください。');
   }
   const workbook = window.XLSX.read(arrayBuffer, { type: 'array' });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) throw new Error('Excelファイルにシートがありません。');
+  const missingSheets = Object.values(REQUIRED_WORKBOOK_SHEETS).filter((sheetName) => !workbook.SheetNames.includes(sheetName));
+  if (missingSheets.length) {
+    throw new Error(`新形式の4シートExcel（★英単語 / ★チャンク / ★文節和訳 / ★英文和訳）を選択してください。不足: ${missingSheets.join(' / ')}`);
+  }
 
   const modeRows = {};
-  for (const mode of Object.keys(WORKBOOK_SHEET_ALIASES)) {
-    const actualSheetName = findWorkbookSheetNameForMode(workbook, mode);
-    if (actualSheetName) modeRows[mode] = parseSheetRows(workbook, actualSheetName);
+  for (const [mode, sheetName] of Object.entries(REQUIRED_WORKBOOK_SHEETS)) {
+    modeRows[mode] = parseSheetRows(workbook, sheetName, { completeOnly: true });
+    if (modeRows[mode].length === 0) throw new Error(`${sheetName} に出題可能行がありません。C〜G列とM列 question_key がある行を1件以上入れてください。`);
   }
-
-  if (workbook.SheetNames.length > 1) {
-    if (!modeRows[selectedMode]) {
-      throw new Error(`${MODES[selectedMode].label}に対応するシートが見つかりません。シート名を「${WORKBOOK_SHEET_ALIASES[selectedMode].slice(0, -1).join('」「')}」のいずれかにしてください。`);
-    }
-    return { type: 'multiMode', modeRows, activeMode: selectedMode };
-  }
-
-  if (modeRows[selectedMode]) {
-    return { type: 'multiMode', modeRows, activeMode: selectedMode };
-  }
-
-  return { type: 'single', rows: parseSheetRows(workbook, firstSheetName), activeMode: selectedMode };
+  return { type: 'multiMode', modeRows, activeMode: selectedMode };
 }
 
 function parseWorkbookRows(arrayBuffer) {
@@ -1120,7 +1116,7 @@ async function fetchSharedQuestions(mode) {
   const response = await fetch(`${API_BASE}/api/questions/current?mode=${encodeURIComponent(mode)}`, { cache: 'no-store' });
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   const payload = await response.json();
-  if (!payload.ok || !Array.isArray(payload.rows)) throw new Error(payload.error || '共通問題データの形式が不正です。');
+  if (!payload.ok || !Array.isArray(payload.rows)) throw new Error(payload.legacy ? '保存済みの共通問題データは旧形式のため使用できません。新形式の4シートExcelをアップロードしてください。現在は標準サンプルデータを表示しています。' : (payload.error || '共通問題データの形式が不正です。'));
   cacheSharedQuestions(mode, payload);
   return payload;
 }
@@ -1152,7 +1148,7 @@ async function loadMode(mode) {
     try {
       const rows = await loadStandardCsv(mode);
       if (loadToken !== state.loadToken || state.mode !== mode) return;
-      applyQuestions(rows, '標準CSV', { message: `標準CSVから${rows.length}問を読み込みました` });
+      applyQuestions(rows, '標準CSV', { message: sharedError.message.includes('旧形式') ? sharedError.message : `標準CSVから${rows.length}問を読み込みました` });
     } catch (standardError) {
       if (loadToken !== state.loadToken || state.mode !== mode) return;
       els.questionText.textContent = 'CSVの読み込みに失敗しました。GitHub PagesなどのWebサーバー上で開いてください。';
@@ -1164,41 +1160,32 @@ async function loadMode(mode) {
   }
 }
 
-async function uploadRowsForMode(mode, rows, filename) {
-  const formData = new FormData();
-  formData.append('mode', mode);
-  const normalizedCsv = rowsToCsv(rows);
-  const normalizedFile = new File([normalizedCsv], filename.replace(/\.xlsx?$/i, `-${mode}.csv`), { type: 'text/csv' });
-  formData.append('file', normalizedFile);
-  const response = await fetch(`${API_BASE}/api/questions/upload`, { method: 'POST', body: formData });
+async function uploadWorkbookRows(modeRows, filename) {
+  const response = await fetch(`${API_BASE}/api/questions/upload-workbook`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ schema_version: 2, source: 'study-app-workbook', filename, modes: modeRows }),
+  });
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.ok) throw new Error(result.error || `${response.status} ${response.statusText}`);
-  cacheSharedQuestions(mode, { ok: true, mode, rows, count: rows.length, updatedAt: result.updatedAt, filename });
+  for (const [mode, rows] of Object.entries(modeRows)) {
+    cacheSharedQuestions(mode, { ok: true, schema_version: 2, mode, rows, count: rows.length, updatedAt: result.updatedAt, filename });
+  }
   return result;
 }
 
+
 async function handleMultiModeWorkbookUpload(file, parsed) {
   const modeRows = parsed.modeRows;
+  const currentMode = state.mode;
+  const result = await uploadWorkbookRows(modeRows, file.name || 'study-app-workbook.xlsx');
   state.localModeRows = modeRows;
-  let savedCount = 0;
-  let lastError = null;
-
-  for (const mode of Object.keys(modeRows)) {
-    try {
-      await uploadRowsForMode(mode, modeRows[mode] || [], file.name || 'study-app-workbook.xlsx');
-      savedCount += 1;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  state.mode = parsed.activeMode || state.mode;
+  state.mode = currentMode;
   updateModeUi();
-  const summary = getWorkbookSummaryText(modeRows);
-  const saveMessage = savedCount === Object.keys(modeRows).length
-    ? '共通問題データをモード別に保存しました。PC・iPhone共通で利用できます'
-    : `${serverSaveUnavailableMessage()}サーバー保存には一部または全部失敗しましたが、一時確認用に読み込みました。${lastError ? `理由: ${lastError.message}` : ''}`;
-  applyQuestions(modeRows[state.mode] || [], 'アップロードExcelブック', { message: `Excelブックから読み込みました：${summary}。${saveMessage}` });
+  applyQuestions(modeRows[currentMode] || [], '共通問題データ', {
+    message: `4シートExcelを保存しました。${getWorkbookSummaryText(modeRows)}をPC・iPhone共通で利用できます。`,
+  });
+  return result;
 }
 
 async function handleUpload(event) {
@@ -1206,44 +1193,22 @@ async function handleUpload(event) {
   if (!file) return;
   const uploadMode = state.mode;
   state.loadToken += 1;
-  setLoadingState('ファイルを読み込み中...');
-
-  let parsedRows = null;
+  setLoadingState('4シートExcelを読み込み中...');
 
   try {
     const extension = file.name.split('.').pop().toLowerCase();
-    const parsed = /^(xlsx|xls)$/i.test(extension)
-      ? parseWorkbookModeRows(await file.arrayBuffer(), uploadMode)
-      : { type: 'single', rows: parseCsv(decodeText(await file.arrayBuffer())) };
-
-    if (parsed.type === 'multiMode') {
-      await handleMultiModeWorkbookUpload(file, parsed);
-      return;
-    }
-
-    const rows = parsed.rows;
-    parsedRows = rows;
+    if (extension !== 'xlsx') throw new Error('アップロードできるファイルは .xlsx の4シートExcelのみです。');
+    const parsed = parseWorkbookModeRows(await file.arrayBuffer(), uploadMode);
+    await handleMultiModeWorkbookUpload(file, parsed);
+  } catch (error) {
     state.localModeRows = {};
-
-    const result = await uploadRowsForMode(uploadMode, rows, file.name || 'study-app-upload.csv');
     state.mode = uploadMode;
     updateModeUi();
-    applyQuestions(rows, '共通問題データ', { message: '共通問題データを保存しました。PC・iPhone共通で利用できます' });
-  } catch (error) {
-    if (parsedRows) {
-      state.localModeRows = {};
-      state.mode = uploadMode;
-      updateModeUi();
-      applyQuestions(parsedRows, 'アップロードファイル', {
-        message: `${serverSaveUnavailableMessage()}サーバー保存には失敗しましたが、一時確認用に${parsedRows.length}行を読み込みました。API: /api/questions/upload 理由: ${error.message}`,
-      });
-    } else {
-      els.questionText.textContent = 'アップロードファイルの読み込みに失敗しました。';
-      els.feedback.textContent = error.message;
-      els.feedback.className = 'feedback wrong';
-      els.feedback.hidden = false;
-      els.uploadStatus.textContent = `${serverSaveUnavailableMessage()}アップロードに失敗しました。API: /api/questions/upload 理由: ${error.message}`;
-    }
+    els.questionText.textContent = 'アップロードファイルの読み込みに失敗しました。';
+    els.feedback.textContent = error.message;
+    els.feedback.className = 'feedback wrong';
+    els.feedback.hidden = false;
+    els.uploadStatus.textContent = `${serverSaveUnavailableMessage()}アップロードに失敗しました。API: /api/questions/upload-workbook 理由: ${error.message}`;
   } finally {
     event.target.value = '';
   }

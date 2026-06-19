@@ -2,27 +2,21 @@ const assert = require('assert');
 const fs = require('fs');
 
 const source = fs.readFileSync('study-app/script.js', 'utf8');
+const html = fs.readFileSync('study-app/index.html', 'utf8');
 
-for (const name of ['英単語', '英単語テスト', 'word', 'word_mode', '単語']) {
-  assert.ok(source.includes(`'${name}'`), `英単語モードのシート名 ${name} を許可する`);
+for (const name of ['★英単語', '★チャンク', '★文節和訳', '★英文和訳']) {
+  assert.ok(source.includes(`'${name}'`) || source.includes(`${name}`), `正式シート名 ${name} を使う`);
 }
-for (const name of ['チャンク', 'chunk', 'chunk_mode']) {
-  assert.ok(source.includes(`'${name}'`), `チャンクモードのシート名 ${name} を許可する`);
-}
-for (const name of ['文節和訳', 'phrase', 'phrase_mode']) {
-  assert.ok(source.includes(`'${name}'`), `文節和訳モードのシート名 ${name} を許可する`);
-}
-for (const name of ['英文和訳', '英文', '和訳', 'definition', 'definition_mode']) {
-  assert.ok(source.includes(`'${name}'`), `英文和訳モードのシート名 ${name} を許可する`);
-}
-
-assert.ok(source.includes('parseWorkbookModeRows(arrayBuffer, selectedMode = state.mode)'), '現在選択中モードを指定してExcelを解析する');
-assert.ok(source.includes('findWorkbookSheetNameForMode(workbook, mode)'), 'ファイル名ではなくシート名でモード別シートを探す');
-assert.ok(source.includes('if (!modeRows[selectedMode])'), '複数シートExcelで現在モードのシートがない場合に先頭シートへフォールバックしない');
-assert.ok(source.includes('対応するシートが見つかりません'), '対応シートがない場合のエラーを表示する');
-assert.ok(source.includes('const uploadMode = state.mode'), 'アップロード保存先は現在選択中モードに固定する');
-assert.ok(!source.includes('detectModeFromFilename'), 'ファイル名だけでモード判定しない');
-assert.ok(source.includes('state.localModeRows[mode]'), 'モード切替時にアップロード済みExcelブック由来データを参照する');
-assert.ok(source.includes('for (const mode of Object.keys(modeRows))'), 'モード別rowsを個別にPersistent Diskへ保存する');
+assert.ok(source.includes('REQUIRED_WORKBOOK_SHEETS'), '正式4シート完全一致チェックを持つ');
+assert.ok(source.includes("extension !== 'xlsx'"), '.xlsx以外を拒否する');
+assert.ok(source.includes('/api/questions/upload-workbook'), '新APIへ一括送信する');
+assert.ok(source.includes('schema_version: 2'), 'schema_version: 2を送る');
+assert.ok(source.includes('isCompleteUploadRow'), 'C〜G列とM列の完成行チェックを持つ');
+assert.ok(source.includes('state.mode = currentMode'), 'アップロード成功後に現在選択中モードを維持する');
+assert.ok(source.includes('保存済みの共通問題データは旧形式のため使用できません'), '旧保存データ警告を表示する');
+assert.ok(source.includes('questionKey'), 'question_keyを履歴キーに使う処理を維持する');
+assert.ok(html.includes('4シートExcelをアップロード'), 'ラベルを4シートExcelにする');
+assert.ok(html.includes('accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"'), 'file acceptを.xlsxのみにする');
+assert.ok(!html.includes('CSV/Excelをアップロード'), 'CSVアップロード表記を消す');
 
 console.log('tests_study_app_workbook_modes: OK');

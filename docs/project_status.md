@@ -39,3 +39,11 @@
 
 - 2026-06-19: study-app第1段階として4モード化を実施。`phrase`（文節和訳）を追加し、表示順を英単語 / チャンク / 文節和訳 / 英文和訳へ変更。標準CSVは `word_mode.csv` / `chunk_mode.csv` / `phrase_mode.csv` / `definition_mode.csv` の4ファイル構成に更新し、A〜M列の `question_key` を読み込む基礎対応を追加。
 - 2026-06-19: localStorage学習履歴 `englishGameLearningStats` を `schema_version: 2` + `items` 形式に変更。履歴キーは `モード名::固定シート名::question_key` を優先し、旧schema履歴は読み込み時に削除する方針へ更新。
+
+
+## 2026-06-19 第2段階ステータス
+- study-app正式アップロードを `.xlsx` の4シートExcelのみへ切り替え済み。
+- 新API `POST /api/questions/upload-workbook` で `schema_version: 2` の4モード保存に対応済み。
+- 旧API `POST /api/questions/upload` は410エラーで使用不可。
+- modeなし取得はRPG互換として `word` rowsを返す。
+- 詳細バリデーションと専用エラーUIは第3段階へ先送り。
