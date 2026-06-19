@@ -12,6 +12,9 @@ const STUDY_APP_FILES = { word: 'word_mode.csv', chunk: 'chunk_mode.csv', phrase
 const MODES = ['word', 'chunk', 'phrase', 'definition'];
 const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', phrase: '★文節和訳', definition: '★英文和訳' };
 const STANDARD_COLUMNS = ['row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note', 'question_key'];
+const MODE_KEY_PREFIXES = { word: 'w', chunk: 'c', phrase: 'p', definition: 's' };
+const ALLOWED_LEVELS = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
+const MAX_SHOWN_UPLOAD_ERRORS = 20;
 const PUBLIC_DIR = __dirname;
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 10 * 1024 * 1024);
 
@@ -100,6 +103,57 @@ function parseOfficialWorkbookRows(buffer) {
 
 function isCompleteRow(row) {
   return ['question', 'correct', 'choice1', 'choice2', 'choice3'].every((column) => String(row[column] || '').trim() !== '');
+}
+
+function rowHasAnyOfficialContent(row) {
+  return ['level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'question_key'].some((column) => String(row[column] || '').trim() !== '');
+}
+
+function normalizeDuplicateValue(value) {
+  return String(value || '').trim().normalize('NFKC').toLowerCase();
+}
+
+function makeValidationResponse(errors) {
+  const shownErrors = errors.slice(0, MAX_SHOWN_UPLOAD_ERRORS);
+  return {
+    ok: false,
+    error: `アップロード検証エラーが${errors.length}件あります。`,
+    errors: shownErrors,
+    errorCount: errors.length,
+    shownErrorCount: shownErrors.length,
+    moreErrorCount: Math.max(0, errors.length - shownErrors.length),
+  };
+}
+
+function validateOfficialModeRows(modeRows) {
+  const errors = [];
+  const playableRows = {};
+  for (const mode of MODES) {
+    const rows = modeRows[mode] || [];
+    const sheetName = OFFICIAL_WORKBOOK_SHEETS[mode];
+    const prefix = MODE_KEY_PREFIXES[mode];
+    const keys = new Map();
+    playableRows[mode] = [];
+    rows.forEach((row, index) => {
+      const excelRow = index + 2;
+      if (!rowHasAnyOfficialContent(row)) return;
+      if (!isCompleteRow(row)) return;
+      const level = String(row.level || '').trim().toUpperCase();
+      const key = String(row.question_key || '').trim();
+      if (!ALLOWED_LEVELS.has(level)) errors.push(`${sheetName} ${excelRow}行目: B列 level は A1, A2, B1, B2, C1, C2 のいずれかにしてください。`);
+      if (!key) errors.push(`${sheetName} ${excelRow}行目: M列 question_key が空です。`);
+      else if (!new RegExp(`^${prefix}\\d{6}$`).test(key)) errors.push(`${sheetName} ${excelRow}行目: M列 question_key は ${prefix}000001 形式にしてください。`);
+      if (key) {
+        if (keys.has(key)) errors.push(`${sheetName} ${excelRow}行目: M列 question_key が同一シート内で重複しています（${keys.get(key)}行目と同じ ${key}）。`);
+        else keys.set(key, excelRow);
+      }
+      const answerValues = ['correct', 'choice1', 'choice2', 'choice3'].map((column) => normalizeDuplicateValue(row[column]));
+      if (new Set(answerValues).size !== answerValues.length) errors.push(`${sheetName} ${excelRow}行目: D〜G列に正規化後重複する選択肢があります。`);
+      playableRows[mode].push({ ...row, level, question_key: key });
+    });
+    if (playableRows[mode].length === 0) errors.push(`${sheetName}: C〜G列がすべて入った出題対象行が0件です。`);
+  }
+  return { errors, playableRows };
 }
 
 function hasSchemaVersion2(store) { return store?.schema_version === 2; }
@@ -204,12 +258,12 @@ function handleWorkbookUpload(req, res) {
       if (!file?.buffer?.length) return sendJson(res, 400, { ok: false, error: 'アップロードファイルがありません。' });
       if (!/\.xlsx$/i.test(file.filename || '')) return sendJson(res, 400, { ok: false, error: '正式アップロードは .xlsx の4シートExcelのみ対応です。' });
       const modeRows = parseOfficialWorkbookRows(file.buffer);
-      const emptyModes = MODES.filter((mode) => modeRows[mode].filter(isCompleteRow).length === 0);
-      if (emptyModes.length) return sendJson(res, 400, { ok: false, error: `完成行が0件のモードがあります: ${emptyModes.join(', ')}` });
+      const validation = validateOfficialModeRows(modeRows);
+      if (validation.errors.length) return sendJson(res, 400, makeValidationResponse(validation.errors));
       const now = new Date().toISOString();
-      const store = buildSchemaV2Store(modeRows, file.filename, now);
+      const store = buildSchemaV2Store(validation.playableRows, file.filename, now);
       writeStore(store);
-      return sendJson(res, 200, { ok: true, schema_version: 2, modes: Object.fromEntries(MODES.map((mode) => [mode, { count: modeRows[mode].length }])), updatedAt: now, filename: file.filename });
+      return sendJson(res, 200, { ok: true, schema_version: 2, modes: Object.fromEntries(MODES.map((mode) => [mode, { count: validation.playableRows[mode].length }])), updatedAt: now, filename: file.filename });
     } catch (error) { return sendJson(res, 400, { ok: false, error: error.message }); }
   });
 }
