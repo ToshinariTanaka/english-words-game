@@ -9,22 +9,13 @@ const MODES = {
     correctAliases: ['D correct', 'correct', 'meaning', '和訳', '意味', '正解'],
   },
   chunk: {
-    label: 'チャンクモード',
-    historyModeName: 'チャンク',
-    historySheetName: '★チャンク',
-    file: './data/chunk_mode.csv',
-    description: '英語のかたまり表現を見て、自然な意味を選びます。',
-    questionAliases: ['C question', 'question', 'chunk', 'チャンク', '問題'],
-    correctAliases: ['D correct', 'correct', 'chunk_meaning', 'チャンク和訳', '和訳', '意味', '正解'],
-  },
-  phrase: {
     label: '文節和訳モード',
     historyModeName: '文節和訳',
-    historySheetName: '★文節和訳',
-    file: './data/phrase_mode.csv',
-    description: '英文中の一部分を見て、正しい部分訳を選びます。',
-    questionAliases: ['C question', 'question', 'phrase', '文節和訳', '文節', '部分訳', '問題'],
-    correctAliases: ['D correct', 'correct', 'phrase_meaning', '部分訳', '和訳', '意味', '正解'],
+    historySheetName: '★チャンク',
+    file: './data/chunk_mode.csv',
+    description: '英文中の短いチャンクを見て、正しい部分訳を選びます。',
+    questionAliases: ['C question', 'question', 'chunk', 'チャンク', '問題'],
+    correctAliases: ['D correct', 'correct', 'chunk_meaning', 'チャンク和訳', '和訳', '意味', '正解'],
   },
   definition: {
     label: '英文和訳モード',
@@ -88,13 +79,12 @@ const SPECIAL_VOICE_KEYWORDS = [
 
 
 const WORKBOOK_SHEET_ALIASES = {
-  word: ['★英単語', '英単語', '英単語テスト', 'word', 'word_mode', '単語', '★英単語テスト_001_生成'],
-  chunk: ['★チャンク', 'チャンク', 'chunk', 'chunk_mode', '★チャンク_001_生成'],
-  phrase: ['★文節和訳', '文節和訳', '文節', '部分訳', 'phrase', 'phrase_mode'],
-  definition: ['★英文和訳', '英文和訳', '英文', '和訳', 'definition', 'definition_mode', '★英文和訳_001_生成'],
+  word: ['★英単語', '英単語', '英単語テスト', 'word', 'word_mode', 'vocabulary', '単語', '★英単語テスト_001_生成'],
+  chunk: ['★チャンク', 'チャンク', '文節和訳', '文節', '部分訳', 'chunk', 'chunk_mode', 'phrase', 'phrase_mode', '★チャンク_001_生成'],
+  definition: ['★英文和訳', '英文和訳', '英文', 'sentence', 'translation', 'definition', 'definition_mode', '★英文和訳_001_生成'],
 };
-const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', phrase: '★文節和訳', definition: '★英文和訳' };
-const MODE_KEY_PREFIXES = { word: 'w', chunk: 'c', phrase: 'p', definition: 's' };
+const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', definition: '★英文和訳' };
+const MODE_KEY_PREFIXES = { word: 'w', chunk: 'c', definition: 's' };
 const ALLOWED_OFFICIAL_LEVELS = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 const MAX_SHOWN_UPLOAD_ERRORS = 20;
 
@@ -655,7 +645,7 @@ function parseCsv(text) {
 }
 
 function getWorkbookSummaryText(modeRows) {
-  return `英単語 ${normalizeQuestionsForMode(modeRows.word || [], 'word').length}問、チャンク ${normalizeQuestionsForMode(modeRows.chunk || [], 'chunk').length}問、文節和訳 ${normalizeQuestionsForMode(modeRows.phrase || [], 'phrase').length}問、英文和訳 ${normalizeQuestionsForMode(modeRows.definition || [], 'definition').length}問`;
+  return `英単語 ${normalizeQuestionsForMode(modeRows.word || [], 'word').length}問、文節和訳 ${normalizeQuestionsForMode(modeRows.chunk || [], 'chunk').length}問、英文和訳 ${normalizeQuestionsForMode(modeRows.definition || [], 'definition').length}問`;
 }
 
 function isCompleteOfficialRow(row) {
@@ -889,13 +879,13 @@ function parseWorkbookModeRows(arrayBuffer, selectedMode = state.mode, { officia
     const requiredSheetNames = Object.values(OFFICIAL_WORKBOOK_SHEETS);
     const missing = requiredSheetNames.filter((sheetName) => !workbook.SheetNames.includes(sheetName));
     const extra = workbook.SheetNames.filter((sheetName) => !requiredSheetNames.includes(sheetName));
-    if (missing.length || extra.length) throw new Error(`正式アップロードは .xlsx の4シートExcelのみ対応です。必要シート: ${requiredSheetNames.join(' / ')}。不足: ${missing.join(' / ') || 'なし'}。許可外: ${extra.join(' / ') || 'なし'}。`);
+    if (missing.length || extra.length) throw new Error(`正式アップロードは .xlsx の3シートExcelのみ対応です。必要シート: ${requiredSheetNames.join(' / ')}。不足: ${missing.join(' / ') || 'なし'}。許可外: ${extra.join(' / ') || 'なし'}。`);
     return { type: 'multiMode', modeRows, activeMode: selectedMode };
   }
 
   if (workbook.SheetNames.length > 1) {
     if (!modeRows[selectedMode]) {
-      throw new Error(`${MODES[selectedMode].label}に対応するシートが見つかりません。シート名を「${WORKBOOK_SHEET_ALIASES[selectedMode].slice(0, -1).join('」「')}」のいずれかにしてください。`);
+      throw new Error(`${MODES[selectedMode].label}に対応するシートが見つかりません。シート名を「${WORKBOOK_SHEET_ALIASES[selectedMode].join('」「')}」のいずれかにしてください。`);
     }
     return { type: 'multiMode', modeRows, activeMode: selectedMode };
   }
@@ -1209,7 +1199,20 @@ function cacheSharedQuestions(mode, payload) {
   }
 }
 
-const LEGACY_SHARED_QUESTIONS_WARNING = '保存済みの共通問題データは旧形式のため使用できません。\n新形式の4シートExcelをアップロードしてください。\n現在は標準サンプルデータを表示しています。';
+const LEGACY_SHARED_QUESTIONS_WARNING = '保存済みの共通問題データは旧形式のため使用できません。\n新形式の3シートExcelをアップロードしてください。\n現在は標準サンプルデータを表示しています。';
+
+function normalizeApiMode(value) {
+  const raw = String(value || '').trim();
+  if (raw === 'phrase') return 'chunk';
+  if (raw === 'vocabulary') return 'word';
+  if (raw === 'sentence' || raw === 'translation') return 'definition';
+  return raw;
+}
+
+function isSharedPayloadForMode(payload, requestedMode) {
+  const payloadMode = normalizeApiMode(payload?.mode || payload?.type || requestedMode);
+  return payloadMode === requestedMode;
+}
 
 async function fetchSharedQuestions(mode) {
   const response = await fetch(`${API_BASE}/api/questions/current?mode=${encodeURIComponent(mode)}`, { cache: 'no-store' });
@@ -1227,6 +1230,7 @@ async function fetchSharedQuestions(mode) {
     throw error;
   }
   if (!payload?.ok || !Array.isArray(payload.rows)) throw new Error(payload?.error || '共通問題データの形式が不正です。');
+  if (!isSharedPayloadForMode(payload, mode)) throw new Error(`共通問題データのモードが不一致です（要求: ${mode} / 応答: ${payload.mode || payload.type || '未設定'}）。`);
   cacheSharedQuestions(mode, payload);
   return payload;
 }
@@ -1294,7 +1298,7 @@ async function handleMultiModeWorkbookUpload(file, parsed) {
   const modeRows = validation.playableRows;
   clearUploadValidationErrors();
   state.localModeRows = modeRows;
-  let saveMessage = '共通問題データを4モード一括保存しました。PC・iPhone共通で利用できます';
+  let saveMessage = '共通問題データを3モード一括保存しました。PC・iPhone共通で利用できます';
   try {
     await uploadOfficialWorkbook(file);
     for (const mode of Object.keys(modeRows)) {
@@ -1337,7 +1341,7 @@ async function handleUpload(event) {
 
     state.mode = uploadMode;
     updateModeUi();
-    applyQuestions(rows, 'アップロードファイル', { message: '単一CSV/単一シートExcelは一時確認用として読み込みました。共通保存は行いません。正式保存は4シート.xlsxを使用してください。' });
+    applyQuestions(rows, 'アップロードファイル', { message: '単一CSV/単一シートExcelは一時確認用として読み込みました。共通保存は行いません。正式保存は3シート.xlsxを使用してください。' });
   } catch (error) {
     if (parsedRows) {
       state.localModeRows = {};
@@ -1365,7 +1369,6 @@ function updateModeUi() {
   els.modeLabel.textContent = state.reviewMode ? `${MODES[state.mode].label}（復習）` : MODES[state.mode].label;
   getQuizCardElement()?.classList.toggle('mode-word', state.mode === 'word');
   getQuizCardElement()?.classList.toggle('mode-chunk', state.mode === 'chunk');
-  getQuizCardElement()?.classList.toggle('mode-phrase', state.mode === 'phrase');
   getQuizCardElement()?.classList.toggle('mode-definition', state.mode === 'definition');
 }
 
