@@ -8,12 +8,12 @@ const PORT = Number(process.env.PORT || 3000);
 const DATA_DIR = process.env.DATA_DIR || '/var/data/english_words_game';
 const DATA_FILE = process.env.QUESTIONS_FILE || path.join(DATA_DIR, 'current-questions.json');
 const STUDY_APP_DATA_DIR = process.env.STUDY_APP_DATA_DIR || '/var/data/study-app';
-const STUDY_APP_FILES = { word: 'word_mode.csv', chunk: 'chunk_mode.csv', definition: 'definition_mode.csv' };
-const MODES = ['word', 'chunk', 'definition'];
-const MODE_ALIASES = { vocabulary: 'word', sentence: 'definition', translation: 'definition', phrase: 'chunk' };
-const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', definition: '★英文和訳' };
+const STUDY_APP_FILES = { word: 'word_mode.csv', chunk: 'chunk_mode.csv', phrase: 'phrase_mode.csv', definition: 'definition_mode.csv' };
+const MODES = ['word', 'chunk', 'phrase', 'definition'];
+const MODE_ALIASES = { vocabulary: 'word', sentence: 'definition', translation: 'definition' };
+const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', phrase: '★文節和訳', definition: '★英文和訳' };
 const STANDARD_COLUMNS = ['row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note', 'question_key'];
-const MODE_KEY_PREFIXES = { word: 'w', chunk: 'c', definition: 's' };
+const MODE_KEY_PREFIXES = { word: 'w', chunk: 'c', phrase: 'p', definition: 's' };
 const ALLOWED_LEVELS = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 const MAX_SHOWN_UPLOAD_ERRORS = 20;
 const PUBLIC_DIR = __dirname;
@@ -150,7 +150,7 @@ function parseOfficialWorkbookRows(buffer) {
   const missing = requiredSheetNames.filter((sheetName) => !Object.prototype.hasOwnProperty.call(sheets, sheetName));
   const extra = actualSheetNames.filter((sheetName) => !requiredSheetNames.includes(sheetName));
   if (missing.length || extra.length) {
-    throw new Error(`正式アップロードは .xlsx の3シートExcelのみ対応です。必要シート: ${requiredSheetNames.join(' / ')}。不足: ${missing.join(' / ') || 'なし'}。許可外: ${extra.join(' / ') || 'なし'}。`);
+    throw new Error(`正式アップロードは .xlsx の4シートExcelのみ対応です。必要シート: ${requiredSheetNames.join(' / ')}。不足: ${missing.join(' / ') || 'なし'}。許可外: ${extra.join(' / ') || 'なし'}。`);
   }
   return Object.fromEntries(MODES.map((mode) => [mode, normalizeMatrixRows(sheets[OFFICIAL_WORKBOOK_SHEETS[mode]] || [])]));
 }
@@ -304,7 +304,7 @@ function readMultipartRequest(req, res, onReady) {
 function handleUpload(req, res) {
   return sendJson(res, 410, {
     ok: false,
-    error: 'このAPIは旧形式のため使用できません。\n新形式の3シートExcelは /api/questions/upload-workbook を使用してください。',
+    error: 'このAPIは旧形式のため使用できません。\n新形式の4シートExcelは /api/questions/upload-workbook を使用してください。',
   });
 }
 
@@ -313,7 +313,7 @@ function handleWorkbookUpload(req, res) {
     try {
       const { file } = parseMultipart(bodyBuffer, contentType);
       if (!file?.buffer?.length) return sendJson(res, 400, { ok: false, error: 'アップロードファイルがありません。' });
-      if (!/\.xlsx$/i.test(file.filename || '')) return sendJson(res, 400, { ok: false, error: '正式アップロードは .xlsx の3シートExcelのみ対応です。' });
+      if (!/\.xlsx$/i.test(file.filename || '')) return sendJson(res, 400, { ok: false, error: '正式アップロードは .xlsx の4シートExcelのみ対応です。' });
       const modeRows = parseOfficialWorkbookRows(file.buffer);
       const validation = validateOfficialModeRows(modeRows);
       if (validation.errors.length) return sendJson(res, 400, makeValidationResponse(validation.errors));

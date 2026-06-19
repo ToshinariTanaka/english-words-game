@@ -45,7 +45,7 @@ vm.runInContext(`${snippet}; this.fetchSharedQuestions = fetchSharedQuestions; t
   assert.strictEqual(jsonRead, true, '409 response JSON should be read before throwing');
   assert.strictEqual(cache.size, 0, 'legacy error payload should not be cached');
   assert.ok(sandbox.LEGACY_SHARED_QUESTIONS_WARNING.includes('保存済みの共通問題データは旧形式のため使用できません。'));
-  assert.ok(sandbox.LEGACY_SHARED_QUESTIONS_WARNING.includes('新形式の3シートExcelをアップロードしてください。'));
+  assert.ok(sandbox.LEGACY_SHARED_QUESTIONS_WARNING.includes('新形式の4シートExcelをアップロードしてください。'));
   assert.ok(sandbox.LEGACY_SHARED_QUESTIONS_WARNING.includes('現在は標準サンプルデータを表示しています。'));
   assert.ok(source.includes('sharedError.legacy'), 'loadMode should branch on legacy shared-data errors');
   assert.ok(source.includes("applyQuestions(rows, '標準CSV', { message: fallbackMessage })"), 'legacy errors should still fall back to standard CSV');

@@ -23,12 +23,13 @@
 - スタイル: `study-app/style.css`
 - データ:
   - `study-app/data/word_mode.csv`（英単語モード）
-  - `study-app/data/chunk_mode.csv`（文節和訳モード。内部IDは `chunk`）
+  - `study-app/data/chunk_mode.csv`（チャンクモード。内部IDは `chunk`）
+  - `study-app/data/phrase_mode.csv`（文節和訳モード。内部IDは `phrase`）
   - `study-app/data/definition_mode.csv`（英文和訳モード。内部IDは互換性維持のため `definition`）
 
 ### 音声読み上げ（2026-06-18）
 
-`study-app/` はブラウザ標準の Web Speech API（`speechSynthesis`）で、現在表示中の C列相当 `question` の英語だけを読み上げます。英単語モードは英単語、文節和訳モードは英語チャンク、英文和訳モードは英文全体が対象です。日本語の正解・選択肢は読み上げません。
+`study-app/` はブラウザ標準の Web Speech API（`speechSynthesis`）で、現在表示中の C列相当 `question` の英語だけを読み上げます。英単語モードは英単語、チャンクモードは英語チャンク、文節和訳モードは英文中の文節、英文和訳モードは英文全体が対象です。日本語の正解・選択肢は読み上げません。
 
 - 新しい問題表示時は、出題設定の「自動読み上げ」がONの場合に自動再生します（初期値ON）。
 - 問題カード付近の「🔊 もう一度聞く」ボタンで、現在の問題を手動再生できます。
@@ -62,14 +63,14 @@
 
 ### CSV形式
 
-モードごとに別CSVを読み込みます。最小構成では3モード共通で以下の列を使います。
+モードごとに別CSVを読み込みます。最小構成では4モード共通で以下の列を使います。
 
 ```csv
 row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
 ```
 
 - `level`: 問題カードに表示する難易度・教材レベルです。
-- `question`: 英単語モードでは英単語、文節和訳モードでは英語チャンク、英文和訳モードでは英文を入れます。
+- `question`: 英単語モードでは英単語、チャンクモードでは英語チャンク、文節和訳モードでは英文中の文節、英文和訳モードでは英文全体を入れます。
 - `correct`: 正解を入れます。英文和訳モードでは英文全体の正しい日本語訳を入れます。
 - `choice1`〜`choice3`: 不正解選択肢を入れます。英文和訳モードでは日本語の誤訳選択肢を入れます。
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
@@ -77,7 +78,7 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - 学習履歴は `localStorage` の `englishGameLearningStats` に保存し、キーは「モード名::固定シート名::問題文」です。`row_number` や読み込み元ラベル（例: 共通問題データ）は履歴キーに使いません。
 - `A row_number`〜`L note` 形式の教材CSV/Excelも受け入れます。読み込み時は最初の12列（A〜L）だけを標準列として扱い、M列以降の余分な列や後方の重複ヘッダーは無視します。
 - `question` / `correct` / `choice1`〜`choice3` がそろった行だけを出題し、選択肢不足行はエラーにせずスキップします。
-- Render版では各モードの起動時・モード切替時に `GET /api/questions/current?mode=...` を優先し、未保存・取得失敗時のみ標準の `study-app/data/*.csv` を読み込みます。画面から正式な3シート `.xlsx` をアップロードすると `POST /api/questions/upload-workbook` でサーバー保存します。単一CSV/単一シートExcelは一時確認用として読み込むだけで共通保存しません。GitHub Pages版では `/api/questions/upload` が存在しないため、画面上に「サーバー保存不可」とRender版への誘導を表示します。
+- Render版では各モードの起動時・モード切替時に `GET /api/questions/current?mode=...` を優先し、未保存・取得失敗時のみ標準の `study-app/data/*.csv` を読み込みます。画面から正式な4シート `.xlsx` をアップロードすると `POST /api/questions/upload-workbook` でサーバー保存します。単一CSV/単一シートExcelは一時確認用として読み込むだけで共通保存しません。GitHub Pages版では `/api/questions/upload` が存在しないため、画面上に「サーバー保存不可」とRender版への誘導を表示します。
 
 
 ## 標準問題ファイルの自動読み込み（2026-06-16）
@@ -85,7 +86,8 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 Render版の `study-app/` は、全端末・全ブラウザ・全ログイン状態で同じ問題を使うため、Render API上の共通問題データを正本として扱います。未保存時の初期データとして、以下の標準CSVへフォールバックします。
 
 - 英単語モード: `study-app/data/word_mode.csv`
-- 文節和訳モード: `study-app/data/chunk_mode.csv`
+- チャンクモード: `study-app/data/chunk_mode.csv`
+- 文節和訳モード: `study-app/data/phrase_mode.csv`
 - 英文和訳モード: `study-app/data/definition_mode.csv`
 
 Render版では起動時・モード切替時に共通問題データAPIを優先し、取得できない場合のみ上記CSVを読み込みます。過去にアップロードしたCSV/Excelを `localStorage` / `IndexedDB` から復元して標準CSVより優先することはありません。GitHub Pages版でのアップロードはサーバー保存不可のため一時確認用です。全端末で共通利用したい問題はRender版URLからアップロードしてください。
@@ -111,12 +113,13 @@ Render版では起動時・モード切替時に共通問題データAPIを優�
 | 読み込み先モード | 対応シート名 | C列 `question` の内容 |
 | --- | --- | --- |
 | `word`（英単語モード） | `英単語`, `英単語テスト`, `word`, `word_mode`, `単語`, `★英単語テスト_001_生成` | 英単語 |
-| `chunk`（文節和訳モード） | `チャンク`, `文節和訳`, `文節`, `部分訳`, `chunk`, `chunk_mode`, `phrase`, `phrase_mode`, `★チャンク_001_生成` | チャンク |
+| `chunk`（チャンクモード） | `チャンク`, `chunk`, `chunk_mode`, `★チャンク_001_生成` | チャンク |
+| `phrase`（文節和訳モード） | `文節和訳`, `文節`, `部分訳`, `phrase`, `phrase_mode`, `★文節和訳_001_生成` | 文節 |
 | `definition`（英文和訳モード） | `英文和訳`, `英文`, `sentence`, `translation`, `definition`, `definition_mode`, `★英文和訳_001_生成` | 英文 |
 
-正式アップロードは `.xlsx` の3シートExcelのみです。シート名は `★英単語` / `★チャンク` / `★英文和訳` の完全一致だけを許可し、旧シート名・別名・`word_mode` / `chunk_mode` / `definition_mode` などは正式アップロードでは許可しません。Render版では `/api/questions/upload-workbook` へ一括保存し、保存JSONは `schema_version: 2` と `modes.word|chunk|definition` を持ちます。
+正式アップロードは `.xlsx` の4シートExcelのみです。シート名は `★英単語` / `★チャンク` / `★文節和訳` / `★英文和訳` の完全一致だけを許可し、旧シート名・別名・`word_mode` / `chunk_mode` / `definition_mode` などは正式アップロードでは許可しません。Render版では `/api/questions/upload-workbook` へ一括保存し、保存JSONは `schema_version: 2` と `modes.word|chunk|phrase|definition` を持ちます。
 
-サーバー側の3シートExcel読み込みには `python3` と `openpyxl` が必要です。Render本番では `render.yaml` の `buildCommand` で `npm ci` に続けて `python3 -m pip install --target ./.python_packages -r tools/requirements.txt` を実行し、Python依存関係をアプリ内の固定ディレクトリ `.python_packages` にインストールします。`server.js` は `PYTHON_PACKAGE_DIR`（未設定時は `.python_packages`）を `PYTHONPATH` に追加して `python3` を実行するため、診断APIとExcel解析APIは同じPython import条件で `openpyxl` を参照します。デプロイ後は先に `/api/diagnostics/python` を開き、`python.available` が `true`、`openpyxl.available` が `true`、`openpyxl.version` が表示されることを確認してください。診断APIで `openpyxl.available:true` を確認してから、`/study-app/` で正式3シートExcelをアップロードし、3モードの件数が保存されることを確認してください。診断APIで失敗する場合は、Render DashboardのBuild Commandが次の内容になっているか確認してください。
+サーバー側の4シートExcel読み込みには `python3` と `openpyxl` が必要です。Render本番では `render.yaml` の `buildCommand` で `npm ci` に続けて `python3 -m pip install --target ./.python_packages -r tools/requirements.txt` を実行し、Python依存関係をアプリ内の固定ディレクトリ `.python_packages` にインストールします。`server.js` は `PYTHON_PACKAGE_DIR`（未設定時は `.python_packages`）を `PYTHONPATH` に追加して `python3` を実行するため、診断APIとExcel解析APIは同じPython import条件で `openpyxl` を参照します。デプロイ後は先に `/api/diagnostics/python` を開き、`python.available` が `true`、`openpyxl.available` が `true`、`openpyxl.version` が表示されることを確認してください。診断APIで `openpyxl.available:true` を確認してから、`/study-app/` で正式4シートExcelをアップロードし、4モードの件数が保存されることを確認してください。診断APIで失敗する場合は、Render DashboardのBuild Commandが次の内容になっているか確認してください。
 
 ```bash
 npm ci && python3 -m pip install --target ./.python_packages -r tools/requirements.txt
@@ -167,8 +170,8 @@ python3 tools/fill_excel_choices.py input.xlsx \
 
 ## RPG本体の問題データ読み込みと一時確認アップロード（2026-06-19）
 
-- 問題データの正式管理は `study-app/` の3シートExcelアップロードに集約しています。PC・iPhone共通保存をしたい場合は `/study-app/` の「3シートExcelアップロード」を使います。
-- RPG本体 `/` は起動時に mode指定なしの `GET /api/questions/current` を優先して読み込みます。サーバー側は mode省略時に `word` モードを返すため、RPG本体は `schema_version: 2` の保存済み3モードデータのうち英単語RPG用の `word` だけを使います。
+- 問題データの正式管理は `study-app/` の4シートExcelアップロードに集約しています。PC・iPhone共通保存をしたい場合は `/study-app/` の「4シートExcelアップロード」を使います。
+- RPG本体 `/` は起動時に mode指定なしの `GET /api/questions/current` を優先して読み込みます。サーバー側は mode省略時に `word` モードを返すため、RPG本体は `schema_version: 2` の保存済み4モードデータのうち英単語RPG用の `word` だけを使います。
 - `GET /api/questions/current` が未保存・取得失敗・RPGで使える行不足の場合だけ、RPG本体は `data/default-words.csv` へフォールバックします。
 - RPG本体のCSV/Excelアップロード欄は、このブラウザで内容を試すための一時確認用です。共通問題データとしては保存しません。
 - 旧 `POST /api/questions/upload` と `POST /api/study-app/upload` は410で、今後使いません。RPG本体からも呼び出しません。
@@ -179,12 +182,12 @@ Renderでは `server.js` を起動し、静的ファイル配信と共通問題�
 
 ### API
 
-- `GET /api/questions/current?mode=word|chunk|definition`: 現在保存されている `schema_version: 2` の共通問題データを返します。`mode` 省略時は `word` を返します。未保存の場合は404を返し、画面側は標準CSVへフォールバックします。旧形式データを示す409かつ `{ legacy: true }` の場合も標準CSVへフォールバックし、3シートExcel再アップロードを促す警告を表示します。
-- `GET /api/questions/status`: 3モード全体の件数、`schema_version`、保存日時、ファイル名を返します。
+- `GET /api/questions/current?mode=word|chunk|phrase|definition`: 現在保存されている `schema_version: 2` の共通問題データを返します。`mode` 省略時は `word` を返します。未保存の場合は404を返し、画面側は標準CSVへフォールバックします。旧形式データを示す409かつ `{ legacy: true }` の場合も標準CSVへフォールバックし、4シートExcel再アップロードを促す警告を表示します。
+- `GET /api/questions/status`: 4モード全体の件数、`schema_version`、保存日時、ファイル名を返します。
 - `GET /api/diagnostics/python`: Render上で `python3` と `openpyxl` が利用できるかを確認する診断APIです。HTTP 200で `ok`、`python.available`、`python.version`、`openpyxl.available`、`openpyxl.version` またはエラー情報を返します。
-- `POST /api/questions/upload-workbook`: `multipart/form-data` の `.xlsx` 3シートExcelを受け取り、`schema_version: 2` の3モード形式でPersistent Diskへ保存します。
+- `POST /api/questions/upload-workbook`: `multipart/form-data` の `.xlsx` 4シートExcelを受け取り、`schema_version: 2` の4モード形式でPersistent Diskへ保存します。
 - `POST /api/questions/upload`: 旧形式APIのため使用不可です。呼び出すと410と新API案内を返します。
-- `GET /api/questions/status?mode=word|chunk|definition`: 保存有無、問題数、最終更新日時、保存ファイルパスを返します。
+- `GET /api/questions/status?mode=word|chunk|phrase|definition`: 保存有無、問題数、最終更新日時、保存ファイルパスを返します。
 
 ### Render設定
 
@@ -210,11 +213,11 @@ RenderサーバーはディレクトリURLの `index.html` を自動解決しま
 ### 共通問題データAPI
 
 - `GET /api/questions/current`: 現在の共通問題データを取得します。RPG本体は起動時にこのAPIを優先します。
-- `POST /api/questions/upload-workbook`: study-app第2段階の正式APIです。`.xlsx` 3シートExcelだけを受け取り、共通問題データを `schema_version: 2` 形式で一括保存します。
+- `POST /api/questions/upload-workbook`: study-app第2段階の正式APIです。`.xlsx` 4シートExcelだけを受け取り、共通問題データを `schema_version: 2` 形式で一括保存します。
 - `POST /api/questions/upload` / `POST /api/study-app/upload`: 旧形式APIのため使用不可です。
 - `GET /api/questions/status`: 保存状態、問題数、最終更新日時、保存ファイルパスを返します。
 
-学習アプリは既存互換のため `?mode=word|chunk|definition` を付けてモード別データを読みます。RPG本体はモード指定なしの現在データを読み、取得に成功した場合は「共通問題データから○問を読み込みました」と表示します。取得に失敗した場合のみ `data/default-words.csv` へフォールバックします。
+学習アプリは既存互換のため `?mode=word|chunk|phrase|definition` を付けてモード別データを読みます。RPG本体はモード指定なしの現在データを読み、取得に成功した場合は「共通問題データから○問を読み込みました」と表示します。取得に失敗した場合のみ `data/default-words.csv` へフォールバックします。
 
 ### PC・iPhoneで同じ問題を読む確認
 
@@ -225,14 +228,15 @@ RenderサーバーはディレクトリURLの `index.html` を自動解決しま
 
 Persistent DiskなしのRender環境やGitHub Pagesでは、アップロード内容の端末間共有は保証されません。
 
-## study-app 現行3モードと `question_key` 対応（2026-06-19）
+## study-app 現行4モードと `question_key` 対応（2026-06-19）
 
-`study-app/` は第1段階として、学習モードを次の3つに整理しました。表示順もこの順番です。
+`study-app/` は第1段階として、学習モードを次の4つに整理しました。表示順もこの順番です。
 
 | 表示名 | 内部mode | 標準CSV | 固定シート名 |
 | --- | --- | --- | --- |
 | 英単語 | `word` | `study-app/data/word_mode.csv` | `★英単語` |
-| 文節和訳 | `chunk` | `study-app/data/chunk_mode.csv` | `★チャンク` |
+| チャンク | `chunk` | `study-app/data/chunk_mode.csv` | `★チャンク` |
+| 文節和訳 | `phrase` | `study-app/data/phrase_mode.csv` | `★文節和訳` |
 | 英文和訳 | `definition` | `study-app/data/definition_mode.csv` | `★英文和訳` |
 
 標準CSVはA〜M列形式です。
@@ -241,8 +245,8 @@ Persistent DiskなしのRender環境やGitHub Pagesでは、アップロード�
 row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note,question_key
 ```
 
-- 3モードすべて、読み上げ対象はC列相当の `question` だけです。D〜G列の日本語選択肢は読み上げません。
+- 4モードすべて、読み上げ対象はC列相当の `question` だけです。D〜G列の日本語選択肢は読み上げません。
 - B列 `level` は `A1` / `A2` / `B1` / `B2` / `C1` / `C2` だけを出題対象にします。空白や範囲外のlevelは除外します。
-- M列 `question_key` を読み込み、学習履歴キーは `モード名::固定シート名::question_key` を優先します。例: `文節和訳::★チャンク::c000001`。
+- M列 `question_key` を読み込み、学習履歴キーは `モード名::固定シート名::question_key` を優先します。例: `チャンク::★チャンク::c000001` / `文節和訳::★文節和訳::p000001`。
 - localStorageの `englishGameLearningStats` は `schema_version: 2` と `items` を持つ形式です。`schema_version: 2` がない旧履歴は読み込み時に削除します。
-- 第2段階では正式アップロードを `.xlsx` の3シートExcelだけにし、`POST /api/questions/upload-workbook` で `schema_version: 2` 形式へ一括保存します。単一CSV/単一シートExcelは一時確認用で、共通保存しません。`question_key` の接頭辞・重複検証も実施します。
+- 第2段階では正式アップロードを `.xlsx` の4シートExcelだけにし、`POST /api/questions/upload-workbook` で `schema_version: 2` 形式へ一括保存します。単一CSV/単一シートExcelは一時確認用で、共通保存しません。`question_key` の接頭辞・重複検証も実施します。

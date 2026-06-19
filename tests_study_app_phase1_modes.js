@@ -31,17 +31,26 @@ this.readLearningStats = readLearningStats;
 this.LEARNING_STATS_STORAGE_KEY = LEARNING_STATS_STORAGE_KEY;
 `, sandbox);
 
-assert.deepStrictEqual(Object.keys(sandbox.MODES), ['word', 'chunk', 'definition']);
-assert.strictEqual(sandbox.MODES.chunk.label, '文節和訳モード');
+assert.deepStrictEqual(Object.keys(sandbox.MODES), ['word', 'chunk', 'phrase', 'definition']);
+assert.strictEqual(sandbox.MODES.chunk.label, 'チャンクモード');
+assert.strictEqual(sandbox.MODES.phrase.label, '文節和訳モード');
+assert.strictEqual(sandbox.MODES.chunk.file, './data/chunk_mode.csv');
+assert.strictEqual(sandbox.MODES.phrase.file, './data/phrase_mode.csv');
 
 const modeButtonOrder = [...html.matchAll(/data-mode="([^"]+)"/g)].map((match) => match[1]);
-assert.deepStrictEqual(modeButtonOrder, ['word', 'chunk', 'definition']);
+assert.deepStrictEqual(modeButtonOrder, ['word', 'chunk', 'phrase', 'definition']);
 
 const chunkCsv = fs.readFileSync('study-app/data/chunk_mode.csv', 'utf8');
 const chunkRows = sandbox.parseCsv(chunkCsv);
 const [chunkQuestion] = sandbox.normalizeQuestionsForMode(chunkRows, 'chunk');
 assert.strictEqual(chunkQuestion.questionKey, 'c000001');
-assert.strictEqual(sandbox.getLearningHistoryKey(chunkQuestion, 'chunk'), '文節和訳::★チャンク::c000001');
+assert.strictEqual(sandbox.getLearningHistoryKey(chunkQuestion, 'chunk'), 'チャンク::★チャンク::c000001');
+const phraseCsv = fs.readFileSync('study-app/data/phrase_mode.csv', 'utf8');
+const phraseRows = sandbox.parseCsv(phraseCsv);
+const [phraseQuestion] = sandbox.normalizeQuestionsForMode(phraseRows, 'phrase');
+assert.strictEqual(phraseQuestion.questionKey, 'p000001');
+assert.strictEqual(sandbox.getLearningHistoryKey(phraseQuestion, 'phrase'), '文節和訳::★文節和訳::p000001');
+assert.notStrictEqual(sandbox.MODES.chunk.file, sandbox.MODES.phrase.file);
 
 const wordA = sandbox.normalizeQuestionsForMode([{ row_number: '1', level: 'A1', question: 'before', correct: '前に', choice1: '後に', choice2: '中に', choice3: '上に', question_key: 'w000010' }], 'word')[0];
 const wordB = sandbox.normalizeQuestionsForMode([{ row_number: '999', level: 'A1', question: 'changed question', correct: '前に', choice1: '後に', choice2: '中に', choice3: '上に', question_key: 'w000010' }], 'word')[0];

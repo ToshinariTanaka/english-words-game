@@ -9,13 +9,22 @@ const MODES = {
     correctAliases: ['D correct', 'correct', 'meaning', '和訳', '意味', '正解'],
   },
   chunk: {
-    label: '文節和訳モード',
-    historyModeName: '文節和訳',
+    label: 'チャンクモード',
+    historyModeName: 'チャンク',
     historySheetName: '★チャンク',
     file: './data/chunk_mode.csv',
     description: '英文中の短いチャンクを見て、正しい部分訳を選びます。',
     questionAliases: ['C question', 'question', 'chunk', 'チャンク', '問題'],
-    correctAliases: ['D correct', 'correct', 'chunk_meaning', 'チャンク和訳', '和訳', '意味', '正解'],
+    correctAliases: ['D correct', 'correct', 'chunk_meaning', 'チャンク和訳', '意味', '正解'],
+  },
+  phrase: {
+    label: '文節和訳モード',
+    historyModeName: '文節和訳',
+    historySheetName: '★文節和訳',
+    file: './data/phrase_mode.csv',
+    description: '文節単位の英文を見て、正しい日本語訳を選びます。',
+    questionAliases: ['C question', 'question', 'phrase', '文節', '文節和訳', '問題'],
+    correctAliases: ['D correct', 'correct', 'phrase_meaning', '文節和訳', '文節訳', '意味', '正解'],
   },
   definition: {
     label: '英文和訳モード',
@@ -80,11 +89,12 @@ const SPECIAL_VOICE_KEYWORDS = [
 
 const WORKBOOK_SHEET_ALIASES = {
   word: ['★英単語', '英単語', '英単語テスト', 'word', 'word_mode', 'vocabulary', '単語', '★英単語テスト_001_生成'],
-  chunk: ['★チャンク', 'チャンク', '文節和訳', '文節', '部分訳', 'chunk', 'chunk_mode', 'phrase', 'phrase_mode', '★チャンク_001_生成'],
+  chunk: ['★チャンク', 'チャンク', 'chunk', 'chunk_mode', '★チャンク_001_生成'],
+  phrase: ['★文節和訳', '文節和訳', '文節', '部分訳', 'phrase', 'phrase_mode', '★文節和訳_001_生成'],
   definition: ['★英文和訳', '英文和訳', '英文', 'sentence', 'translation', 'definition', 'definition_mode', '★英文和訳_001_生成'],
 };
-const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', definition: '★英文和訳' };
-const MODE_KEY_PREFIXES = { word: 'w', chunk: 'c', definition: 's' };
+const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', phrase: '★文節和訳', definition: '★英文和訳' };
+const MODE_KEY_PREFIXES = { word: 'w', chunk: 'c', phrase: 'p', definition: 's' };
 const ALLOWED_OFFICIAL_LEVELS = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 const MAX_SHOWN_UPLOAD_ERRORS = 20;
 
@@ -645,7 +655,7 @@ function parseCsv(text) {
 }
 
 function getWorkbookSummaryText(modeRows) {
-  return `英単語 ${normalizeQuestionsForMode(modeRows.word || [], 'word').length}問、文節和訳 ${normalizeQuestionsForMode(modeRows.chunk || [], 'chunk').length}問、英文和訳 ${normalizeQuestionsForMode(modeRows.definition || [], 'definition').length}問`;
+  return `英単語 ${normalizeQuestionsForMode(modeRows.word || [], 'word').length}問、チャンク ${normalizeQuestionsForMode(modeRows.chunk || [], 'chunk').length}問、文節和訳 ${normalizeQuestionsForMode(modeRows.phrase || [], 'phrase').length}問、英文和訳 ${normalizeQuestionsForMode(modeRows.definition || [], 'definition').length}問`;
 }
 
 function isCompleteOfficialRow(row) {
@@ -879,7 +889,7 @@ function parseWorkbookModeRows(arrayBuffer, selectedMode = state.mode, { officia
     const requiredSheetNames = Object.values(OFFICIAL_WORKBOOK_SHEETS);
     const missing = requiredSheetNames.filter((sheetName) => !workbook.SheetNames.includes(sheetName));
     const extra = workbook.SheetNames.filter((sheetName) => !requiredSheetNames.includes(sheetName));
-    if (missing.length || extra.length) throw new Error(`正式アップロードは .xlsx の3シートExcelのみ対応です。必要シート: ${requiredSheetNames.join(' / ')}。不足: ${missing.join(' / ') || 'なし'}。許可外: ${extra.join(' / ') || 'なし'}。`);
+    if (missing.length || extra.length) throw new Error(`正式アップロードは .xlsx の4シートExcelのみ対応です。必要シート: ${requiredSheetNames.join(' / ')}。不足: ${missing.join(' / ') || 'なし'}。許可外: ${extra.join(' / ') || 'なし'}。`);
     return { type: 'multiMode', modeRows, activeMode: selectedMode };
   }
 
@@ -1126,12 +1136,20 @@ function beginConfiguredSession() {
   showQuestion();
 }
 
+function getNoDataMessage(mode = state.mode) {
+  if (mode === 'phrase') return '文節和訳データがありません';
+  if (mode === 'chunk') return 'チャンクデータがありません';
+  if (mode === 'definition') return '英文和訳データがありません';
+  if (mode === 'word') return '英単語データがありません';
+  return '出題できる問題がありません。';
+}
+
 function showEmptyState() {
   cancelSpeech();
   state.questions = [];
   state.index = 0;
   els.progressLabel.textContent = '0 / 0';
-  els.questionText.textContent = '出題できる問題がありません。';
+  els.questionText.textContent = getNoDataMessage();
   els.choices.innerHTML = '';
   els.feedback.textContent = '正解と3つの誤答選択肢がそろっている行だけを出題します。';
   els.feedback.className = 'feedback';
@@ -1199,11 +1217,10 @@ function cacheSharedQuestions(mode, payload) {
   }
 }
 
-const LEGACY_SHARED_QUESTIONS_WARNING = '保存済みの共通問題データは旧形式のため使用できません。\n新形式の3シートExcelをアップロードしてください。\n現在は標準サンプルデータを表示しています。';
+const LEGACY_SHARED_QUESTIONS_WARNING = '保存済みの共通問題データは旧形式のため使用できません。\n新形式の4シートExcelをアップロードしてください。\n現在は標準サンプルデータを表示しています。';
 
 function normalizeApiMode(value) {
   const raw = String(value || '').trim();
-  if (raw === 'phrase') return 'chunk';
   if (raw === 'vocabulary') return 'word';
   if (raw === 'sentence' || raw === 'translation') return 'definition';
   return raw;
@@ -1298,7 +1315,7 @@ async function handleMultiModeWorkbookUpload(file, parsed) {
   const modeRows = validation.playableRows;
   clearUploadValidationErrors();
   state.localModeRows = modeRows;
-  let saveMessage = '共通問題データを3モード一括保存しました。PC・iPhone共通で利用できます';
+  let saveMessage = '共通問題データを4モード一括保存しました。PC・iPhone共通で利用できます';
   try {
     await uploadOfficialWorkbook(file);
     for (const mode of Object.keys(modeRows)) {
@@ -1341,7 +1358,7 @@ async function handleUpload(event) {
 
     state.mode = uploadMode;
     updateModeUi();
-    applyQuestions(rows, 'アップロードファイル', { message: '単一CSV/単一シートExcelは一時確認用として読み込みました。共通保存は行いません。正式保存は3シート.xlsxを使用してください。' });
+    applyQuestions(rows, 'アップロードファイル', { message: '単一CSV/単一シートExcelは一時確認用として読み込みました。共通保存は行いません。正式保存は4シート.xlsxを使用してください。' });
   } catch (error) {
     if (parsedRows) {
       state.localModeRows = {};
@@ -1369,6 +1386,7 @@ function updateModeUi() {
   els.modeLabel.textContent = state.reviewMode ? `${MODES[state.mode].label}（復習）` : MODES[state.mode].label;
   getQuizCardElement()?.classList.toggle('mode-word', state.mode === 'word');
   getQuizCardElement()?.classList.toggle('mode-chunk', state.mode === 'chunk');
+  getQuizCardElement()?.classList.toggle('mode-phrase', state.mode === 'phrase');
   getQuizCardElement()?.classList.toggle('mode-definition', state.mode === 'definition');
 }
 
