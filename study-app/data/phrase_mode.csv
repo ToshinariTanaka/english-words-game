@@ -1,0 +1,4 @@
+row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note,question_key
+1,A1,after school,放課後に,朝食の前に,駅の近くで,雨の日に,0,0,0%,0,英文中の部分 after school の訳を選びます。,p000001
+2,A2,in the kitchen,台所で,教室で,公園で,駅で,0,0,0%,0,英文中の部分 in the kitchen の訳を選びます。,p000002
+3,B1,If it rains tomorrow,もし明日雨が降れば,昨日雨が降ったので,明日晴れたら,今夜雪が降れば,0,0,0%,0,英文中の条件部分の訳を選びます。,p000003

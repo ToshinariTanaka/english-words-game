@@ -1,4 +1,4 @@
-row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
-1,A1,look forward to,〜を楽しみに待つ,〜を延期する,〜を探す,〜を提出する,0,0,0%,0,look forward to は期待を表すチャンクです。
-2,A2,as soon as possible,できるだけ早く,たぶん,少しずつ,念のため,0,0,0%,0,as soon as possible は ASAP とも略されます。
-3,B1,in front of,〜の前に,〜の中で,〜の代わりに,〜にもかかわらず,0,0,0%,0,in front of は位置を表すチャンクです。
+row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note,question_key
+1,A1,look forward to,〜を楽しみに待つ,〜を延期する,〜を探す,〜を提出する,0,0,0%,0,look forward to は期待を表すチャンクです。,c000001
+2,A2,as soon as possible,できるだけ早く,たぶん,少しずつ,念のため,0,0,0%,0,as soon as possible は ASAP とも略されます。,c000002
+3,B1,in front of,〜の前に,〜の中で,〜の代わりに,〜にもかかわらず,0,0,0%,0,in front of は位置を表すチャンクです。,c000003
