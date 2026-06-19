@@ -41,7 +41,7 @@ function createWorkbook(target, emptyMode = null) {
   const script = `
 from openpyxl import Workbook
 import sys
-sheets = [('word', '★英単語', 'w000001'), ('chunk', '★チャンク', 'c000001'), ('phrase', '★文節和訳', 'p000001'), ('definition', '★英文和訳', 's000001')]
+sheets = [('word', '★英単語', 'w000001'), ('chunk', '★チャンク', 'c000001'), ('definition', '★英文和訳', 's000001')]
 columns = ['row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note', 'question_key']
 wb = Workbook()
 wb.remove(wb.active)
@@ -90,7 +90,7 @@ wb.save(sys.argv[1])
     const uploaded = await request('POST', '/api/questions/upload-workbook', upload);
     assert.strictEqual(uploaded.status, 200, uploaded.text);
     assert.strictEqual(uploaded.json.ok, true);
-    assert.deepStrictEqual(Object.keys(uploaded.json.modes).sort(), ['chunk', 'definition', 'phrase', 'word']);
+    assert.deepStrictEqual(Object.keys(uploaded.json.modes).sort(), ['chunk', 'definition', 'word']);
 
     const saved = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
     assert.strictEqual(saved.schema_version, 2);
@@ -106,8 +106,8 @@ wb.save(sys.argv[1])
 
     const phrase = await request('GET', '/api/questions/current?mode=phrase');
     assert.strictEqual(phrase.status, 200, phrase.text);
-    assert.strictEqual(phrase.json.mode, 'phrase');
-    assert.strictEqual(phrase.json.rows[0].question_key, 'p000001');
+    assert.strictEqual(phrase.json.mode, 'chunk');
+    assert.strictEqual(phrase.json.rows[0].question_key, 'c000001');
 
     const current = await request('GET', '/api/questions/current');
     assert.strictEqual(current.status, 200, current.text);
@@ -116,7 +116,7 @@ wb.save(sys.argv[1])
     const status = await request('GET', '/api/questions/status');
     assert.strictEqual(status.status, 200, status.text);
     assert.strictEqual(status.json.schema_version, 2);
-    assert.deepStrictEqual(status.json.modes, { word: { count: 1 }, chunk: { count: 1 }, phrase: { count: 1 }, definition: { count: 1 } });
+    assert.deepStrictEqual(status.json.modes, { word: { count: 1 }, chunk: { count: 1 }, definition: { count: 1 } });
 
     const invalidWorkbook = path.join(tmpDir, 'invalid.xlsx');
     createWorkbook(invalidWorkbook);

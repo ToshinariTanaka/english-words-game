@@ -47,3 +47,4 @@
 
 - 2026-06-19: 第3.7段階として、Render本番のPython依存関係を `.python_packages` に固定配置する方式へ変更。`render.yaml` は `python3 -m pip install --target ./.python_packages -r tools/requirements.txt` を実行し、`server.js` は診断APIとExcel解析の両方で同じ `PYTHONPATH` を明示して `openpyxl` を参照する。
 - 2026-06-19: 第3.6段階として `GET /api/diagnostics/python` を追加し、Render本番で `python3` と `openpyxl` の利用可否・バージョンをHTTP 200のJSONで確認できるようにした。Excel読み込み失敗時のサーバーログには実行コマンド、cwd、PATH、spawnSyncのerror/status/stdout/stderrを出す方針へ更新。
+- 2026-06-19: study-appの文節和訳モードを内部 `chunk` モードへ統一。正式アップロードは `★英単語` / `★チャンク` / `★英文和訳` の3シートに整理し、`phrase` API指定は `chunk` として扱うことで英文和訳データへの混入・フォールバックを防止。
