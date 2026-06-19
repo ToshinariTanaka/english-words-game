@@ -78,7 +78,7 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - 学習履歴は `localStorage` の `englishGameLearningStats` に保存し、キーは「モード名::固定シート名::問題文」です。`row_number` や読み込み元ラベル（例: 共通問題データ）は履歴キーに使いません。
 - `A row_number`〜`L note` 形式の教材CSV/Excelも受け入れます。読み込み時は最初の12列（A〜L）だけを標準列として扱い、M列以降の余分な列や後方の重複ヘッダーは無視します。
 - `question` / `correct` / `choice1`〜`choice3` がそろった行だけを出題し、選択肢不足行はエラーにせずスキップします。
-- Render版では各モードの起動時・モード切替時に `GET /api/questions/current?mode=...` を優先し、未保存・取得失敗時のみ標準の `study-app/data/*.csv` を読み込みます。画面から正式な4シート `.xlsx` をアップロードすると `POST /api/questions/upload-workbook` でサーバー保存します。単一CSV/単一シートExcelは一時確認用として読み込むだけで共通保存しません。GitHub Pages版では `/api/questions/upload` が存在しないため、画面上に「サーバー保存不可」とRender版への誘導を表示します。
+- Render版では各モードの起動時・モード切替時に `GET /api/questions/current?mode=...` を優先し、未保存・取得失敗時のみ標準の `study-app/data/*.csv` を読み込みます。画面から正式な4シート `.xlsx` をアップロードすると `POST /api/questions/upload-workbook` でサーバー保存します。単一CSV/単一シートExcelは一時確認用として読み込むだけで共通保存しません。GitHub Pages版で動作する場合も、共通問題データAPIは `https://english-words-game-1ph3.onrender.com` をベースURLとしてRender側の `/api/questions/current` を参照し、画面上にはRender版 `https://english-words-game-1ph3.onrender.com/study-app/` への誘導を表示します。
 
 
 ## 標準問題ファイルの自動読み込み（2026-06-16）

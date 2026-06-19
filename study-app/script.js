@@ -37,11 +37,12 @@ const MODES = {
   },
 };
 
-const API_BASE = typeof window !== 'undefined' ? window.location.origin : '';
-const RENDER_STUDY_APP_URL = ''; // 未確認のRender URLは設定しない。確定後に /study-app/ まで含めて設定する。
+const RENDER_API_BASE_URL = 'https://english-words-game-1ph3.onrender.com';
+const RENDER_STUDY_APP_URL = `${RENDER_API_BASE_URL}/study-app/`;
 const HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : '';
 const IS_GITHUB_PAGES = HOSTNAME.endsWith('github.io');
 const IS_RENDER = HOSTNAME.endsWith('onrender.com') || HOSTNAME === 'localhost' || HOSTNAME === '127.0.0.1';
+const API_BASE = IS_GITHUB_PAGES ? RENDER_API_BASE_URL : (typeof window !== 'undefined' ? window.location.origin : '');
 const SHARED_CACHE_PREFIX = 'englishWordsGame.sharedQuestions.';
 const SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
 const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
