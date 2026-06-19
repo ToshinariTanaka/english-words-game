@@ -3,7 +3,7 @@ services:
     name: english-words-game
     env: node
     plan: starter
-    buildCommand: npm ci && python3 -m pip install -r tools/requirements.txt
+    buildCommand: npm ci && python3 -m pip install --target ./.python_packages -r tools/requirements.txt
     startCommand: npm start
     disk:
       name: english-words-game-data

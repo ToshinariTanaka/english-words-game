@@ -17,6 +17,7 @@ const ALLOWED_LEVELS = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 const MAX_SHOWN_UPLOAD_ERRORS = 20;
 const PUBLIC_DIR = __dirname;
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 10 * 1024 * 1024);
+const PYTHON_PACKAGE_DIR = process.env.PYTHON_PACKAGE_DIR || path.join(__dirname, '.python_packages');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -32,6 +33,12 @@ function rowsToStandardCsv(rows) { return [STANDARD_COLUMNS, ...rows.map((row) =
 function decodeUploadBuffer(buffer) { const utf8 = buffer.toString('utf8'); if (!utf8.includes('�')) return utf8; try { return new TextDecoder('shift_jis').decode(buffer); } catch (error) { return utf8; } }
 function ensureStudyAppDataDir() { fs.mkdirSync(STUDY_APP_DATA_DIR, { recursive: true }); }
 function writeStudyAppCsv(mode, rows) { const filename = STUDY_APP_FILES[mode]; if (!filename) return null; ensureStudyAppDataDir(); const target = path.join(STUDY_APP_DATA_DIR, filename); fs.writeFileSync(target, `\uFEFF${rowsToStandardCsv(rows)}`, 'utf8'); return target; }
+function getPythonEnv() {
+  return {
+    ...process.env,
+    PYTHONPATH: [PYTHON_PACKAGE_DIR, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+  };
+}
 
 function parseCsv(text) {
   const rows = [];
@@ -64,6 +71,8 @@ function logWorkbookParserFailure(parsed, command) {
     stdout: parsed.stdout || '',
     cwd: process.cwd(),
     path: process.env.PATH || '',
+    pythonPackageDir: PYTHON_PACKAGE_DIR,
+    pythonPath: getPythonEnv().PYTHONPATH || '',
   });
 }
 
@@ -71,21 +80,22 @@ function buildPythonDiagnostics() {
   const pythonCommand = 'python3';
   const python = { available: false };
   const openpyxl = { available: false };
-  const pythonVersion = spawnSync(pythonCommand, ['--version'], { encoding: 'utf8' });
+  const pythonEnv = getPythonEnv();
+  const pythonVersion = spawnSync(pythonCommand, ['--version'], { encoding: 'utf8', env: pythonEnv });
   if (pythonVersion.error) {
     python.error = pythonVersion.error.message;
     openpyxl.error = 'python3 is not available, so openpyxl could not be checked.';
-    return { ok: false, python, openpyxl };
+    return { ok: false, python, openpyxl, pythonPackageDir: PYTHON_PACKAGE_DIR, pythonPath: pythonEnv.PYTHONPATH || '' };
   }
   if (pythonVersion.status !== 0) {
     python.error = (pythonVersion.stderr || pythonVersion.stdout || `python3 --version exited with status ${pythonVersion.status}`).trim();
     openpyxl.error = 'python3 version check failed, so openpyxl could not be checked.';
-    return { ok: false, python, openpyxl };
+    return { ok: false, python, openpyxl, pythonPackageDir: PYTHON_PACKAGE_DIR, pythonPath: pythonEnv.PYTHONPATH || '' };
   }
   python.available = true;
   python.version = (pythonVersion.stdout || pythonVersion.stderr || '').trim();
 
-  const openpyxlCheck = spawnSync(pythonCommand, ['-c', 'import openpyxl; print(openpyxl.__version__)'], { encoding: 'utf8' });
+  const openpyxlCheck = spawnSync(pythonCommand, ['-c', 'import openpyxl; print(openpyxl.__version__)'], { encoding: 'utf8', env: pythonEnv });
   if (openpyxlCheck.error) {
     openpyxl.error = openpyxlCheck.error.message;
   } else if (openpyxlCheck.status !== 0) {
@@ -95,7 +105,7 @@ function buildPythonDiagnostics() {
     openpyxl.version = (openpyxlCheck.stdout || '').trim();
   }
 
-  return { ok: python.available && openpyxl.available, python, openpyxl };
+  return { ok: python.available && openpyxl.available, python, openpyxl, pythonPackageDir: PYTHON_PACKAGE_DIR, pythonPath: pythonEnv.PYTHONPATH || '' };
 }
 
 function parseWorkbookBuffer(buffer) {
@@ -117,7 +127,7 @@ for sheet_name in workbook.sheetnames:
 print(json.dumps(result, ensure_ascii=False))
 `, 'utf8');
   try {
-    const parsed = spawnSync('python3', [scriptPath, workbookPath], { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 });
+    const parsed = spawnSync('python3', [scriptPath, workbookPath], { encoding: 'utf8', env: getPythonEnv(), maxBuffer: 20 * 1024 * 1024 });
     if (parsed.error) {
       logWorkbookParserFailure(parsed, `python3 ${scriptPath} ${workbookPath}`);
       throw new Error('Excelファイルの読み込みに失敗しました。Render環境で python3 / openpyxl が利用できるか確認してください。');

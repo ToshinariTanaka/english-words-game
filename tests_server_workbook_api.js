@@ -76,6 +76,9 @@ wb.save(sys.argv[1])
     assert.ok(Object.prototype.hasOwnProperty.call(diagnostics.json, 'ok'), diagnostics.text);
     assert.ok(Object.prototype.hasOwnProperty.call(diagnostics.json, 'python'), diagnostics.text);
     assert.ok(Object.prototype.hasOwnProperty.call(diagnostics.json, 'openpyxl'), diagnostics.text);
+    assert.ok(Object.prototype.hasOwnProperty.call(diagnostics.json, 'pythonPackageDir'), diagnostics.text);
+    assert.ok(Object.prototype.hasOwnProperty.call(diagnostics.json, 'pythonPath'), diagnostics.text);
+    assert.ok(diagnostics.json.pythonPath.includes('.python_packages'), diagnostics.text);
     if (diagnostics.json.openpyxl.available) {
       assert.strictEqual(diagnostics.json.openpyxl.available, true);
       assert.ok(diagnostics.json.openpyxl.version, diagnostics.text);
