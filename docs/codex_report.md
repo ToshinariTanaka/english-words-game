@@ -1,27 +1,29 @@
 ## 今回やったこと
-- 文節和訳モードを内部 `chunk` モードへ統一し、`★チャンク` / `chunk_mode.csv` のデータだけを使うようにしました。
-- 英文和訳モードは `definition`、英単語モードは `word` として、サーバーAPI・Excel正式アップロード・画面のモード対応を3モードに整理しました。
-- `phrase` など旧文節和訳IDで `/api/questions/current` が呼ばれた場合も、英文和訳へフォールバックせず `chunk` を返す互換エイリアスを追加しました。
-- 旧形式データや標準CSVへのフォールバック文言を3シートExcel前提に更新しました。
+- PR #79で消えていた「チャンク」ボタンを復旧し、学習モードを `word` / `chunk` / `phrase` / `definition` の4つに戻しました。
+- `chunk` は `★チャンク` / `chunk_mode.csv`、`phrase` は `★文節和訳` / `phrase_mode.csv`、`definition` は `★英文和訳` / `definition_mode.csv` として明確に分離しました。
+- `/api/questions/current?mode=phrase` が `chunk` に正規化される処理を削除し、サーバー側でも4モードを個別保存・個別返却するよう修正しました。
+- 「文節和訳」などの別名を `chunk` 側に含めないようにし、曖昧な「和訳」だけでシート判定しない構成へ戻しました。
+- 文節和訳データが空の場合は「文節和訳データがありません」と表示し、英文和訳へフォールバックしないことをテストで固定しました。
+- UI変更として、学習モードボタンは「英単語」「チャンク」「文節和訳」「英文和訳」の4つに戻しています（スクリーンショット取得はこのCLI環境では未実施）。
 
 ## 変更ファイル
-- `study-app/script.js`: 文節和訳モードの表示・読み込み先を `chunk` / `★チャンク` に統一し、API応答の `mode` / `type` 不一致時は別モードデータとして採用しないように変更。Excelシート判定から `★文節和訳` を除外。
-- `study-app/index.html`: 学習モード選択を英単語・文節和訳・英文和訳の3モード表示に整理。
-- `server.js`: 正式アップロードを `★英単語` / `★チャンク` / `★英文和訳` の3シートに変更し、`phrase` リクエストを `chunk` へ正規化。
-- `tests_*.js`: 3モード仕様と文節和訳=chunk仕様に合わせてテストを更新。
-- `README.md`, `docs/project_status.md`: 現在仕様を追記・更新。
+- `study-app/index.html`: 学習モードボタンを4ボタン構成に復旧。
+- `study-app/script.js`: `MODES`、公式シート、キー接頭辞、API mode正規化、空データ表示、モードUIクラスを4モード仕様へ修正。
+- `server.js`: 保存対象・取得対象・正式アップロード検証を4モード仕様へ修正し、`phrase` を `chunk` に寄せないように変更。
+- `tests_study_app_hotfix_modes.js`: hotfix対象の4モード分離・phrase非フォールバックを検証するテストを追加。
+- `tests_study_app_phase1_modes.js`, `tests_server_workbook_api.js`, `tests_study_app_workbook_modes.js`, `tests_study_app_legacy_shared_questions.js`, `tests_study_app_learning_stats.js`, `package.json`: 4モード仕様に合わせて既存テストとテスト実行順を更新。
+- `README.md`, `docs/project_status.md`: 4モード仕様への復旧を反映。
 
 ## テスト結果
 - `npm test` を実行し、全テストが成功しました。
-- `node -c study-app/script.js` と `node -c server.js` で構文エラーがないことを確認しました。
 
 ## 注意点
-- 旧4モード仕様の `★文節和訳` シートは正式アップロード対象から外しました。今後は文節和訳データを `★チャンク` シートに入れる必要があります。
-- 既存の `phrase_mode.csv` は互換用ファイルとして残っていますが、画面の文節和訳モードでは使用しません。
+- Render本番はPR #78へRollback済みとのことなので、このhotfixをmainへマージ後にRenderへ再デプロイし、`/study-app/` で4ボタン表示と各modeのデータ分離を実ブラウザで確認してください。
+- このCLI環境ではブラウザスクリーンショットを取得していません。UI差分は `study-app/index.html` とテストで確認しています。
 
 ## 次にやるべきこと
-- UI変更（モードボタンを3つに整理）はコード・テストで確認済みですが、ブラウザスクリーンショット取得は未実施です。実ブラウザで3モードを切り替え、文節和訳モードに長文全体が混入しないことを確認してください。
-- 実教材Excel（`★英単語テスト_001_生成` / `★チャンク_001_生成` / `★英文和訳_001_生成` 相当）から正式3シート名へ変換したファイルでアップロード確認してください。
+- Renderへデプロイ後、`/api/questions/current?mode=chunk` / `phrase` / `definition` がそれぞれ別データを返すことを本番データで確認する。
+- `/study-app/` で4モードを順に切り替え、問題が混ざらないことを目視確認する。
 
 ## チャッピーに相談すべき点
-- 既存教材に `★文節和訳` シートが残っている場合、`★チャンク` へ移行する変換手順を用意するか相談してください。
+- 既存教材Excelに `★文節和訳` シートが必ず含まれる運用で問題ないか、また旧3シート教材の移行手順を用意するか相談してください。

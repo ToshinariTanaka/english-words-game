@@ -46,7 +46,7 @@ assert.strictEqual(sandbox.getLearningHistoryKey(excelQuestion, 'word'), sandbox
 assert.strictEqual(sandbox.getLearningHistoryKey({ ...excelQuestion, id: '999' }, 'word'), sandbox.getLearningHistoryKey(excelQuestion, 'word'));
 assert.strictEqual(sandbox.normalizeHistorySheetName('英単語'), '★英単語');
 assert.strictEqual(sandbox.normalizeHistorySheetName('word_mode'), '★英単語');
-assert.strictEqual(sandbox.getLearningHistoryKey({ question: 'in response to this' }, 'chunk'), '文節和訳::★チャンク::in response to this');
+assert.strictEqual(sandbox.getLearningHistoryKey({ question: 'in response to this' }, 'chunk'), 'チャンク::★チャンク::in response to this');
 assert.strictEqual(sandbox.getLearningHistoryKey({ question: 'Modern warfare is associated with military drones.' }, 'definition'), '英文和訳::★英文和訳::Modern warfare is associated with military drones.');
 
 let stat = sandbox.updateLearningStat(excelQuestion, true, 'word');

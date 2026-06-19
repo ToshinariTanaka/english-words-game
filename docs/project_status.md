@@ -6,7 +6,7 @@
 - 2026-06-18: study-appの全問終了画面と復習終了画面に「問題設定へ戻る」ボタンを追加。終了後だけ表示し、押すと出題設定見出しへスムーズスクロールする。
 - 2026-06-18: study-appのランダム/自動読み上げ向けおすすめ音声名に Ava / Jenny / Aria / Emma / Brian / Andrew / Guy / Davis / Jane / Sara / Nancy / Steffan / Christopher / Cora / Ashley / Jason / Tony / Brandon / Elizabeth / Eric / Ryan を重複なしで追加し、女性系・男性系の性別推定リストも更新。手動プルダウンは全候補表示のまま維持。
 - 2026-06-18: study-appのExcelアップロードを現在選択中モードのシート名優先に修正。複数シートExcelでは対応シートがない場合に先頭シートへフォールバックせず、モード別rowsとしてPersistent Diskへ個別保存する方針を固定。
-- 2026-06-18: study-appで指定3シートを含むExcelブックをアップロードした場合、英単語・チャンク・英文和訳の3モードへ自動振り分けして読み込む処理を追加。
+- 2026-06-18: study-appで指定4シートを含むExcelブックをアップロードした場合、英単語・チャンク・文節和訳・英文和訳の4モードへ自動振り分けして読み込む処理を追加。
 
 - 2026-06-16: Render本番運用向けにNodeサーバーを追加し、共通問題データAPIを実装。
 - 2026-06-16: RPG本体もRender APIの `GET /api/questions/current` を起動時に優先し、成功時は共通問題データ、失敗時のみ `data/default-words.csv` へフォールバックする構成へ変更。
@@ -47,4 +47,4 @@
 
 - 2026-06-19: 第3.7段階として、Render本番のPython依存関係を `.python_packages` に固定配置する方式へ変更。`render.yaml` は `python3 -m pip install --target ./.python_packages -r tools/requirements.txt` を実行し、`server.js` は診断APIとExcel解析の両方で同じ `PYTHONPATH` を明示して `openpyxl` を参照する。
 - 2026-06-19: 第3.6段階として `GET /api/diagnostics/python` を追加し、Render本番で `python3` と `openpyxl` の利用可否・バージョンをHTTP 200のJSONで確認できるようにした。Excel読み込み失敗時のサーバーログには実行コマンド、cwd、PATH、spawnSyncのerror/status/stdout/stderrを出す方針へ更新。
-- 2026-06-19: study-appの文節和訳モードを内部 `chunk` モードへ統一。正式アップロードは `★英単語` / `★チャンク` / `★英文和訳` の3シートに整理し、`phrase` API指定は `chunk` として扱うことで英文和訳データへの混入・フォールバックを防止。
+- 2026-06-19: hotfixとしてPR #79の3モード化を取り消し、study-appを `word` / `chunk` / `phrase` / `definition` の4モードへ復旧。`chunk` は `★チャンク` / `chunk_mode.csv`、`phrase` は `★文節和訳` / `phrase_mode.csv` として分離し、`phrase` API指定を `chunk` に寄せない。
