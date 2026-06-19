@@ -1,38 +1,39 @@
 ## 今回やったこと
-- 第3.7段階として、Render本番のNode Web Service実行時でも `openpyxl` を確実に import できるよう、Python依存関係を `.python_packages` に固定配置する構成へ変更しました。
-- `render.yaml` の `buildCommand` を `npm ci && python3 -m pip install --target ./.python_packages -r tools/requirements.txt` に変更しました。
-- `server.js` に `PYTHON_PACKAGE_DIR` と `getPythonEnv()` を追加し、Excel解析用 `parseWorkbookBuffer()` と診断用 `buildPythonDiagnostics()` の `spawnSync('python3', ...)` が同じ `PYTHONPATH` を使うようにしました。
-- Excel解析失敗時のサーバーログに `pythonPackageDir` と `pythonPath` を追加しました。ユーザー画面には従来どおり短いエラーだけを返します。
-- 診断APIのJSONに `pythonPackageDir` と `pythonPath` を含め、`/api/diagnostics/python` で確認したPython環境とExcel解析処理のPython環境が一致するようにしました。
-- `.python_packages/` をGit管理対象外にするため `.gitignore` を追加しました。
-- READMEに、Render本番のPython依存関係を `.python_packages` に入れるBuild Commandと、`/api/diagnostics/python` で `openpyxl.available:true` を確認してからExcelアップロードする手順を追記・更新しました。
+- 第4段階として、RPG本体 `/` のCSV/Excelアップロード導線を「共通保存」から「一時確認用」へ整理しました。
+- RPG本体の `script.js` から旧 `POST /api/questions/upload` への保存処理・定数・FormData送信を削除し、アップロードファイルはブラウザ上で読み込んで試すだけにしました。
+- アップロード成功メッセージに「一時確認用」「共通保存は行っていません」「PC・iPhone共通利用は学習アプリの4シートExcelアップロードを使う」趣旨を明記しました。
+- RPG本体のアップロード欄付近に `/study-app/` への「問題データを管理する」導線を追加しました。
+- RPG本体の起動時読み込みで `GET /api/questions/current` を優先し、失敗時のみ `data/default-words.csv` へフォールバックする処理は維持しました。
+- RPG本体が旧アップロードAPIを呼ばないこと、成功メッセージと `/study-app/` 導線があること、`GET /api/questions/current` 読み込みが維持されることを固定するテストを追加しました。
+- README / docs に、正式な問題データ管理は `study-app/` の4シートExcelアップロードへ集約し、RPG本体アップロードは一時確認用であることを追記しました。
 
 ## 変更ファイル
-- `.gitignore`: `.python_packages/` を除外。
-- `render.yaml`: Render buildCommandを `.python_packages` へのtarget install方式に変更。
-- `server.js`: `PYTHON_PACKAGE_DIR` / `getPythonEnv()` を追加し、診断APIとExcel解析のPython実行に同じ `PYTHONPATH` を適用。失敗ログにもPythonパス情報を追加。
-- `tests_server_workbook_api.js`: 診断APIレスポンスに `pythonPackageDir` / `pythonPath` が含まれ、`.python_packages` が参照されることを確認。
-- `README.md`: Render本番のPython依存関係インストール方式と診断API確認手順を更新。
-- `docs/project_status.md`: 第3.7段階のRender Python依存関係固定配置対応を追記。
-- `docs/codex_report.md`: 今回の作業内容・テスト結果・注意点を更新。
+- `index.html`: RPG本体のアップロード欄文言を一時確認用に変更し、`/study-app/` への「問題データを管理する」リンクを追加。
+- `script.js`: 旧 `POST /api/questions/upload` 保存処理を削除し、アップロード成功時は一時確認用として読み込んだ旨を表示。
+- `style.css`: `/study-app/` 管理リンクをボタン風に表示するスタイルを追加。
+- `tests_rpg_upload_guidance.js`: RPG本体の旧API非使用・一時確認メッセージ・study-app導線・`GET /api/questions/current` 維持を確認する静的テストを追加。
+- `package.json`: `npm test` に `tests_rpg_upload_guidance.js` を追加。
+- `README.md`: RPG本体の問題データ読み込み、一時確認アップロード、正式管理先、旧API410を追記。
+- `docs/architecture.md`: RPG本体アップロード導線を一時確認用へ整理した設計に更新。
+- `docs/project_status.md`: 第4段階の方針変更を追記。
+- `docs/next_tasks.md`: RPG本体旧アップロード導線の整理完了に合わせて次タスクを更新。
+- `docs/codex_report.md`: 今回の作業内容に更新。
 
 ## テスト結果
 - `npm test`: 成功。
 - `git diff --check`: 成功。
-- `rm -rf .python_packages`: 成功。
-- `python3 -m pip install --target ./.python_packages -r tools/requirements.txt`: 環境制限により未完了（プロキシ経由は403、プロキシなしはDNS解決不可）。
-- `PYTHONPATH=./.python_packages python3 -c "import openpyxl; print(openpyxl.__version__)"`: 上記install未完了のため未実施。
 
 ## 注意点
-- `.python_packages` はビルド成果物としてRender上に作られる想定で、Gitにはコミットしません。
-- 診断APIは `pythonPath` を返します。機密値ではありませんが、Render実行環境のパス情報が見えるため、公開URLとして必要な範囲で利用してください。
-- UI変更はありません。スクリーンショット取得対象の見た目変更はありません。
-- Render本番ではデプロイ後に必ず `https://<service>.onrender.com/api/diagnostics/python` を開き、`openpyxl.available:true` を確認してから `/study-app/` で正式4シートExcelをアップロードしてください。
+- UI文言と導線を変更しましたが、この環境にはブラウザスクリーンショット取得用ツールがないため、実画面スクリーンショットは未取得です。表示内容としては、アップロード欄のラベルが「CSV/Excelを一時確認用に読み込む」になり、その直下に「問題データを管理する」ボタン風リンクが表示されます。
+- RPG本体は4モード化していません。従来どおり mode指定なし `GET /api/questions/current` でサーバー側の既定 `word` を読みます。
+- 旧APIは復活させていません。RPG本体からも呼び出しません。
+- study-app側の4モードUI、正式4シートExcelアップロード、検証処理、サーバーAPI仕様は変更していません。
 
 ## 次にやるべきこと
-- Renderへデプロイし、`/api/diagnostics/python` の `pythonPath` に `.python_packages` が含まれ、`openpyxl.available:true` になることを確認してください。
-- 診断API成功後、`/study-app/` から正式4シートExcelをアップロードし、`/api/questions/status` で4モードの件数が保存されることを確認してください。
+- Renderへデプロイ後、RPG本体 `/` で共通問題データが `GET /api/questions/current` から読み込まれることを実ブラウザで確認してください。
+- RPG本体でCSV/Excelを選択したときに、一時確認用メッセージが表示され、ページ再読み込み後は共通保存されていないことを確認してください。
+- `/study-app/` の正式4シートExcelアップロード導線が引き続き使えることを本番で確認してください。
 
 ## チャッピーに相談すべき点
-- Render本番のサービスURLが確定したら、README内の未確認URL表記を正式URLに置き換えるか相談してください。
-- 診断APIに `pythonPath` を返し続けるか、運用安定後にレスポンスから外してログのみへ寄せるか相談してください。
+- RPG本体の一時確認アップロード欄を残すか、混乱防止のため将来的に非表示・折りたたみにするか相談してください。
+- GitHub Pages版で `RENDER_STUDY_APP_URL` を正式Render URLへ設定するタイミングを相談してください。

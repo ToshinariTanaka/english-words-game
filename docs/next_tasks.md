@@ -47,4 +47,4 @@
 - 実ブラウザで `phrase` モード、音声読み上げ、効果音ON/OFF、復習、レベル範囲、ランダム出題を確認する。
 
 - Renderデプロイ後、build logで `python3 -m pip install -r tools/requirements.txt` が成功していることを確認し、`/study-app/` から正式4シートExcelを実アップロードする。
-- RPG本体の旧アップロード導線は `/api/questions/upload` が410になったため、第3段階とは別に新しい4シートExcel導線へ移行するか非表示にするか決める。
+- RPG本体の旧アップロード導線は第4段階で一時確認用に整理済み。今後はユーザー説明が十分か、必要なら実ブラウザで文言確認する。

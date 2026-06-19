@@ -10,7 +10,8 @@
 
 - 2026-06-16: Render本番運用向けにNodeサーバーを追加し、共通問題データAPIを実装。
 - 2026-06-16: RPG本体もRender APIの `GET /api/questions/current` を起動時に優先し、成功時は共通問題データ、失敗時のみ `data/default-words.csv` へフォールバックする構成へ変更。
-- 2026-06-16: RPG本体と `study-app/` のどちらからアップロードしても `POST /api/questions/upload` で同じPersistent Disk上の共通問題データを更新する方針へ統一。
+- 2026-06-19: 第4段階として、RPG本体のCSV/Excelアップロードは一時確認用に整理し、旧 `POST /api/questions/upload` / `POST /api/study-app/upload` を呼び出さない方針へ変更。共通保存は `/study-app/` の正式4シートExcelアップロードに集約。
+- 2026-06-16: 当初はRPG本体と `study-app/` のどちらからアップロードしても `POST /api/questions/upload` で共通問題データを更新する方針だったが、現在は第4段階の方針により廃止。
 - 2026-06-16: `/`、`/study-app/`、`/admin/wordbook-batch/` のディレクトリURLはRenderサーバーが各 `index.html` に自動解決する。
 - 2026-06-16: study-appとRenderアップロードAPIで、教材CSV/ExcelのA〜L列のみを標準列として読み、M列以降と重複ヘッダーを無視する正規化に対応。
 - CSV/Excelアップロード後の問題データは、ブラウザlocalStorageではなくRender Persistent Disk想定の `/var/data/english_words_game/current-questions.json` に保存する。

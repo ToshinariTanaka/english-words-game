@@ -6,7 +6,6 @@ const REVIEW_START_DELAY_MS = 3000;
 const GAME_VERSION = "v0.9.9";
 const DEFAULT_WORDS_PATH = "./data/default-words.csv";
 const QUESTIONS_API_CURRENT = "/api/questions/current";
-const QUESTIONS_API_UPLOAD = "/api/questions/upload";
 const RENDER_STUDY_APP_URL = ""; // 未確認のRender URLは設定しない。確定後に /study-app/ まで含めて設定する。
 const GOLD_STORAGE_KEY = "englishWordsGameGold";
 const VOICE_RANDOM_STORAGE_KEY = "englishWordsGameVoiceRandom";
@@ -400,16 +399,6 @@ function rowsToCsv(rows) {
 
 function objectsToGameWords(rows) {
   return parseCsv(rowsToCsv(rows));
-}
-
-async function saveSharedQuestionsCsv(csvText, filename = "rpg-upload.csv") {
-  const formData = new FormData();
-  formData.append("mode", "word");
-  formData.append("file", new File([csvText], filename.replace(/\.xlsx?$/i, ".csv"), { type: "text/csv" }));
-  const response = await fetch(QUESTIONS_API_UPLOAD, { method: "POST", body: formData });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
-  return result;
 }
 
 function shuffle(arr) {
@@ -1107,16 +1096,15 @@ el.csvFile.addEventListener("change", async (event) => {
   if (!file) return;
   try {
     const text = await readUploadedFileAsCsv(file);
-    await saveSharedQuestionsCsv(text, file.name || "rpg-upload.csv");
     loadWordsFromCsv(text, ({ count, definitionText, chunkText }) => {
-      const message = `共通問題データを保存しました：${count}問`;
+      const message = `一時確認用として読み込みました：${count}問`;
       setDataSourceStatus(message);
-      return `${message}。PC・iPhone共通でRPG/学習アプリから利用できます。現在Gold: ${gold}${definitionText}${chunkText}`;
+      return `${message}。共通保存は行っていません。PC・iPhone共通で利用する場合は、学習アプリから4シートExcelをアップロードしてください。現在Gold: ${gold}${definitionText}${chunkText}`;
     });
   } catch (error) {
     console.error("Failed to read uploaded word file:", error);
     el.homeMessage.textContent = error.message || "アップロードファイルの読み込みに失敗しました。";
-    setDataSourceStatus("共通問題データの保存に失敗しました");
+    setDataSourceStatus("一時確認用ファイルの読み込みに失敗しました");
   }
 });
 
