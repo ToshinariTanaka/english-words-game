@@ -3,26 +3,17 @@ const fs = require('fs');
 
 const source = fs.readFileSync('study-app/script.js', 'utf8');
 
-for (const name of ['英単語', '英単語テスト', 'word', 'word_mode', '単語']) {
-  assert.ok(source.includes(`'${name}'`), `英単語モードのシート名 ${name} を許可する`);
-}
-for (const name of ['チャンク', 'chunk', 'chunk_mode']) {
-  assert.ok(source.includes(`'${name}'`), `チャンクモードのシート名 ${name} を許可する`);
-}
-for (const name of ['文節和訳', 'phrase', 'phrase_mode']) {
-  assert.ok(source.includes(`'${name}'`), `文節和訳モードのシート名 ${name} を許可する`);
-}
-for (const name of ['英文和訳', '英文', '和訳', 'definition', 'definition_mode']) {
-  assert.ok(source.includes(`'${name}'`), `英文和訳モードのシート名 ${name} を許可する`);
+for (const name of ['★英単語', '★チャンク', '★文節和訳', '★英文和訳']) {
+  assert.ok(source.includes(`'${name}'`), `正式アップロードのシート名 ${name} を定義する`);
 }
 
-assert.ok(source.includes('parseWorkbookModeRows(arrayBuffer, selectedMode = state.mode)'), '現在選択中モードを指定してExcelを解析する');
-assert.ok(source.includes('findWorkbookSheetNameForMode(workbook, mode)'), 'ファイル名ではなくシート名でモード別シートを探す');
-assert.ok(source.includes('if (!modeRows[selectedMode])'), '複数シートExcelで現在モードのシートがない場合に先頭シートへフォールバックしない');
-assert.ok(source.includes('対応するシートが見つかりません'), '対応シートがない場合のエラーを表示する');
-assert.ok(source.includes('const uploadMode = state.mode'), 'アップロード保存先は現在選択中モードに固定する');
-assert.ok(!source.includes('detectModeFromFilename'), 'ファイル名だけでモード判定しない');
+assert.ok(source.includes('OFFICIAL_WORKBOOK_SHEETS'), '正式アップロード用の完全一致シート名を持つ');
+assert.ok(source.includes('officialOnly'), '正式アップロードでは別名ではなく公式シート名だけを使う');
+assert.ok(source.includes('parseWorkbookModeRows(await file.arrayBuffer(), uploadMode, { officialOnly: true })'), 'study-appの正式アップロードは公式4シートExcelとして解析する');
+assert.ok(source.includes('正式アップロードは .xlsx の4シートExcelのみ対応です'), '公式4シート以外のエラーを表示する');
+assert.ok(source.includes('fetch(`${API_BASE}/api/questions/upload-workbook`'), '4シートExcelは一括アップロードAPIへ送信する');
+assert.ok(source.includes('単一CSV/単一シートExcelは一時確認用として読み込みました。共通保存は行いません。'), '単一CSV/単一シートExcelは共通保存しない');
 assert.ok(source.includes('state.localModeRows[mode]'), 'モード切替時にアップロード済みExcelブック由来データを参照する');
-assert.ok(source.includes('for (const mode of Object.keys(modeRows))'), 'モード別rowsを個別にPersistent Diskへ保存する');
+assert.ok(!source.includes('detectModeFromFilename'), 'ファイル名だけでモード判定しない');
 
 console.log('tests_study_app_workbook_modes: OK');
