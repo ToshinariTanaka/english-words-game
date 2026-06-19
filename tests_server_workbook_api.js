@@ -71,6 +71,16 @@ wb.save(sys.argv[1])
       try { await request('GET', '/api/questions/status'); break; } catch (error) { await wait(100); }
     }
 
+    const diagnostics = await request('GET', '/api/diagnostics/python');
+    assert.strictEqual(diagnostics.status, 200, diagnostics.text);
+    assert.ok(Object.prototype.hasOwnProperty.call(diagnostics.json, 'ok'), diagnostics.text);
+    assert.ok(Object.prototype.hasOwnProperty.call(diagnostics.json, 'python'), diagnostics.text);
+    assert.ok(Object.prototype.hasOwnProperty.call(diagnostics.json, 'openpyxl'), diagnostics.text);
+    if (diagnostics.json.openpyxl.available) {
+      assert.strictEqual(diagnostics.json.openpyxl.available, true);
+      assert.ok(diagnostics.json.openpyxl.version, diagnostics.text);
+    }
+
     const workbook = path.join(tmpDir, 'official.xlsx');
     createWorkbook(workbook);
     const upload = makeMultipart(workbook, 'official.xlsx');

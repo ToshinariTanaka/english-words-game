@@ -54,6 +54,50 @@ function parseUploadedRows(buffer) {
   return parseCsv(decodeUploadBuffer(buffer));
 }
 
+
+function logWorkbookParserFailure(parsed, command) {
+  console.error('Excel workbook parser diagnostics:', {
+    command,
+    errorMessage: parsed.error?.message || null,
+    status: parsed.status,
+    stderr: parsed.stderr || '',
+    stdout: parsed.stdout || '',
+    cwd: process.cwd(),
+    path: process.env.PATH || '',
+  });
+}
+
+function buildPythonDiagnostics() {
+  const pythonCommand = 'python3';
+  const python = { available: false };
+  const openpyxl = { available: false };
+  const pythonVersion = spawnSync(pythonCommand, ['--version'], { encoding: 'utf8' });
+  if (pythonVersion.error) {
+    python.error = pythonVersion.error.message;
+    openpyxl.error = 'python3 is not available, so openpyxl could not be checked.';
+    return { ok: false, python, openpyxl };
+  }
+  if (pythonVersion.status !== 0) {
+    python.error = (pythonVersion.stderr || pythonVersion.stdout || `python3 --version exited with status ${pythonVersion.status}`).trim();
+    openpyxl.error = 'python3 version check failed, so openpyxl could not be checked.';
+    return { ok: false, python, openpyxl };
+  }
+  python.available = true;
+  python.version = (pythonVersion.stdout || pythonVersion.stderr || '').trim();
+
+  const openpyxlCheck = spawnSync(pythonCommand, ['-c', 'import openpyxl; print(openpyxl.__version__)'], { encoding: 'utf8' });
+  if (openpyxlCheck.error) {
+    openpyxl.error = openpyxlCheck.error.message;
+  } else if (openpyxlCheck.status !== 0) {
+    openpyxl.error = (openpyxlCheck.stderr || openpyxlCheck.stdout || `openpyxl check exited with status ${openpyxlCheck.status}`).trim();
+  } else {
+    openpyxl.available = true;
+    openpyxl.version = (openpyxlCheck.stdout || '').trim();
+  }
+
+  return { ok: python.available && openpyxl.available, python, openpyxl };
+}
+
 function parseWorkbookBuffer(buffer) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'english-words-workbook-'));
   const workbookPath = path.join(tmpDir, 'upload.xlsx');
@@ -75,12 +119,11 @@ print(json.dumps(result, ensure_ascii=False))
   try {
     const parsed = spawnSync('python3', [scriptPath, workbookPath], { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 });
     if (parsed.error) {
-      console.error('Excel workbook parser failed to start:', parsed.error.message);
+      logWorkbookParserFailure(parsed, `python3 ${scriptPath} ${workbookPath}`);
       throw new Error('Excelファイルの読み込みに失敗しました。Render環境で python3 / openpyxl が利用できるか確認してください。');
     }
     if (parsed.status !== 0) {
-      const detail = (parsed.stderr || parsed.stdout || '').trim();
-      if (detail) console.error('Excel workbook parser failed:', detail);
+      logWorkbookParserFailure(parsed, `python3 ${scriptPath} ${workbookPath}`);
       throw new Error('Excelファイルの読み込みに失敗しました。Render環境で python3 / openpyxl が利用できるか確認してください。');
     }
     return JSON.parse(parsed.stdout || '{}');
@@ -221,6 +264,9 @@ function handleCurrent(req, res, url) {
   if (!entry) return sendJson(res, 404, { ok: false, error: '共通問題データは未保存です。', mode: requestedMode });
   return sendJson(res, 200, { ok: true, mode: entry.mode || requestedMode, rows: entry.rows || [], count: entry.count || 0, updatedAt: store.updatedAt || null, filename: store.filename || null });
 }
+function handlePythonDiagnostics(req, res) {
+  return sendJson(res, 200, buildPythonDiagnostics());
+}
 function handleStatus(req, res, url) {
   const store = readStore();
   if (!hasSchemaVersion2(store)) return sendJson(res, 200, { ok: true, schema_version: null, legacy: true, saved: false, modes: Object.fromEntries(MODES.map((mode) => [mode, { count: 0 }])), updatedAt: null, filename: null });
@@ -280,6 +326,7 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (req.method === 'GET' && url.pathname === '/api/questions/current') return handleCurrent(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/questions/status') return handleStatus(req, res, url);
+  if (req.method === 'GET' && url.pathname === '/api/diagnostics/python') return handlePythonDiagnostics(req, res);
   if (req.method === 'POST' && url.pathname === '/api/questions/upload-workbook') return handleWorkbookUpload(req, res);
   if (req.method === 'POST' && (url.pathname === '/api/questions/upload' || url.pathname === '/api/study-app/upload')) return handleUpload(req, res);
   return serveStatic(req, res, url.pathname);

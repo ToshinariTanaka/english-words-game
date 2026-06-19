@@ -1,27 +1,31 @@
 ## 今回やったこと
-- 第3段階PRの正式Workbook検証仕様を維持しつつ、study-app側のアップロード検証エラー表示が未定義関数で落ちないように専用表示関数を追加しました。
-- `definition` モードの `question_key` 接頭辞は `s` のまま維持しました。
-- サーバー側・study-app側で、B列 `level`、M列 `question_key`、D〜G列の正規化後重複、C〜G列が揃った出題対象行のみ保存/読込する検証を揃えました。
-- HTML特殊文字を含む検証エラーは `textContent` とDOM生成で表示し、HTMLとして解釈されないようにしました。
+- 第3.6段階として、Render本番で `python3` と `openpyxl` の状態を切り分ける `GET /api/diagnostics/python` を追加しました。
+- 診断APIはHTTP 200のJSONで `ok`、`python.available`、`python.version`、`openpyxl.available`、`openpyxl.version` またはエラー情報を返します。
+- 4シートExcelのサーバー解析に失敗した場合、ユーザー画面には従来どおり短いエラーを返しつつ、サーバーログには `spawnSync` の `error.message`、`status`、`stderr`、`stdout`、実行コマンド、`process.cwd()`、`process.env.PATH` を出すようにしました。
+- Renderデプロイ後の確認手順として、READMEに `/api/diagnostics/python` の確認項目と期待するBuild Commandを追記しました。
+- ローカルAPIテストに、診断APIがJSONを返し、`ok` / `python` / `openpyxl` キーを含むことの確認を追加しました。
 
 ## 変更ファイル
-- `server.js`: 正式Workbook検証、出題対象行のみの保存、構造化エラーレスポンスを追加。
-- `study-app/script.js`: 事前検証、専用エラーボックス、HTML安全表示を追加。
-- `study-app/style.css`: 専用エラーボックスの最低限の表示スタイルを追加。
-- `tests_server_workbook_api.js`: 第3段階仕様の維持確認と `definition` 接頭辞 `s` のテストを更新。
-- `tests_study_app_upload_validation_errors.js`: 未定義関数で落ちないこととHTML特殊文字の安全表示テストを追加。
-- `package.json`: 新規テストを `npm test` に追加。
+- `server.js`: Python/openpyxl診断処理、診断APIルート、Excel解析失敗時の詳細ログを追加。
+- `tests_server_workbook_api.js`: `GET /api/diagnostics/python` の最低限のレスポンス構造テストを追加。
+- `README.md`: Render本番での診断API確認手順、失敗時のBuild Command確認手順、API一覧を更新。
+- `docs/project_status.md`: 第3.6段階の診断API追加とログ改善を追記。
+- `docs/codex_report.md`: 今回の作業内容・テスト結果・注意点を更新。
 
 ## テスト結果
 - `npm test`: 成功。
 - `git diff --check`: 成功。
+- ローカル診断API確認: `GET /api/diagnostics/python` がHTTP 200でJSONを返すことを確認。例: `{"ok":true,"python":{"available":true,"version":"Python 3.14.4"},"openpyxl":{"available":true,"version":"3.1.5"}}`
 
 ## 注意点
-- UI変更は既存アップロード欄直下に検証エラーをDOM生成で追加する軽微な変更です。スクリーンショット取得が必要な見た目の大幅変更はありません。
-- 旧 `/api/questions/upload` と `/api/study-app/upload` は引き続き410です。
+- 診断APIは原因切り分け用のため、失敗時もHTTP 200で `ok:false` と詳細情報を返す設計です。
+- Excelアップロード失敗時の詳細情報はサーバーログだけに出し、ユーザー画面には長い技術ログを表示しません。
+- Render本番で診断APIが `openpyxl.available:false` になる場合は、Build Commandが `npm ci && python3 -m pip install -r tools/requirements.txt` になっているか確認してください。
+- UI変更はありません。スクリーンショット取得対象の見た目変更はありません。
 
 ## 次にやるべきこと
-- 実際の公式Excelで、サーバー保存後の4モード件数と未完成行除外を手動確認してください。
+- Renderへデプロイ後、`https://<service>.onrender.com/api/diagnostics/python` を開いて `python.available:true`、`openpyxl.available:true`、`openpyxl.version` 表示を確認してください。
+- 診断APIが成功した状態で、正式4シートExcelを `/study-app/` からアップロードし、4モード件数が期待値どおり保存されるか確認してください。
 
 ## チャッピーに相談すべき点
-- エラー表示件数の上限（現在20件）や文言を利用者向けにさらに調整するか確認してください。
+- Render本番のサービスURLが確定したら、README内の未確認URL表記を正式URLに置き換えるか相談してください。

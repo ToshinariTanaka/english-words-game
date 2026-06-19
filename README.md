@@ -116,7 +116,11 @@ Render版では起動時・モード切替時に共通問題データAPIを優�
 
 正式アップロードは `.xlsx` の4シートExcelのみです。シート名は `★英単語` / `★チャンク` / `★文節和訳` / `★英文和訳` の完全一致だけを許可し、旧シート名・別名・`word_mode` / `chunk_mode` / `definition_mode` などは正式アップロードでは許可しません。Render版では `/api/questions/upload-workbook` へ一括保存し、保存JSONは `schema_version: 2` と `modes.word|chunk|phrase|definition` を持ちます。
 
-サーバー側の4シートExcel読み込みには `python3` と `openpyxl` が必要です。Render本番では `render.yaml` の `buildCommand` で `npm ci` に続けて `python3 -m pip install -r tools/requirements.txt` を実行し、`tools/requirements.txt` の `openpyxl>=3.1.0` をインストールします。デプロイ後は `/study-app/` から正式4シートExcelをアップロードし、4モードの件数が保存されることを確認してください。
+サーバー側の4シートExcel読み込みには `python3` と `openpyxl` が必要です。Render本番では `render.yaml` の `buildCommand` で `npm ci` に続けて `python3 -m pip install -r tools/requirements.txt` を実行し、`tools/requirements.txt` の `openpyxl>=3.1.0` をインストールします。デプロイ後は `/api/diagnostics/python` を開き、`python.available` が `true`、`openpyxl.available` が `true`、`openpyxl.version` が表示されることを確認してください。その後、`/study-app/` から正式4シートExcelをアップロードし、4モードの件数が保存されることを確認してください。診断APIで失敗する場合は、Render DashboardのBuild Commandが次の内容になっているか確認してください。
+
+```bash
+npm ci && python3 -m pip install -r tools/requirements.txt
+```
 
 各シートは1行目をヘッダーとして扱い、A〜L列（`row_number`, `level`, `question`, `correct`, `choice1`, `choice2`, `choice3`, `total_correct`, `total_wrong`, `accuracy`, `current_streak`, `note`）だけを読み込みます。C列 `question`、D列 `correct`、E〜G列 `choice1`〜`choice3` がそろった行だけを出題対象にし、H〜L列の空欄、A列 `row_number` の空欄、M列以降の余分な列、空白行はエラーにしません。H〜L列に値があっても初期学習履歴としては読み込まず、localStorageの学習履歴とは分離します。
 
@@ -169,6 +173,7 @@ Renderでは `server.js` を起動し、静的ファイル配信と共通問題�
 
 - `GET /api/questions/current?mode=word|chunk|phrase|definition`: 現在保存されている `schema_version: 2` の共通問題データを返します。`mode` 省略時は `word` を返します。未保存の場合は404を返し、画面側は標準CSVへフォールバックします。旧形式データを示す409かつ `{ legacy: true }` の場合も標準CSVへフォールバックし、4シートExcel再アップロードを促す警告を表示します。
 - `GET /api/questions/status`: 4モード全体の件数、`schema_version`、保存日時、ファイル名を返します。
+- `GET /api/diagnostics/python`: Render上で `python3` と `openpyxl` が利用できるかを確認する診断APIです。HTTP 200で `ok`、`python.available`、`python.version`、`openpyxl.available`、`openpyxl.version` またはエラー情報を返します。
 - `POST /api/questions/upload-workbook`: `multipart/form-data` の `.xlsx` 4シートExcelを受け取り、`schema_version: 2` の4モード形式でPersistent Diskへ保存します。
 - `POST /api/questions/upload`: 旧形式APIのため使用不可です。呼び出すと410と新API案内を返します。
 - `GET /api/questions/status?mode=word|chunk|phrase|definition`: 保存有無、問題数、最終更新日時、保存ファイルパスを返します。
