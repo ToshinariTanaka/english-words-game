@@ -196,6 +196,8 @@ const els = {
 let audioContext = null;
 let soundEnabled = loadStoredBoolean(SOUND_ENABLED_STORAGE_KEY, true);
 let lastRandomVoiceURI = '';
+let currentQuestionAudio = null;
+let questionPlaybackToken = 0;
 
 
 function loadStoredBoolean(key, defaultValue) {
@@ -548,12 +550,33 @@ function getCurrentQuestionText() {
   return current?.question ? String(current.question).trim() : '';
 }
 
-function cancelSpeech() {
+function stopQuestionAudio() {
+  if (!currentQuestionAudio) return;
+  currentQuestionAudio.pause();
+  currentQuestionAudio.removeAttribute('src');
+  currentQuestionAudio.load();
+  currentQuestionAudio = null;
+}
+
+function stopQuestionPlayback() {
+  questionPlaybackToken += 1;
+  stopQuestionAudio();
   const synthesis = getSpeechSynthesis();
   if (synthesis) synthesis.cancel();
 }
 
-function speakCurrentQuestion() {
+function cancelSpeech() {
+  stopQuestionPlayback();
+}
+
+function getCurrentQuestionAudioUrl() {
+  const current = state.questions[state.index];
+  const questionKey = current?.questionKey ? String(current.questionKey).trim() : '';
+  if (!questionKey) return '';
+  return `${API_BASE}/audio/${encodeURIComponent(questionKey)}.mp3`;
+}
+
+function speakCurrentQuestionWithWebSpeech() {
   const synthesis = getSpeechSynthesis();
   const text = getCurrentQuestionText();
   if (!synthesis || !text || typeof SpeechSynthesisUtterance === 'undefined') return;
@@ -574,6 +597,46 @@ function speakCurrentQuestion() {
   utterance.pitch = 1.0;
 
   synthesis.speak(utterance);
+}
+
+function playAudioElement(src) {
+  return new Promise((resolve, reject) => {
+    if (!src) {
+      reject(new Error('MP3 URL is empty.'));
+      return;
+    }
+    stopQuestionAudio();
+    const synthesis = getSpeechSynthesis();
+    if (synthesis) synthesis.cancel();
+    const audio = new Audio(src);
+    currentQuestionAudio = audio;
+    audio.preload = 'auto';
+    audio.crossOrigin = 'anonymous';
+    audio.addEventListener('ended', () => {
+      if (currentQuestionAudio === audio) currentQuestionAudio = null;
+    }, { once: true });
+    audio.addEventListener('error', () => {
+      if (currentQuestionAudio === audio) currentQuestionAudio = null;
+      reject(new Error('MP3 failed to load.'));
+    }, { once: true });
+    audio.play().then(resolve).catch((error) => {
+      if (currentQuestionAudio === audio) currentQuestionAudio = null;
+      reject(error);
+    });
+  });
+}
+
+function speakCurrentQuestion() {
+  const text = getCurrentQuestionText();
+  if (!text) return;
+  const playbackToken = questionPlaybackToken + 1;
+  questionPlaybackToken = playbackToken;
+  const audioUrl = getCurrentQuestionAudioUrl();
+  playAudioElement(audioUrl).catch(() => {
+    if (playbackToken !== questionPlaybackToken) return;
+    stopQuestionAudio();
+    speakCurrentQuestionWithWebSpeech();
+  });
 }
 
 function initializeSpeech() {
@@ -1434,9 +1497,8 @@ function showQuestion() {
   els.nextButton.textContent = state.index === state.questions.length - 1 ? '結果を見る' : '次の問題へ';
   updateModeUi();
   updateSpeakButton();
-  if (els.autoSpeak?.checked) {
-    speakCurrentQuestion();
-  }
+  // スマホでは自動再生が失敗しやすいため、問題表示時は再生しない。
+  // 音声は「もう一度聞く」ボタンのユーザー操作時だけ再生する。
 }
 
 function answer(choice) {

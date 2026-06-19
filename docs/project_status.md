@@ -1,5 +1,6 @@
 # Project Status
 
+- 2026-06-19: study-appの音声再生をMP3優先に更新。`question_key` から `https://english-words-game-1ph3.onrender.com/audio/{question_key}.mp3` を取得し、失敗時はWeb Speech APIへフォールバックする。スマホ前提のため問題表示時の自動再生は行わず、手動の「もう一度聞く」操作時のみ再生する。Render側は `/audio/{filename}.mp3` を `/var/data/audio` から `audio/mpeg` と CORS `*` 付きで配信する。
 - 2026-06-19: Render正式URLを `https://english-words-game-1ph3.onrender.com` として確定し、study-appの `RENDER_STUDY_APP_URL` を `https://english-words-game-1ph3.onrender.com/study-app/` に設定。GitHub Pages上では `API_BASE` をRender APIベースURLへ切り替え、共通問題データAPIをRenderから取得する構成へ更新。
 - 2026-06-18: study-appの学習履歴localStorage保存を追加。履歴キーは読み込み元ラベルではなく「モード名::固定シート名::問題文」に統一し、row_numberや共通問題データラベルに依存しないよう変更。H〜L列は互換性として受け入れるが初期学習履歴には使わない方針に更新。
 - 2026-06-18: study-appのレベル範囲選択で、空白およびA1〜C2以外のlevelを出題対象外に変更。レベル範囲変更時・問題適用後は絞り込み後件数で出題数選択肢を更新し、対象0件時は開始ボタンを無効化して専用メッセージを表示。
