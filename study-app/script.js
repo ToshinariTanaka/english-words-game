@@ -1116,11 +1116,24 @@ function cacheSharedQuestions(mode, payload) {
   }
 }
 
+const LEGACY_SHARED_QUESTIONS_WARNING = '保存済みの共通問題データは旧形式のため使用できません。\n新形式の4シートExcelをアップロードしてください。\n現在は標準サンプルデータを表示しています。';
+
 async function fetchSharedQuestions(mode) {
   const response = await fetch(`${API_BASE}/api/questions/current?mode=${encodeURIComponent(mode)}`, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-  const payload = await response.json();
-  if (!payload.ok || !Array.isArray(payload.rows)) throw new Error(payload.error || '共通問題データの形式が不正です。');
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    if (response.ok) throw error;
+  }
+  if (!response.ok) {
+    const error = new Error(payload?.error || `${response.status} ${response.statusText}`);
+    error.status = response.status;
+    error.payload = payload;
+    error.legacy = payload?.legacy === true;
+    throw error;
+  }
+  if (!payload?.ok || !Array.isArray(payload.rows)) throw new Error(payload?.error || '共通問題データの形式が不正です。');
   cacheSharedQuestions(mode, payload);
   return payload;
 }
@@ -1152,7 +1165,10 @@ async function loadMode(mode) {
     try {
       const rows = await loadStandardCsv(mode);
       if (loadToken !== state.loadToken || state.mode !== mode) return;
-      applyQuestions(rows, '標準CSV', { message: `標準CSVから${rows.length}問を読み込みました` });
+      const fallbackMessage = sharedError.legacy
+        ? LEGACY_SHARED_QUESTIONS_WARNING
+        : `標準CSVから${rows.length}問を読み込みました`;
+      applyQuestions(rows, '標準CSV', { message: fallbackMessage });
     } catch (standardError) {
       if (loadToken !== state.loadToken || state.mode !== mode) return;
       els.questionText.textContent = 'CSVの読み込みに失敗しました。GitHub PagesなどのWebサーバー上で開いてください。';

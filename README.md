@@ -165,9 +165,9 @@ Renderでは `server.js` を起動し、静的ファイル配信と共通問題�
 
 ### API
 
-- `GET /api/questions/current?mode=word|chunk|definition`: 現在保存されている共通問題データを返します。未保存の場合は404を返し、画面側は標準CSVへフォールバックします。
+- `GET /api/questions/current?mode=word|chunk|phrase|definition`: 現在保存されている共通問題データを返します。未保存の場合は404を返し、画面側は標準CSVへフォールバックします。旧形式データを示す409かつ `{ legacy: true }` の場合も標準CSVへフォールバックし、4シートExcel再アップロードを促す警告を表示します。
 - `POST /api/questions/upload`: `multipart/form-data` の `file` と `mode` を受け取り、CSV/Excelを行データへ変換してPersistent Diskへ保存します。
-- `GET /api/questions/status?mode=word|chunk|definition`: 保存有無、問題数、最終更新日時、保存ファイルパスを返します。
+- `GET /api/questions/status?mode=word|chunk|phrase|definition`: 保存有無、問題数、最終更新日時、保存ファイルパスを返します。
 
 ### Render設定
 
@@ -194,10 +194,10 @@ RenderサーバーはディレクトリURLの `index.html` を自動解決しま
 
 - `GET /api/questions/current`: 現在の共通問題データを取得します。RPG本体は起動時にこのAPIを優先します。
 - `POST /api/questions/upload`: CSV/Excel由来の問題データを共通問題データとして保存します。RPG側・学習アプリ側のどちらからアップロードしても同じ保存先を更新します。
-- `POST /api/study-app/upload`: 学習アプリ用の互換APIです。`mode=word|chunk|definition` と `file` を受け取り、A〜L列だけを標準CSVへ正規化して `/var/data/study-app/*.csv` にも保存します。
+- `POST /api/study-app/upload`: 学習アプリ用の互換APIです。`mode=word|chunk|phrase|definition` と `file` を受け取り、A〜L列だけを標準CSVへ正規化して `/var/data/study-app/*.csv` にも保存します。
 - `GET /api/questions/status`: 保存状態、問題数、最終更新日時、保存ファイルパスを返します。
 
-学習アプリは既存互換のため `?mode=word|chunk|definition` を付けてモード別データを読みます。RPG本体はモード指定なしの現在データを読み、取得に成功した場合は「共通問題データから○問を読み込みました」と表示します。取得に失敗した場合のみ `data/default-words.csv` へフォールバックします。
+学習アプリは既存互換のため `?mode=word|chunk|phrase|definition` を付けてモード別データを読みます。RPG本体はモード指定なしの現在データを読み、取得に成功した場合は「共通問題データから○問を読み込みました」と表示します。取得に失敗した場合のみ `data/default-words.csv` へフォールバックします。
 
 ### PC・iPhoneで同じ問題を読む確認
 
