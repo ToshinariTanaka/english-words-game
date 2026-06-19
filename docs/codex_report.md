@@ -1,26 +1,34 @@
 ## 今回やったこと
-- Renderの正式URL確定に合わせて、学習アプリのAPIベースURLを `https://english-words-game-1ph3.onrender.com` に固定しました。
-- `RENDER_STUDY_APP_URL` を `https://english-words-game-1ph3.onrender.com/study-app/` になるように設定しました。
-- GitHub Pages上で動作する場合は、`/api/questions/current?mode=...` や正式アップロードAPIの呼び出し先がGitHub Pages自身ではなくRender側になるようにしました。
-- UI変更はなく、スクリーンショット取得は不要と判断しました。
+- `question_key` から `{API_BASE}/audio/{question_key}.mp3` を組み立て、手動の「もう一度聞く」操作でMP3を優先再生するようにしました。
+- MP3が存在しない、読み込み失敗、または再生失敗の場合は、従来のWeb Speech APIで現在表示中のC列相当 `question` の英語だけを読み上げるフォールバックを維持しました。
+- スマホ利用前提に合わせ、問題表示時の自動読み上げを停止し、ユーザー操作時だけ音声再生するようにしました。
+- 次の問題表示、読み込み状態、セッション終了時にMP3とWeb Speech APIの両方を停止する共通停止処理を追加しました。
+- Render側に `GET /audio/{filename}.mp3` を追加し、Persistent Diskの `/var/data/audio` から `audio/mpeg` と `access-control-allow-origin: *` 付きでMP3を配信するようにしました。
+- UIの見た目は変更していないため、スクリーンショット取得は不要と判断しました。
 
 ## 変更ファイル
-- `study-app/script.js`: Render正式URLの定数を追加し、GitHub Pages時の `API_BASE` をRender APIベースURLへ切り替えるよう変更。
-- `README.md`: GitHub Pages版でも共通問題データ取得はRender APIを参照する旨を追記。
-- `docs/project_status.md`: Render正式URL確定とGitHub Pages時のAPI参照先を記録。
-- `docs/codex_report.md`: 今回の作業内容、変更ファイル、テスト結果、注意点を更新。
+- `server.js`: `/audio/` 配信ルート、Persistent Disk音声ディレクトリ、CORS付き `audio/mpeg` レスポンスを追加。
+- `study-app/script.js`: MP3優先再生、Web Speech APIフォールバック、音声停止処理、自動再生停止を追加。
+- `README.md`: Render音声配信仕様とMP3配置ルールを追記。
+- `docs/project_status.md`: MP3音声配信対応の状態を追記。
+- `docs/architecture.md`: study-app音声再生とRender音声配信APIの設計を追記。
+- `docs/next_tasks.md`: Renderデプロイ後の音声配信確認項目を追記。
+- `docs/codex_report.md`: 今回の作業内容、テスト結果、注意点を更新。
 
 ## テスト結果
-- `npm test` を実行し、全テストが成功しました。
+- `node -c server.js` を実行し、構文エラーがないことを確認しました。
+- `node -c study-app/script.js` を実行し、構文エラーがないことを確認しました。
+- `npm test` を実行し、既存テストがすべて成功しました。
 
 ## 注意点
-- APIベースURLは `https://english-words-game-1ph3.onrender.com` で、末尾に `/study-app/` は含めていません。
-- 学習アプリURLは `https://english-words-game-1ph3.onrender.com/study-app/` です。
-- 現状のstudy-appの効果音はWeb Audio APIで生成しており、`/sounds/correct.mp3` を直接fetchする実装は見当たりませんでした。今後MP3ファイル再生へ切り替える場合も、GitHub Pagesでは同じRender APIベースURLを使う方針に合わせてください。
+- MP3生成処理やAPIキーはブラウザ側にもサーバー側にも追加していません。ブラウザは生成済みMP3を取得して再生するだけです。
+- `/audio/` の実ファイルはRender Persistent Diskの `/var/data/audio` に `{question_key}.mp3` 形式で配置する必要があります。
+- MP3が1つも存在しない場合でも、404後にWeb Speech APIへフォールバックするため既存読み上げとクイズは継続します。
+- `autoSpeak` チェックボックスは既存UIとして残っていますが、今回のスマホ前提仕様に合わせて問題表示時の自動再生には使っていません。
 
 ## 次にやるべきこと
-- Renderへデプロイ後、GitHub Pages版の `/study-app/` から `https://english-words-game-1ph3.onrender.com/api/questions/current?mode=word` へアクセスできることをブラウザのNetworkタブで確認する。
-- 必要であれば `/audio/{question_key}.mp3` や `/sounds/correct.mp3` を実ファイル再生する機能追加時に、今回の `RENDER_API_BASE_URL` を共通利用する。
+- Render Persistent Diskに `/var/data/audio/w000001.mp3` などの実ファイルを置き、`https://english-words-game-1ph3.onrender.com/audio/w000001.mp3` が `content-type: audio/mpeg` と CORS ヘッダー付きで返ることを確認してください。
+- GitHub Pages版の `/study-app/` から「もう一度聞く」を押し、RenderのMP3再生またはWeb Speech APIフォールバックが動くことを実機確認してください。
 
 ## チャッピーに相談すべき点
-- GitHub Pages版で表示する「サーバー保存不可」の案内文を、Render API参照自体は可能になった現在の仕様に合わせて文言調整するか相談してください。
+- 既存の「問題表示時に自動で読み上げ」チェックボックスを非表示または文言変更するか相談してください。

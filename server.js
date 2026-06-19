@@ -8,6 +8,7 @@ const PORT = Number(process.env.PORT || 3000);
 const DATA_DIR = process.env.DATA_DIR || '/var/data/english_words_game';
 const DATA_FILE = process.env.QUESTIONS_FILE || path.join(DATA_DIR, 'current-questions.json');
 const STUDY_APP_DATA_DIR = process.env.STUDY_APP_DATA_DIR || '/var/data/study-app';
+const AUDIO_DIR = process.env.AUDIO_DIR || '/var/data/audio';
 const STUDY_APP_FILES = { word: 'word_mode.csv', chunk: 'chunk_mode.csv', phrase: 'phrase_mode.csv', definition: 'definition_mode.csv' };
 const MODES = ['word', 'chunk', 'phrase', 'definition'];
 const MODE_ALIASES = { vocabulary: 'word', sentence: 'definition', translation: 'definition' };
@@ -262,6 +263,33 @@ function writeStore(store) {
   fs.renameSync(tmp, DATA_FILE);
 }
 function sendJson(res, status, data) { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); }
+
+function sendAudioHeaders(res, status, extraHeaders = {}) {
+  res.writeHead(status, {
+    'content-type': 'audio/mpeg',
+    'access-control-allow-origin': '*',
+    ...extraHeaders,
+  });
+}
+
+function handleAudio(req, res, pathname) {
+  const filename = decodeURIComponent(pathname.replace(/^\/audio\//, ''));
+  if (!/^[A-Za-z0-9_-]+\.mp3$/.test(filename)) {
+    sendAudioHeaders(res, 400);
+    return res.end('Bad request');
+  }
+  const target = path.resolve(AUDIO_DIR, filename);
+  if (!target.startsWith(path.resolve(AUDIO_DIR) + path.sep)) {
+    sendAudioHeaders(res, 403);
+    return res.end('Forbidden');
+  }
+  if (!fs.existsSync(target) || fs.statSync(target).isDirectory()) {
+    sendAudioHeaders(res, 404);
+    return res.end('Not found');
+  }
+  sendAudioHeaders(res, 200);
+  fs.createReadStream(target).pipe(res);
+}
 function getMode(url) { const raw = url.searchParams.get('mode') || 'word'; return MODE_ALIASES[raw] || raw; }
 
 function getCurrentEntry(store, mode) {
@@ -338,6 +366,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/questions/current') return handleCurrent(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/questions/status') return handleStatus(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/diagnostics/python') return handlePythonDiagnostics(req, res);
+  if (req.method === 'GET' && url.pathname.startsWith('/audio/')) return handleAudio(req, res, url.pathname);
   if (req.method === 'POST' && url.pathname === '/api/questions/upload-workbook') return handleWorkbookUpload(req, res);
   if (req.method === 'POST' && (url.pathname === '/api/questions/upload' || url.pathname === '/api/study-app/upload')) return handleUpload(req, res);
   return serveStatic(req, res, url.pathname);

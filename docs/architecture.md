@@ -29,6 +29,13 @@
 - `study-app/data/phrase_mode.csv`: 文節和訳モード用CSV。内部IDは `phrase`。
 - `study-app/data/definition_mode.csv`: 英文和訳モード用CSV。内部IDとファイル名は互換性維持のため `definition` のまま。
 
+
+### study-app のMP3音声配信
+
+`study-app/script.js` は現在表示中の問題の `questionKey` を使い、`{API_BASE}/audio/{question_key}.mp3` を `HTMLAudioElement` で再生します。対象テキストはC列相当の `question` の英語だけで、正解や選択肢の日本語は読み上げません。MP3が未配置、読み込み失敗、または再生失敗の場合は既存の Web Speech API へフォールバックします。スマホ利用を優先し、問題表示時の自動再生は行わず、「もう一度聞く」ボタンのユーザー操作時だけ再生します。問題遷移、読み込み状態、セッション終了時はMP3とWeb Speech APIの両方を停止します。
+
+Renderサーバーの `server.js` は `GET /audio/{filename}.mp3` を Persistent Disk の `/var/data/audio` から配信します。レスポンスは `content-type: audio/mpeg` と `access-control-allow-origin: *` を付与し、GitHub Pages版の学習アプリからも取得できるようにします。MP3ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` のように `{question_key}.mp3` とします。TTS生成処理やAPIキーはブラウザには置かず、生成済みMP3だけを配置する方針です。
+
 ### study-app のCSV形式
 
 第1段階では4モードとも次のA〜M列を使います。

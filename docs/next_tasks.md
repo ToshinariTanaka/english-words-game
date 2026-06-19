@@ -48,3 +48,9 @@
 
 - Renderデプロイ後、build logで `python3 -m pip install -r tools/requirements.txt` が成功していることを確認し、`/study-app/` から正式4シートExcelを実アップロードする。
 - RPG本体の旧アップロード導線は第4段階で一時確認用に整理済み。今後はユーザー説明が十分か、必要なら実ブラウザで文言確認する。
+
+## MP3音声配信の確認
+
+- Render Persistent Diskの `/var/data/audio` に `{question_key}.mp3` 形式のMP3を配置する。
+- `https://english-words-game-1ph3.onrender.com/audio/w000001.mp3` などが `content-type: audio/mpeg` と `access-control-allow-origin: *` を返すことを確認する。
+- GitHub Pages版とRender版の `/study-app/` で「もう一度聞く」を押し、MP3がある問題はMP3、ない問題はWeb Speech APIで読み上げられることを実機確認する。

@@ -176,6 +176,15 @@ python3 tools/fill_excel_choices.py input.xlsx \
 - RPG本体のCSV/Excelアップロード欄は、このブラウザで内容を試すための一時確認用です。共通問題データとしては保存しません。
 - 旧 `POST /api/questions/upload` と `POST /api/study-app/upload` は410で、今後使いません。RPG本体からも呼び出しません。
 
+
+## study-app のMP3音声配信
+
+学習アプリの「もう一度聞く」は、現在表示中の問題の `question_key` から `{API_BASE}/audio/{question_key}.mp3` を作り、生成済みMP3を優先して再生します。例: `https://english-words-game-1ph3.onrender.com/audio/w000001.mp3`。APIベースURLには `/study-app/` を含めません。
+
+MP3が存在しない、読み込みに失敗した、または再生に失敗した場合は、従来どおり Web Speech API へフォールバックします。読み上げ対象はC列相当の `question` の英語だけで、正解や選択肢の日本語は読み上げません。スマホ利用を前提に、問題表示時の自動再生は行わず、ユーザーが「もう一度聞く」を押したときだけ再生します。
+
+Render側では `GET /audio/{filename}.mp3` を Persistent Disk の `/var/data/audio` から配信します。MP3ファイル名は `{question_key}.mp3` です（例: `w000001.mp3`, `c000001.mp3`, `p000001.mp3`, `s000001.mp3`）。レスポンスは `content-type: audio/mpeg` と `access-control-allow-origin: *` を返すため、GitHub Pages版の学習アプリからもRender上のMP3を取得できます。APIキーやTTS生成処理はブラウザ側に置かず、ブラウザは生成済みMP3を取得して再生するだけです。
+
 ## Render本番運用と共通問題データ
 
 Renderでは `server.js` を起動し、静的ファイル配信と共通問題データAPIを同じURLで提供します。アップロードされたCSV/Excelはブラウザの `localStorage` を正本にせず、Persistent Disk上の `/var/data/english_words_game/current-questions.json` に保存します。
