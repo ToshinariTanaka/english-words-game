@@ -12,11 +12,13 @@
         <h1>英単語RPG</h1>
         <p>英単語モンスターを倒して gold を稼ごう！</p>
         <p id="version-label" class="hint">version</p>
-        <p class="study-app-link">PC・iPhone共通保存を使う場合は <a id="study-app-render-link" >Render版 英語学習アプリ（アプトレ）</a> を開いてください。</p>
+        <p class="study-app-link">PC・iPhone共通保存を使う場合は <a id="study-app-render-link">Render版 英語学習アプリ（アプトレ）</a> を開いてください。</p>
         <div class="panel">
-          <label for="csv-file">単語CSV/Excelを共通問題データへアップロード</label>
+          <label for="csv-file">CSV/Excelを一時確認用に読み込む</label>
           <input id="csv-file" type="file" accept=".csv,.xlsx,.xls" />
-          <p class="hint">アップロードしたファイルはRender APIへ保存され、RPGモードと学習モードの共通問題データとして利用されます。対応列: word/meaning/level/chunk/chunk_meaning/definition/definition_meaning（日本語見出しも可）。</p>
+          <p class="hint">この画面で読み込んだファイルは、このブラウザでの一時確認用です。PC・iPhone共通の問題データとして保存する場合は、学習アプリの4シートExcelアップロードを使ってください。</p>
+          <p class="study-app-action"><a class="button-link" href="/study-app/">問題データを管理する</a></p>
+          <p class="hint">対応列: word/meaning/level/chunk/chunk_meaning/definition/definition_meaning（日本語見出しも可）。</p>
           <p id="data-source-status" class="data-source-status" aria-live="polite">標準問題ファイルを読み込み中</p>
           <button id="reset-uploaded-data-btn" type="button">標準問題に戻す</button>
           <label for="wordbook-category">カテゴリを選ぶ</label>

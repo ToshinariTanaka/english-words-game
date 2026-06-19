@@ -120,7 +120,7 @@ RPG本体の起動順は以下です。
 3. 取得失敗時のみ `data/default-words.csv` を読み込む。
 4. 標準CSVも失敗した場合だけ内蔵サンプルを利用する。
 
-RPG本体の旧アップロード導線は旧 `POST /api/questions/upload` に依存していたため、第2段階では共通保存対象外です。旧APIは410を返し、保存はstudy-appの正式4シートExcelアップロードへ集約します。
+RPG本体のアップロード欄は第4段階で一時確認用に整理しました。RPG本体は旧 `POST /api/questions/upload` / `POST /api/study-app/upload` を呼び出さず、読み込んだCSV/Excelをブラウザ上で試すだけで共通保存しません。共通保存は `/study-app/` の正式4シートExcelアップロードへ集約します。旧APIは410を返します。
 
 ### study-appのExcelブック読み込み
 

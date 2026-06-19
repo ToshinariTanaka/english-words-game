@@ -165,6 +165,14 @@ python3 tools/fill_excel_choices.py input.xlsx \
 
 `study-app` の `definition` 内部IDは互換性のため維持し、表示名だけでなく処理も英文和訳モードとして扱います。標準ファイル名も `study-app/data/definition_mode.csv` のままです。C列相当の `question` に英文、D列相当の `correct` に英文全体の日本語訳、E〜G列相当の `choice1`〜`choice3` に日本語の誤訳選択肢を入れます。旧ファイル名のアップロードは可能ですが、新しい英文和訳形式では `question` を英文、`correct` を日本語訳として出題します。RPG本体の英英辞典モードは別仕様のため維持しています。
 
+## RPG本体の問題データ読み込みと一時確認アップロード（2026-06-19）
+
+- 問題データの正式管理は `study-app/` の4シートExcelアップロードに集約しています。PC・iPhone共通保存をしたい場合は `/study-app/` の「4シートExcelアップロード」を使います。
+- RPG本体 `/` は起動時に mode指定なしの `GET /api/questions/current` を優先して読み込みます。サーバー側は mode省略時に `word` モードを返すため、RPG本体は `schema_version: 2` の保存済み4モードデータのうち英単語RPG用の `word` だけを使います。
+- `GET /api/questions/current` が未保存・取得失敗・RPGで使える行不足の場合だけ、RPG本体は `data/default-words.csv` へフォールバックします。
+- RPG本体のCSV/Excelアップロード欄は、このブラウザで内容を試すための一時確認用です。共通問題データとしては保存しません。
+- 旧 `POST /api/questions/upload` と `POST /api/study-app/upload` は410で、今後使いません。RPG本体からも呼び出しません。
+
 ## Render本番運用と共通問題データ
 
 Renderでは `server.js` を起動し、静的ファイル配信と共通問題データAPIを同じURLで提供します。アップロードされたCSV/Excelはブラウザの `localStorage` を正本にせず、Persistent Disk上の `/var/data/english_words_game/current-questions.json` に保存します。
@@ -185,7 +193,7 @@ Renderでは `server.js` を起動し、静的ファイル配信と共通問題�
 - `DATA_DIR`: 既定値 `/var/data/english_words_game`
 - `QUESTIONS_FILE`: 既定値 `${DATA_DIR}/current-questions.json`
 
-GitHub Pagesは静的ホスティングのため、`POST /api/questions/upload` でのサーバー保存は動作しません。端末間共有が必要な場合はRender版URL （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） を利用してください。RPG本体にも同URLへのリンクを表示し、GitHub Pages版の学習アプリ画面では「サーバー保存不可」とRender版へのリンクを表示します。
+GitHub Pagesは静的ホスティングのため、旧 `POST /api/questions/upload` でのサーバー保存は動作しません。RPG本体からも旧APIは呼び出しません。端末間共有が必要な場合はRender版URL （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） を利用してください。RPG本体にも同URLへのリンクを表示し、GitHub Pages版の学習アプリ画面では「サーバー保存不可」とRender版へのリンクを表示します。
 
 ## Render版への統一（2026-06-16更新）
 

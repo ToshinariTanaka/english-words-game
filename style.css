@@ -294,3 +294,22 @@ button:disabled {
 .study-app-link a {
   color: #9be7ff;
 }
+
+.study-app-action {
+  margin: 12px 0;
+}
+
+.button-link {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #041022;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.button-link:hover,
+.button-link:focus-visible {
+  filter: brightness(1.08);
+}
