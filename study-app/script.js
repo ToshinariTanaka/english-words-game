@@ -94,6 +94,9 @@ const WORKBOOK_SHEET_ALIASES = {
   definition: ['★英文和訳', '英文和訳', '英文', '和訳', 'definition', 'definition_mode', '★英文和訳_001_生成'],
 };
 const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', phrase: '★文節和訳', definition: '★英文和訳' };
+const MODE_KEY_PREFIXES = { word: 'w', chunk: 'c', phrase: 'p', definition: 's' };
+const ALLOWED_OFFICIAL_LEVELS = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
+const MAX_SHOWN_UPLOAD_ERRORS = 20;
 
 const FIXED_HISTORY_SHEET_NAMES = Object.fromEntries(
   Object.entries(MODES).map(([mode, config]) => [mode, config.historySheetName]),
@@ -655,6 +658,86 @@ function getWorkbookSummaryText(modeRows) {
   return `英単語 ${normalizeQuestionsForMode(modeRows.word || [], 'word').length}問、チャンク ${normalizeQuestionsForMode(modeRows.chunk || [], 'chunk').length}問、文節和訳 ${normalizeQuestionsForMode(modeRows.phrase || [], 'phrase').length}問、英文和訳 ${normalizeQuestionsForMode(modeRows.definition || [], 'definition').length}問`;
 }
 
+function isCompleteOfficialRow(row) {
+  return ['question', 'correct', 'choice1', 'choice2', 'choice3'].every((column) => String(row?.[column] || '').trim() !== '');
+}
+
+function normalizeDuplicateValue(value) {
+  return String(value || '').trim().normalize('NFKC').toLowerCase();
+}
+
+function getOrCreateUploadValidationBox() {
+  let box = document.getElementById('uploadValidationErrors');
+  if (box) return box;
+  box = document.createElement('div');
+  box.id = 'uploadValidationErrors';
+  box.className = 'upload-validation-errors';
+  box.hidden = true;
+  els.uploadStatus?.insertAdjacentElement('afterend', box);
+  return box;
+}
+
+function showUploadValidationErrors(payload) {
+  const box = getOrCreateUploadValidationBox();
+  if (!box) return;
+  box.textContent = '';
+  const title = document.createElement('strong');
+  const errorCount = Number(payload?.errorCount || payload?.errors?.length || 0);
+  title.textContent = `アップロード検証エラー: ${errorCount}件`;
+  box.appendChild(title);
+  const list = document.createElement('ul');
+  for (const error of payload?.errors || []) {
+    const item = document.createElement('li');
+    item.textContent = String(error);
+    list.appendChild(item);
+  }
+  box.appendChild(list);
+  if (payload?.moreErrorCount > 0) {
+    const more = document.createElement('p');
+    more.textContent = `ほか ${payload.moreErrorCount} 件のエラーがあります。`;
+    box.appendChild(more);
+  }
+  box.hidden = false;
+}
+
+function clearUploadValidationErrors() {
+  const box = document.getElementById('uploadValidationErrors');
+  if (box) {
+    box.textContent = '';
+    box.hidden = true;
+  }
+}
+
+function validateOfficialWorkbookRows(modeRows) {
+  const errors = [];
+  const playableRows = {};
+  for (const mode of Object.keys(OFFICIAL_WORKBOOK_SHEETS)) {
+    const rows = modeRows[mode] || [];
+    const sheetName = OFFICIAL_WORKBOOK_SHEETS[mode];
+    const prefix = MODE_KEY_PREFIXES[mode];
+    const keys = new Map();
+    playableRows[mode] = [];
+    rows.forEach((row, index) => {
+      if (!isCompleteOfficialRow(row)) return;
+      const excelRow = index + 2;
+      const level = String(row.level || '').trim().toUpperCase();
+      const key = String(row.question_key || '').trim();
+      if (!ALLOWED_OFFICIAL_LEVELS.has(level)) errors.push(`${sheetName} ${excelRow}行目: B列 level は A1, A2, B1, B2, C1, C2 のいずれかにしてください。`);
+      if (!key) errors.push(`${sheetName} ${excelRow}行目: M列 question_key が空です。`);
+      else if (!new RegExp(`^${prefix}\\d{6}$`).test(key)) errors.push(`${sheetName} ${excelRow}行目: M列 question_key は ${prefix}000001 形式にしてください。`);
+      if (key) {
+        if (keys.has(key)) errors.push(`${sheetName} ${excelRow}行目: M列 question_key が同一シート内で重複しています（${keys.get(key)}行目と同じ ${key}）。`);
+        else keys.set(key, excelRow);
+      }
+      const answerValues = ['correct', 'choice1', 'choice2', 'choice3'].map((column) => normalizeDuplicateValue(row[column]));
+      if (new Set(answerValues).size !== answerValues.length) errors.push(`${sheetName} ${excelRow}行目: D〜G列に正規化後重複する選択肢があります。`);
+      playableRows[mode].push({ ...row, level, question_key: key });
+    });
+    if (playableRows[mode].length === 0) errors.push(`${sheetName}: C〜G列がすべて入った出題対象行が0件です。`);
+  }
+  return { errors, playableRows, errorCount: errors.length, shownErrorCount: Math.min(errors.length, MAX_SHOWN_UPLOAD_ERRORS), moreErrorCount: Math.max(0, errors.length - MAX_SHOWN_UPLOAD_ERRORS) };
+}
+
 function normalizeSheetName(sheetName) {
   return String(sheetName || '').trim().toLowerCase();
 }
@@ -1195,12 +1278,21 @@ async function uploadOfficialWorkbook(file) {
   formData.append('file', file, file.name || 'study-app-workbook.xlsx');
   const response = await fetch(`${API_BASE}/api/questions/upload-workbook`, { method: 'POST', body: formData });
   const result = await response.json().catch(() => ({}));
-  if (!response.ok || !result.ok) throw new Error(result.error || `${response.status} ${response.statusText}`);
+  if (!response.ok || !result.ok) {
+    if (Array.isArray(result.errors)) showUploadValidationErrors(result);
+    throw new Error(result.error || `${response.status} ${response.statusText}`);
+  }
   return result;
 }
 
 async function handleMultiModeWorkbookUpload(file, parsed) {
-  const modeRows = parsed.modeRows;
+  const validation = validateOfficialWorkbookRows(parsed.modeRows);
+  if (validation.errors.length) {
+    showUploadValidationErrors({ errors: validation.errors.slice(0, MAX_SHOWN_UPLOAD_ERRORS), errorCount: validation.errorCount, shownErrorCount: validation.shownErrorCount, moreErrorCount: validation.moreErrorCount });
+    throw new Error(`アップロード検証エラーが${validation.errorCount}件あります。`);
+  }
+  const modeRows = validation.playableRows;
+  clearUploadValidationErrors();
   state.localModeRows = modeRows;
   let saveMessage = '共通問題データを4モード一括保存しました。PC・iPhone共通で利用できます';
   try {
@@ -1223,6 +1315,7 @@ async function handleUpload(event) {
   if (!file) return;
   const uploadMode = state.mode;
   state.loadToken += 1;
+  clearUploadValidationErrors();
   setLoadingState('ファイルを読み込み中...');
 
   let parsedRows = null;

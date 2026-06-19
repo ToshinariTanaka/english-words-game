@@ -41,7 +41,7 @@ function createWorkbook(target, emptyMode = null) {
   const script = `
 from openpyxl import Workbook
 import sys
-sheets = [('word', '★英単語', 'w000001'), ('chunk', '★チャンク', 'c000001'), ('phrase', '★文節和訳', 'p000001'), ('definition', '★英文和訳', 'd000001')]
+sheets = [('word', '★英単語', 'w000001'), ('chunk', '★チャンク', 'c000001'), ('phrase', '★文節和訳', 'p000001'), ('definition', '★英文和訳', 's000001')]
 columns = ['row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note', 'question_key']
 wb = Workbook()
 wb.remove(wb.active)
@@ -51,6 +51,8 @@ for mode, sheet_name, key in sheets:
     ws.append(columns)
     if mode != empty:
         ws.append(['1', 'A1', f'{mode} question', f'{mode} correct', 'x1', 'x2', 'x3', '', '', '', '', '', key])
+        ws.append(['2', '', '', '', '', '', '', '', '', '', '', '', ''])
+        ws.append(['3', '', f'incomplete {mode}', '', '', '', '', '', '', '', '', '', ''])
 wb.save(sys.argv[1])
 `;
   const args = ['-c', script, target];
@@ -102,6 +104,27 @@ wb.save(sys.argv[1])
     assert.strictEqual(status.status, 200, status.text);
     assert.strictEqual(status.json.schema_version, 2);
     assert.deepStrictEqual(status.json.modes, { word: { count: 1 }, chunk: { count: 1 }, phrase: { count: 1 }, definition: { count: 1 } });
+
+    const invalidWorkbook = path.join(tmpDir, 'invalid.xlsx');
+    createWorkbook(invalidWorkbook);
+    childProcess.spawnSync('python3', ['-c', `
+from openpyxl import load_workbook
+import sys
+wb = load_workbook(sys.argv[1])
+ws = wb['★英単語']
+ws['B2'] = 'Z9'
+ws['E2'] = 'word correct'
+wb['★英文和訳']['M2'] = 'd000001'
+wb.save(sys.argv[1])
+`, invalidWorkbook], { encoding: 'utf8' });
+    const invalidUpload = makeMultipart(invalidWorkbook, 'invalid.xlsx');
+    const invalid = await request('POST', '/api/questions/upload-workbook', invalidUpload);
+    assert.strictEqual(invalid.status, 400, invalid.text);
+    assert.ok(Array.isArray(invalid.json.errors), invalid.text);
+    assert.ok(invalid.json.errorCount >= 3, invalid.text);
+    assert.ok(invalid.json.errors.some((error) => error.includes('B列 level')), invalid.text);
+    assert.ok(invalid.json.errors.some((error) => error.includes('D〜G列')), invalid.text);
+    assert.ok(invalid.json.errors.some((error) => error.includes('s000001')), invalid.text);
 
     fs.writeFileSync(dataFile, JSON.stringify({ updatedAt: 'legacy', modes: { word: { rows: [] } } }));
     const legacy = await request('GET', '/api/questions/current?mode=word');

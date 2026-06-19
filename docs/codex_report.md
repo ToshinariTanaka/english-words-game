@@ -1,35 +1,27 @@
 ## 今回やったこと
-- Render本番buildでNode依存関係に加えてPython依存関係も入るよう、`render.yaml` の `buildCommand` を `npm ci && python3 -m pip install -r tools/requirements.txt` に変更しました。
-- 既存の `tools/requirements.txt` にある `openpyxl>=3.1.0` を、4シートExcelアップロード用の本番依存関係として明示利用する形にしました。
-- サーバー側のExcel読み込みで `python3` 起動失敗または `openpyxl` import失敗などが起きた場合、ユーザーへ長い技術ログを返さず、Render環境の `python3` / `openpyxl` 確認を促すエラーにしました。詳細はサーバーログへ出します。
-- README / docsに、4シートExcelアップロードには `python3` と `openpyxl` が必要で、Render build時にインストールすること、デプロイ後は `/study-app/` から実Excelアップロード確認することを追記しました。
+- 第3段階PRの正式Workbook検証仕様を維持しつつ、study-app側のアップロード検証エラー表示が未定義関数で落ちないように専用表示関数を追加しました。
+- `definition` モードの `question_key` 接頭辞は `s` のまま維持しました。
+- サーバー側・study-app側で、B列 `level`、M列 `question_key`、D〜G列の正規化後重複、C〜G列が揃った出題対象行のみ保存/読込する検証を揃えました。
+- HTML特殊文字を含む検証エラーは `textContent` とDOM生成で表示し、HTMLとして解釈されないようにしました。
 
 ## 変更ファイル
-- `render.yaml`
-- `server.js`
-- `README.md`
-- `docs/architecture.md`
-- `docs/project_status.md`
-- `docs/next_tasks.md`
-- `docs/codex_report.md`
+- `server.js`: 正式Workbook検証、出題対象行のみの保存、構造化エラーレスポンスを追加。
+- `study-app/script.js`: 事前検証、専用エラーボックス、HTML安全表示を追加。
+- `study-app/style.css`: 専用エラーボックスの最低限の表示スタイルを追加。
+- `tests_server_workbook_api.js`: 第3段階仕様の維持確認と `definition` 接頭辞 `s` のテストを更新。
+- `tests_study_app_upload_validation_errors.js`: 未定義関数で落ちないこととHTML特殊文字の安全表示テストを追加。
+- `package.json`: 新規テストを `npm test` に追加。
 
 ## テスト結果
-- `python3 -c "import openpyxl; print(openpyxl.__version__)"`: 成功
-- `npm test`: 成功
-- `node tests_server_workbook_api.js`: 成功
-- `git diff --check`: 成功
+- `npm test`: 成功。
+- `git diff --check`: 成功。
 
 ## 注意点
-- Render環境のPython/pip自体が利用できる前提です。build logで `python3 -m pip install -r tools/requirements.txt` が成功しているか確認してください。
-- 旧 `/api/questions/upload` と `/api/study-app/upload` は410のままです。RPG本体の旧アップロード導線は今後見直しが必要です。
-- 第3段階の `question_key` 形式チェック、重複チェック、B列 `level` 厳格チェック、D〜G列重複チェック、専用エラー表示は今回未実装です。
+- UI変更は既存アップロード欄直下に検証エラーをDOM生成で追加する軽微な変更です。スクリーンショット取得が必要な見た目の大幅変更はありません。
+- 旧 `/api/questions/upload` と `/api/study-app/upload` は引き続き410です。
 
 ## 次にやるべきこと
-- Render本番へデプロイし、build logで `openpyxl` インストール成功を確認する。
-- `/study-app/` から正式4シートExcelをアップロードし、4モードの保存件数と学習画面の読み込みを確認する。
-- 第3段階として `question_key` と選択肢品質の厳格チェックを追加する。
-- RPG本体の旧アップロード導線を、新しい4シートExcel運用に合わせて整理する。
+- 実際の公式Excelで、サーバー保存後の4モード件数と未完成行除外を手動確認してください。
 
 ## チャッピーに相談すべき点
-- Render上でPython/pipが使えない場合に備えて、Docker化やNodeのみの `.xlsx` パーサーへ寄せるべきか。
-- RPG本体でも4シートExcelを正式導線にするか、RPG側アップロードを非表示にしてstudy-appへ集約するか。
+- エラー表示件数の上限（現在20件）や文言を利用者向けにさらに調整するか確認してください。
