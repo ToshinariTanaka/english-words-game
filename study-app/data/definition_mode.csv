@@ -1,4 +1,4 @@
-row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
-1,A1,I go to the library after school.,私は放課後に図書館へ行きます。,私は朝食の前に駅へ行きます。,私は放課後に病院で働きます。,彼は放課後に図書館へ行きません。,0,0,0%,0,go to the library after school は「放課後に図書館へ行く」という意味です。
-2,A2,She is reading a book in the kitchen.,彼女は台所で本を読んでいます。,彼女は教室で手紙を書いています。,彼は台所で本を探しています。,彼女は公園で音楽を聞いています。,0,0,0%,0,is reading は「読んでいる」という進行中の動作を表します。
-3,B1,If it rains tomorrow, we will stay home.,もし明日雨が降れば、私たちは家にいます。,明日晴れたら、私たちは外で遊びます。,昨日雨が降ったので、私たちは家にいました。,もし今夜雪が降れば、彼らは学校へ行きます。,0,0,0%,0,If it rains tomorrow は「もし明日雨が降れば」という条件を表します。
+row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note,question_key
+1,A1,I go to the library after school.,私は放課後に図書館へ行きます。,私は朝食の前に駅へ行きます。,私は放課後に病院で働きます。,彼は放課後に図書館へ行きません。,0,0,0%,0,go to the library after school は「放課後に図書館へ行く」という意味です。,s000001
+2,A2,She is reading a book in the kitchen.,彼女は台所で本を読んでいます。,彼女は教室で手紙を書いています。,彼は台所で本を探しています。,彼女は公園で音楽を聞いています。,0,0,0%,0,is reading は「読んでいる」という進行中の動作を表します。,s000002
+3,B1,If it rains tomorrow, we will stay home.,もし明日雨が降れば、私たちは家にいます。,明日晴れたら、私たちは外で遊びます。,昨日雨が降ったので、私たちは家にいました。,もし今夜雪が降れば、彼らは学校へ行きます。,0,0,0%,0,If it rains tomorrow は「もし明日雨が降れば」という条件を表します。,s000003

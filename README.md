@@ -207,3 +207,26 @@ RenderサーバーはディレクトリURLの `index.html` を自動解決しま
 4. 共通問題データの読み込みメッセージと問題数が、PCでアップロードした内容と一致することを確認します。
 
 Persistent DiskなしのRender環境やGitHub Pagesでは、アップロード内容の端末間共有は保証されません。
+
+## study-app 第1段階: 4モード化と `question_key` 基礎対応（2026-06-19）
+
+`study-app/` は第1段階として、学習モードを次の4つに変更しました。表示順もこの順番です。
+
+| 表示名 | 内部mode | 標準CSV | 固定シート名 |
+| --- | --- | --- | --- |
+| 英単語 | `word` | `study-app/data/word_mode.csv` | `★英単語` |
+| チャンク | `chunk` | `study-app/data/chunk_mode.csv` | `★チャンク` |
+| 文節和訳 | `phrase` | `study-app/data/phrase_mode.csv` | `★文節和訳` |
+| 英文和訳 | `definition` | `study-app/data/definition_mode.csv` | `★英文和訳` |
+
+標準CSVはA〜M列形式です。
+
+```csv
+row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note,question_key
+```
+
+- 4モードすべて、読み上げ対象はC列相当の `question` だけです。D〜G列の日本語選択肢は読み上げません。
+- B列 `level` は `A1` / `A2` / `B1` / `B2` / `C1` / `C2` だけを出題対象にします。空白や範囲外のlevelは除外します。
+- M列 `question_key` を読み込み、学習履歴キーは `モード名::固定シート名::question_key` を優先します。例: `文節和訳::★文節和訳::p000001`。
+- localStorageの `englishGameLearningStats` は `schema_version: 2` と `items` を持つ形式です。`schema_version: 2` がない旧履歴は読み込み時に削除します。
+- 第1段階では既存のCSV/ExcelアップロードAPI互換を維持しています。`.xlsx` のみ許可、4シート必須チェック、一括アップロードAPI新設、既存API無効化、`question_key` の厳格検証や重複検証は第2段階・第3段階で実施予定です。

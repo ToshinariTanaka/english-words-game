@@ -2,7 +2,7 @@ const MODES = {
   word: {
     label: '英単語モード',
     historyModeName: '英単語',
-    historySheetName: '★英単語テスト_001_生成',
+    historySheetName: '★英単語',
     file: './data/word_mode.csv',
     description: '英単語を見て、日本語の意味を選びます。',
     questionAliases: ['C question', 'question', 'word', '英単語', '単語', '問題'],
@@ -11,16 +11,25 @@ const MODES = {
   chunk: {
     label: 'チャンクモード',
     historyModeName: 'チャンク',
-    historySheetName: '★チャンク_001_生成',
+    historySheetName: '★チャンク',
     file: './data/chunk_mode.csv',
     description: '英語のかたまり表現を見て、自然な意味を選びます。',
     questionAliases: ['C question', 'question', 'chunk', 'チャンク', '問題'],
     correctAliases: ['D correct', 'correct', 'chunk_meaning', 'チャンク和訳', '和訳', '意味', '正解'],
   },
+  phrase: {
+    label: '文節和訳モード',
+    historyModeName: '文節和訳',
+    historySheetName: '★文節和訳',
+    file: './data/phrase_mode.csv',
+    description: '英文中の一部分を見て、正しい部分訳を選びます。',
+    questionAliases: ['C question', 'question', 'phrase', '文節和訳', '文節', '部分訳', '問題'],
+    correctAliases: ['D correct', 'correct', 'phrase_meaning', '部分訳', '和訳', '意味', '正解'],
+  },
   definition: {
     label: '英文和訳モード',
     historyModeName: '英文和訳',
-    historySheetName: '★英文和訳_001_生成',
+    historySheetName: '★英文和訳',
     file: './data/definition_mode.csv',
     description: '英文を読んで、正しい日本語訳を選びます。',
     questionAliases: ['C question', 'question', '英文', '英語', '問題', 'sentence', 'english', 'definition', '英語定義', '定義'],
@@ -79,9 +88,10 @@ const SPECIAL_VOICE_KEYWORDS = [
 
 
 const WORKBOOK_SHEET_ALIASES = {
-  word: ['英単語', '英単語テスト', 'word', 'word_mode', '単語', '★英単語テスト_001_生成'],
-  chunk: ['チャンク', 'chunk', 'chunk_mode', '★チャンク_001_生成'],
-  definition: ['英文和訳', '英文', '和訳', 'definition', 'definition_mode', '★英文和訳_001_生成'],
+  word: ['★英単語', '英単語', '英単語テスト', 'word', 'word_mode', '単語', '★英単語テスト_001_生成'],
+  chunk: ['★チャンク', 'チャンク', 'chunk', 'chunk_mode', '★チャンク_001_生成'],
+  phrase: ['★文節和訳', '文節和訳', '文節', '部分訳', 'phrase', 'phrase_mode'],
+  definition: ['★英文和訳', '英文和訳', '英文', '和訳', 'definition', 'definition_mode', '★英文和訳_001_生成'],
 };
 
 const FIXED_HISTORY_SHEET_NAMES = Object.fromEntries(
@@ -90,7 +100,7 @@ const FIXED_HISTORY_SHEET_NAMES = Object.fromEntries(
 
 const STANDARD_COLUMNS = [
   'row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3',
-  'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note',
+  'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note', 'question_key',
 ];
 
 function normalizeStandardRow(row) {
@@ -125,6 +135,7 @@ const COMMON_ALIASES = {
   accuracy: ['J accuracy', 'accuracy', '正答率', '累計正解率'],
   currentStreak: ['K current_streak', 'current_streak', 'currentStreak', '現在の連勝数', '連続正解'],
   note: ['L note', 'note', '備考', 'メモ'],
+  questionKey: ['M question_key', 'question_key', 'questionKey', '問題キー'],
 };
 
 
@@ -640,7 +651,7 @@ function parseCsv(text) {
 }
 
 function getWorkbookSummaryText(modeRows) {
-  return `英単語 ${normalizeQuestionsForMode(modeRows.word || [], 'word').length}問、チャンク ${normalizeQuestionsForMode(modeRows.chunk || [], 'chunk').length}問、英文和訳 ${normalizeQuestionsForMode(modeRows.definition || [], 'definition').length}問`;
+  return `英単語 ${normalizeQuestionsForMode(modeRows.word || [], 'word').length}問、チャンク ${normalizeQuestionsForMode(modeRows.chunk || [], 'chunk').length}問、文節和訳 ${normalizeQuestionsForMode(modeRows.phrase || [], 'phrase').length}問、英文和訳 ${normalizeQuestionsForMode(modeRows.definition || [], 'definition').length}問`;
 }
 
 function normalizeSheetName(sheetName) {
@@ -665,17 +676,30 @@ function normalizeHistorySheetName(modeOrSheetName) {
 
 function getLearningHistoryKey(question, mode = state.mode) {
   const modeConfig = MODES[mode] || MODES.word;
-  const questionText = typeof question === 'string' ? question : question?.question;
-  return `${modeConfig.historyModeName}::${normalizeHistorySheetName(mode)}::${String(questionText || '').trim()}`;
+  const questionKey = typeof question === 'string' ? question : question?.questionKey;
+  const fallback = typeof question === 'string' ? question : question?.question;
+  return `${modeConfig.historyModeName}::${normalizeHistorySheetName(mode)}::${String(questionKey || fallback || '').trim()}`;
 }
 
 function readLearningStats() {
   try {
-    if (typeof localStorage === 'undefined') return {};
-    return JSON.parse(localStorage.getItem(LEARNING_STATS_STORAGE_KEY) || '{}') || {};
+    if (typeof localStorage === 'undefined') return { schema_version: 2, items: {} };
+    const raw = localStorage.getItem(LEARNING_STATS_STORAGE_KEY);
+    if (!raw) return { schema_version: 2, items: {} };
+    const parsed = JSON.parse(raw) || {};
+    if (parsed.schema_version !== 2 || !parsed.items || typeof parsed.items !== 'object') {
+      localStorage.removeItem(LEARNING_STATS_STORAGE_KEY);
+      return { schema_version: 2, items: {} };
+    }
+    return parsed;
   } catch (error) {
     console.warn('Failed to load learning stats:', error);
-    return {};
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.removeItem(LEARNING_STATS_STORAGE_KEY);
+    } catch (removeError) {
+      console.warn('Failed to remove invalid learning stats:', removeError);
+    }
+    return { schema_version: 2, items: {} };
   }
 }
 
@@ -701,7 +725,7 @@ function calculateRecent10Accuracy(recentResults) {
 
 function getLearningStat(question, mode = state.mode) {
   const stats = readLearningStats();
-  return stats[getLearningHistoryKey(question, mode)] || {
+  return stats.items[getLearningHistoryKey(question, mode)] || {
     total_correct: 0,
     total_wrong: 0,
     recent_results: [],
@@ -714,7 +738,7 @@ function getLearningStat(question, mode = state.mode) {
 function updateLearningStat(question, isCorrect, mode = state.mode) {
   const stats = readLearningStats();
   const key = getLearningHistoryKey(question, mode);
-  const current = stats[key] || getLearningStat(question, mode);
+  const current = stats.items[key] || getLearningStat(question, mode);
   const recentResults = [...(Array.isArray(current.recent_results) ? current.recent_results : []), Boolean(isCorrect)].slice(-10);
   const next = {
     ...current,
@@ -725,7 +749,9 @@ function updateLearningStat(question, isCorrect, mode = state.mode) {
   };
   next.accuracy = calculateAccuracy(next.total_correct, next.total_wrong);
   next.recent10_accuracy = calculateRecent10Accuracy(next.recent_results);
-  stats[key] = next;
+  next.question = typeof question === 'string' ? question : (question?.question || current.question || '');
+  next.question_key = typeof question === 'string' ? question : (question?.questionKey || current.question_key || '');
+  stats.items[key] = next;
   writeLearningStats(stats);
   return next;
 }
@@ -733,10 +759,15 @@ function updateLearningStat(question, isCorrect, mode = state.mode) {
 function setWeakChecked(question, checked, mode = state.mode) {
   const stats = readLearningStats();
   const key = getLearningHistoryKey(question, mode);
-  const current = stats[key] || getLearningStat(question, mode);
-  stats[key] = { ...current, weak_checked: Boolean(checked) };
+  const current = stats.items[key] || getLearningStat(question, mode);
+  stats.items[key] = {
+    ...current,
+    question: typeof question === 'string' ? question : (question?.question || current.question || ''),
+    question_key: typeof question === 'string' ? question : (question?.questionKey || current.question_key || ''),
+    weak_checked: Boolean(checked),
+  };
   writeLearningStats(stats);
-  return stats[key];
+  return stats.items[key];
 }
 
 function clearLearningStatsWithConfirm() {
@@ -907,6 +938,7 @@ function normalizeQuestionsForMode(rows, mode) {
       csvAccuracy: pickField(normalizedRow, COMMON_ALIASES.accuracy) || '0%',
       currentStreak: pickField(normalizedRow, COMMON_ALIASES.currentStreak) || '0',
       note: pickField(normalizedRow, COMMON_ALIASES.note),
+      questionKey: pickField(normalizedRow, COMMON_ALIASES.questionKey),
     };
   }).filter((item) => item.question && item.correct && item.choices.length === 4);
 }
@@ -1224,6 +1256,7 @@ function updateModeUi() {
   els.modeLabel.textContent = state.reviewMode ? `${MODES[state.mode].label}（復習）` : MODES[state.mode].label;
   getQuizCardElement()?.classList.toggle('mode-word', state.mode === 'word');
   getQuizCardElement()?.classList.toggle('mode-chunk', state.mode === 'chunk');
+  getQuizCardElement()?.classList.toggle('mode-phrase', state.mode === 'phrase');
   getQuizCardElement()?.classList.toggle('mode-definition', state.mode === 'definition');
 }
 
@@ -1256,7 +1289,7 @@ function showQuestion() {
     els.weakChecked.disabled = false;
   }
   els.feedback.className = 'feedback';
-  els.feedback.textContent = `問題ID: ${current.id} / レベル: ${current.level || '未設定'} / 学習履歴: 正解 ${learningStat.total_correct}・不正解 ${learningStat.total_wrong}・累計正解率 ${learningStat.accuracy}%・直近10回 ${learningStat.recent10_accuracy}%`;
+  els.feedback.textContent = `問題ID: ${current.questionKey || current.id} / レベル: ${current.level || '未設定'} / 学習履歴: 正解 ${learningStat.total_correct}・不正解 ${learningStat.total_wrong}・累計正解率 ${learningStat.accuracy}%・直近10回 ${learningStat.recent10_accuracy}%`;
   els.feedback.hidden = false;
   els.choices.innerHTML = '';
   current.choices.forEach((choice) => {
@@ -1363,4 +1396,5 @@ setupSoundSetting();
 setupVoiceSelect();
 setupAudioUnlock();
 updateHostingStatus();
+readLearningStats();
 loadMode(state.mode);

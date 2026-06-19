@@ -6,7 +6,7 @@ const PORT = Number(process.env.PORT || 3000);
 const DATA_DIR = process.env.DATA_DIR || '/var/data/english_words_game';
 const DATA_FILE = process.env.QUESTIONS_FILE || path.join(DATA_DIR, 'current-questions.json');
 const STUDY_APP_DATA_DIR = process.env.STUDY_APP_DATA_DIR || '/var/data/study-app';
-const STUDY_APP_FILES = { word: 'word_mode.csv', chunk: 'chunk_mode.csv', definition: 'definition_mode.csv' };
+const STUDY_APP_FILES = { word: 'word_mode.csv', chunk: 'chunk_mode.csv', phrase: 'phrase_mode.csv', definition: 'definition_mode.csv' };
 const STANDARD_COLUMNS = ['row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note'];
 const PUBLIC_DIR = __dirname;
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 10 * 1024 * 1024);
@@ -119,7 +119,7 @@ function handleUpload(req, res) {
       const { fields, file } = parseMultipart(Buffer.concat(chunks), contentType);
       if (!file?.buffer?.length) return sendJson(res, 400, { ok: false, error: 'アップロードファイルがありません。' });
       const mode = fields.mode || 'word';
-      if (!['word', 'chunk', 'definition'].includes(mode)) return sendJson(res, 400, { ok: false, error: 'modeはword / chunk / definitionのいずれかを指定してください。' });
+      if (!['word', 'chunk', 'phrase', 'definition'].includes(mode)) return sendJson(res, 400, { ok: false, error: 'modeはword / chunk / phrase / definitionのいずれかを指定してください。' });
       const rows = parseUploadedRows(file.buffer);
       const now = new Date().toISOString(); const store = readStore();
       const studyAppCsvPath = writeStudyAppCsv(mode, rows);

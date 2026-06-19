@@ -108,7 +108,7 @@ h1 {
 
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 
@@ -235,7 +235,7 @@ h1 {
 
 .stats-card {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   padding: 14px;
   margin-top: 14px;
@@ -485,7 +485,16 @@ h1 {
 
 .quiz-card.mode-word .choice-button,
 .quiz-card.mode-chunk .choice-button {
-  font-size: 1.2em;
+  font-size: 1em;
+}
+
+.quiz-card.mode-phrase #questionText {
+  font-size: clamp(1.6rem, 6.4vw, 2.32rem);
+}
+
+.quiz-card.mode-phrase .choice-button,
+.quiz-card.mode-definition .choice-button {
+  font-size: 0.94em;
 }
 
 .quiz-card.mode-word .quiz-topline,

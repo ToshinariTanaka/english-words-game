@@ -9,6 +9,9 @@ for (const name of ['英単語', '英単語テスト', 'word', 'word_mode', '単
 for (const name of ['チャンク', 'chunk', 'chunk_mode']) {
   assert.ok(source.includes(`'${name}'`), `チャンクモードのシート名 ${name} を許可する`);
 }
+for (const name of ['文節和訳', 'phrase', 'phrase_mode']) {
+  assert.ok(source.includes(`'${name}'`), `文節和訳モードのシート名 ${name} を許可する`);
+}
 for (const name of ['英文和訳', '英文', '和訳', 'definition', 'definition_mode']) {
   assert.ok(source.includes(`'${name}'`), `英文和訳モードのシート名 ${name} を許可する`);
 }

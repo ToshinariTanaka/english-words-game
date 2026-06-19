@@ -19,32 +19,33 @@
 
 ## 新規: study-app
 
-- `study-app/index.html`: ゲーム要素を含まない英語学習アプリの画面。モード選択、成績、4択、復習導線を持つ。
+- `study-app/index.html`: ゲーム要素を含まない英語学習アプリの画面。4モード（英単語 / チャンク / 文節和訳 / 英文和訳）のモード選択、成績、4択、復習導線を持つ。
 - `study-app/script.js`: 標準CSV読み込み、アップロードCSV/Excel読み込み、簡易CSVパース、SheetJS連携、モード切り替え、正誤判定、正答数/出題数/正答率、誤答復習を担当。
 - `study-app/style.css`: スマホ優先のカード型UI。HP/Gold/敵/バトル演出などのゲーム表現は含めない。
 - `study-app/script.js` の音声選択はWeb Speech APIの `speechSynthesis.getVoices()` を使い、「自動選択」「ランダム」「各音声」を `VOICE_STORAGE_KEY` で保存・復元する。固定音声・`random`・自動選択はいずれも `ALLOWED_STUDY_VOICES` の10種類（Junior/Kathy/Ralph/Samantha/Daniel/Karen/Moria/Rishi/Tessa/Fred）に `voice.name` と `voice.lang` が大文字小文字を区別せず一致する取得済み音声だけを対象にし、0件なら `utterance.voice` 未指定でブラウザに任せる。
 - `speechSynthesis.onvoiceschanged` は維持し、Safariなどで音声一覧が遅延取得されても保存済みの `random` や固定音声の復元機会を残す。保存済み固定音声が指定10種類以外、または現在の取得済み一覧に存在しない場合は自動選択へフォールバックして保存値をクリアする。
 - `study-app/data/word_mode.csv`: 英単語モード用CSV。
 - `study-app/data/chunk_mode.csv`: チャンクモード用CSV。
+- `study-app/data/phrase_mode.csv`: 文節和訳モード用CSV。内部IDは `phrase`。
 - `study-app/data/definition_mode.csv`: 英文和訳モード用CSV。内部IDとファイル名は互換性維持のため `definition` のまま。
 
 ### study-app のCSV形式
 
-最小構成では3モードとも次の列を使います。
+第1段階では4モードとも次のA〜M列を使います。
 
 ```csv
-row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note
+row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wrong,accuracy,current_streak,note,question_key
 ```
 
 - `level`: 問題カードに表示する難易度・教材レベルです。
-- `question`: 英単語モードでは英単語、チャンクモードでは英語チャンク、英文和訳モードでは英文を入れます。
+- `question`: 英単語モードでは英単語、チャンクモードでは英語チャンク、文節和訳モードでは英文中の部分、英文和訳モードでは英文全体を入れます。
 - `correct`: 正解を入れます。英文和訳モードでは英文全体の正しい日本語訳を入れます。
 - `choice1`〜`choice3`: 不正解選択肢を入れます。英文和訳モードでは日本語の誤訳選択肢を入れます。
 - アプリ側で `correct` + `choice1`〜`choice3` をシャッフルし、4択として表示します。
 - `total_correct` / `total_wrong` / `accuracy` / `current_streak` などのH〜L列は既存CSV/Excelとの互換性のため受け入れますが、学習履歴としては使いません。
-- 学習履歴は `localStorage` の `englishGameLearningStats` に保存し、キーは「モード名::固定シート名::問題文」です。`row_number` や読み込み元ラベル（例: 共通問題データ）は履歴キーに使いません。
+- 学習履歴は `localStorage` の `englishGameLearningStats` に `schema_version: 2` と `items` を持つ形式で保存し、キーは `モード名::固定シート名::question_key` です。`row_number`、問題文、読み込み元ラベル（例: 共通問題データ）は履歴キーに使いません。
 - 教材CSV/Excelは、元ヘッダーが `A row_number,B level,C question,...,L note` 形式でも、保存時は上記の標準ヘッダーへ正規化します。
-- 読み込み時は最初の12列（A〜L）だけを標準列として位置ベースで読み、M列以降は無視します。後方に重複ヘッダーがあってもA〜L列を上書きしません。
+- 読み込み時は最初の13列（A〜M）を標準列として位置ベースで読み、M列 `question_key` まで受け入れます。後方に重複ヘッダーがあってもA〜L列を上書きしません。
 - 出題対象は `question` / `correct` / `choice1`〜`choice3` がそろった行だけです。不足行はエラーにせずスキップします。
 
 今後、モードごとに列を拡張する場合も、既存RPG本体や既存CSV管理ツールとは別管理にします。
@@ -75,7 +76,8 @@ Render版の `study-app/` は共通問題データAPIを正本として扱いま
 
 1. 英単語モード: `study-app/data/word_mode.csv`
 2. チャンクモード: `study-app/data/chunk_mode.csv`
-3. 英文和訳モード: `study-app/data/definition_mode.csv`
+3. 文節和訳モード: `study-app/data/phrase_mode.csv`
+4. 英文和訳モード: `study-app/data/definition_mode.csv`
 
 起動時・モード切替時は常に標準CSVを `fetch` し、`IndexedDB` / `localStorage` に保存された過去のアップロードデータを標準CSVより優先しません。CSV/Excelアップロードは現在表示中モードの一時確認用で、ページ再読み込みやモード切替後は再び標準CSVへ戻ります。
 
@@ -85,7 +87,7 @@ Render版の `study-app/` は共通問題データAPIを正本として扱いま
 
 Render版は `server.js` が静的ファイルとAPIを同一オリジンで提供します。アップロードされたCSV/Excelはサーバー側で行データへ変換し、Persistent Disk想定の `/var/data/english_words_game/current-questions.json` に保存します。
 
-- `GET /api/questions/current?mode=word|chunk|definition`: 保存済み行データを返す。未保存なら404。
+- `GET /api/questions/current?mode=word|chunk|phrase|definition`: 保存済み行データを返す。未保存なら404。
 - `POST /api/questions/upload`: `multipart/form-data` の `mode` と `file` を受け取り、CSV/Excelを変換して保存する。
 - `POST /api/study-app/upload`: study-app向けの互換アップロードAPI。A〜L列だけを標準列として読み、`/var/data/study-app/{word_mode.csv,chunk_mode.csv,definition_mode.csv}` に標準CSVとしても保存する。
 - `GET /api/questions/status?mode=word|chunk|definition`: 保存状態、問題数、最終更新日時を返す。
@@ -105,7 +107,7 @@ Render版では `server.js` が静的ファイルとAPIを同一オリジンで�
 共通問題データの正本はRender APIです。
 
 - `GET /api/questions/current`: RPG本体が起動時に読む現在の共通問題データ。保存済みデータがなければ404。
-- `GET /api/questions/current?mode=word|chunk|definition`: 学習アプリがモード別に読む共通問題データ。従来のRender API利用を維持。
+- `GET /api/questions/current?mode=word|chunk|phrase|definition`: 学習アプリがモード別に読む共通問題データ。従来のRender API利用を維持。
 - `POST /api/questions/upload`: RPG本体・学習アプリのどちらからアップロードしてもPersistent Disk上の同じJSONを更新する。
 - `GET /api/questions/status`: 現在の共通問題データの保存状態を返す。`?mode=...` 指定も可能。
 
