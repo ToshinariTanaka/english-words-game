@@ -1,13 +1,17 @@
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const PORT = Number(process.env.PORT || 3000);
 const DATA_DIR = process.env.DATA_DIR || '/var/data/english_words_game';
 const DATA_FILE = process.env.QUESTIONS_FILE || path.join(DATA_DIR, 'current-questions.json');
 const STUDY_APP_DATA_DIR = process.env.STUDY_APP_DATA_DIR || '/var/data/study-app';
 const STUDY_APP_FILES = { word: 'word_mode.csv', chunk: 'chunk_mode.csv', phrase: 'phrase_mode.csv', definition: 'definition_mode.csv' };
-const STANDARD_COLUMNS = ['row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note'];
+const MODES = ['word', 'chunk', 'phrase', 'definition'];
+const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', phrase: '★文節和訳', definition: '★英文和訳' };
+const STANDARD_COLUMNS = ['row_number', 'level', 'question', 'correct', 'choice1', 'choice2', 'choice3', 'total_correct', 'total_wrong', 'accuracy', 'current_streak', 'note', 'question_key'];
 const PUBLIC_DIR = __dirname;
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 10 * 1024 * 1024);
 
@@ -47,6 +51,64 @@ function parseUploadedRows(buffer) {
   return parseCsv(decodeUploadBuffer(buffer));
 }
 
+function parseWorkbookBuffer(buffer) {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'english-words-workbook-'));
+  const workbookPath = path.join(tmpDir, 'upload.xlsx');
+  const scriptPath = path.join(tmpDir, 'parse_workbook.py');
+  fs.writeFileSync(workbookPath, buffer);
+  fs.writeFileSync(scriptPath, `
+import json
+import sys
+from openpyxl import load_workbook
+workbook = load_workbook(sys.argv[1], read_only=True, data_only=True)
+result = {}
+for sheet_name in workbook.sheetnames:
+    rows = []
+    for row in workbook[sheet_name].iter_rows(values_only=True):
+        rows.append(['' if value is None else str(value) for value in row])
+    result[sheet_name] = rows
+print(json.dumps(result, ensure_ascii=False))
+`, 'utf8');
+  try {
+    const parsed = spawnSync('python3', [scriptPath, workbookPath], { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 });
+    if (parsed.error) throw parsed.error;
+    if (parsed.status !== 0) throw new Error((parsed.stderr || 'Excelファイルの読み込みに失敗しました。').trim());
+    return JSON.parse(parsed.stdout || '{}');
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+}
+
+function parseOfficialWorkbookRows(buffer) {
+  const sheets = parseWorkbookBuffer(buffer);
+  const actualSheetNames = Object.keys(sheets);
+  const requiredSheetNames = Object.values(OFFICIAL_WORKBOOK_SHEETS);
+  const missing = requiredSheetNames.filter((sheetName) => !Object.prototype.hasOwnProperty.call(sheets, sheetName));
+  const extra = actualSheetNames.filter((sheetName) => !requiredSheetNames.includes(sheetName));
+  if (missing.length || extra.length) {
+    throw new Error(`正式アップロードは .xlsx の4シートExcelのみ対応です。必要シート: ${requiredSheetNames.join(' / ')}。不足: ${missing.join(' / ') || 'なし'}。許可外: ${extra.join(' / ') || 'なし'}。`);
+  }
+  return Object.fromEntries(MODES.map((mode) => [mode, normalizeMatrixRows(sheets[OFFICIAL_WORKBOOK_SHEETS[mode]] || [])]));
+}
+
+function isCompleteRow(row) {
+  return ['question', 'correct', 'choice1', 'choice2', 'choice3'].every((column) => String(row[column] || '').trim() !== '');
+}
+
+function hasSchemaVersion2(store) { return store?.schema_version === 2; }
+function legacyResponse(res) { return sendJson(res, 409, { ok: false, legacy: true }); }
+function buildSchemaV2Store(modeRows, filename, updatedAt) {
+  return {
+    schema_version: 2,
+    updatedAt,
+    filename,
+    modes: Object.fromEntries(MODES.map((mode) => {
+      const rows = modeRows[mode] || [];
+      return [mode, { mode, rows, count: rows.length }];
+    })),
+  };
+}
+
 function parseMultipart(buffer, contentType) {
   const boundaryMatch = contentType.match(/boundary=(?:(?:"([^"]+)")|([^;]+))/i);
   if (!boundaryMatch) throw new Error('multipart boundaryが見つかりません。');
@@ -76,7 +138,7 @@ function parseMultipart(buffer, contentType) {
 function ensureDataDir() { fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true }); }
 function readStore() {
   try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
-  catch (error) { if (error.code === 'ENOENT') return { modes: {}, updatedAt: null }; throw error; }
+  catch (error) { if (error.code === 'ENOENT') return { schema_version: 2, modes: {}, updatedAt: null, filename: null }; throw error; }
 }
 function writeStore(store) {
   ensureDataDir();
@@ -88,19 +150,23 @@ function sendJson(res, status, data) { res.writeHead(status, { 'content-type': '
 function getMode(url) { return url.searchParams.get('mode') || 'word'; }
 
 function getCurrentEntry(store, mode) {
-  if (mode) return store.modes?.[mode] || null;
-  return store.current || store.modes?.word || null;
+  return store.modes?.[mode || 'word'] || null;
 }
 function handleCurrent(req, res, url) {
-  const requestedMode = url.searchParams.get('mode'); const mode = requestedMode || 'current'; const store = readStore(); const entry = getCurrentEntry(store, requestedMode);
-  if (!entry) return sendJson(res, 404, { ok: false, error: '共通問題データは未保存です。', mode });
-  return sendJson(res, 200, { ok: true, mode: requestedMode || entry.mode || 'current', rows: entry.rows, count: entry.count, updatedAt: entry.updatedAt, filename: entry.filename });
+  const requestedMode = url.searchParams.get('mode') || 'word';
+  const store = readStore();
+  if (!hasSchemaVersion2(store)) return legacyResponse(res);
+  const entry = getCurrentEntry(store, requestedMode);
+  if (!entry) return sendJson(res, 404, { ok: false, error: '共通問題データは未保存です。', mode: requestedMode });
+  return sendJson(res, 200, { ok: true, mode: entry.mode || requestedMode, rows: entry.rows || [], count: entry.count || 0, updatedAt: store.updatedAt || null, filename: store.filename || null });
 }
 function handleStatus(req, res, url) {
-  const requestedMode = url.searchParams.get('mode'); const mode = requestedMode || 'current'; const store = readStore(); const entry = getCurrentEntry(store, requestedMode);
-  return sendJson(res, 200, { ok: true, mode, saved: Boolean(entry), count: entry?.count || 0, updatedAt: entry?.updatedAt || null, filename: entry?.filename || null, path: DATA_FILE });
+  const store = readStore();
+  if (!hasSchemaVersion2(store)) return sendJson(res, 200, { ok: true, schema_version: null, legacy: true, saved: false, modes: Object.fromEntries(MODES.map((mode) => [mode, { count: 0 }])), updatedAt: null, filename: null });
+  const modes = Object.fromEntries(MODES.map((mode) => [mode, { count: store.modes?.[mode]?.count || 0 }]));
+  return sendJson(res, 200, { ok: true, schema_version: 2, saved: MODES.every((mode) => Boolean(store.modes?.[mode])), modes, updatedAt: store.updatedAt || null, filename: store.filename || null });
 }
-function handleUpload(req, res) {
+function readMultipartRequest(req, res, onReady) {
   const contentType = req.headers['content-type'] || '';
   if (!contentType.includes('multipart/form-data')) return sendJson(res, 415, { ok: false, error: 'multipart/form-dataでアップロードしてください。' });
   const chunks = [];
@@ -114,24 +180,33 @@ function handleUpload(req, res) {
     }
     chunks.push(chunk);
   });
-  req.on('end', () => {
+  req.on('end', () => onReady(Buffer.concat(chunks), contentType));
+}
+
+function handleUpload(req, res) {
+  return sendJson(res, 410, {
+    ok: false,
+    error: 'このAPIは旧形式のため使用できません。\n新形式の4シートExcelは /api/questions/upload-workbook を使用してください。',
+  });
+}
+
+function handleWorkbookUpload(req, res) {
+  return readMultipartRequest(req, res, (bodyBuffer, contentType) => {
     try {
-      const { fields, file } = parseMultipart(Buffer.concat(chunks), contentType);
+      const { file } = parseMultipart(bodyBuffer, contentType);
       if (!file?.buffer?.length) return sendJson(res, 400, { ok: false, error: 'アップロードファイルがありません。' });
-      const mode = fields.mode || 'word';
-      if (!['word', 'chunk', 'phrase', 'definition'].includes(mode)) return sendJson(res, 400, { ok: false, error: 'modeはword / chunk / phrase / definitionのいずれかを指定してください。' });
-      const rows = parseUploadedRows(file.buffer);
-      const now = new Date().toISOString(); const store = readStore();
-      const studyAppCsvPath = writeStudyAppCsv(mode, rows);
-      const entry = { mode, rows, count: rows.length, updatedAt: now, filename: file.filename, csvPath: studyAppCsvPath };
-      store.modes = store.modes || {}; store.modes[mode] = entry;
-      store.current = entry;
-      store.updatedAt = now;
+      if (!/\.xlsx$/i.test(file.filename || '')) return sendJson(res, 400, { ok: false, error: '正式アップロードは .xlsx の4シートExcelのみ対応です。' });
+      const modeRows = parseOfficialWorkbookRows(file.buffer);
+      const emptyModes = MODES.filter((mode) => modeRows[mode].filter(isCompleteRow).length === 0);
+      if (emptyModes.length) return sendJson(res, 400, { ok: false, error: `完成行が0件のモードがあります: ${emptyModes.join(', ')}` });
+      const now = new Date().toISOString();
+      const store = buildSchemaV2Store(modeRows, file.filename, now);
       writeStore(store);
-      return sendJson(res, 200, { ok: true, mode, count: rows.length, updatedAt: now, filename: file.filename, csvPath: studyAppCsvPath });
+      return sendJson(res, 200, { ok: true, schema_version: 2, modes: Object.fromEntries(MODES.map((mode) => [mode, { count: modeRows[mode].length }])), updatedAt: now, filename: file.filename });
     } catch (error) { return sendJson(res, 400, { ok: false, error: error.message }); }
   });
 }
+
 
 function serveStatic(req, res, pathname) {
   const rawPath = pathname.endsWith('/') ? `${pathname}index.html` : pathname;
@@ -144,6 +219,7 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (req.method === 'GET' && url.pathname === '/api/questions/current') return handleCurrent(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/questions/status') return handleStatus(req, res, url);
+  if (req.method === 'POST' && url.pathname === '/api/questions/upload-workbook') return handleWorkbookUpload(req, res);
   if (req.method === 'POST' && (url.pathname === '/api/questions/upload' || url.pathname === '/api/study-app/upload')) return handleUpload(req, res);
   return serveStatic(req, res, url.pathname);
 });

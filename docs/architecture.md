@@ -88,9 +88,9 @@ Render版の `study-app/` は共通問題データAPIを正本として扱いま
 Render版は `server.js` が静的ファイルとAPIを同一オリジンで提供します。アップロードされたCSV/Excelはサーバー側で行データへ変換し、Persistent Disk想定の `/var/data/english_words_game/current-questions.json` に保存します。
 
 - `GET /api/questions/current?mode=word|chunk|phrase|definition`: 保存済み行データを返す。未保存なら404。
-- `POST /api/questions/upload`: `multipart/form-data` の `mode` と `file` を受け取り、CSV/Excelを変換して保存する。
-- `POST /api/study-app/upload`: study-app向けの互換アップロードAPI。A〜L列だけを標準列として読み、`/var/data/study-app/{word_mode.csv,chunk_mode.csv,definition_mode.csv}` に標準CSVとしても保存する。
-- `GET /api/questions/status?mode=word|chunk|definition`: 保存状態、問題数、最終更新日時を返す。
+- `POST /api/questions/upload-workbook`: `multipart/form-data` の `.xlsx` 4シートExcelを受け取り、`schema_version: 2` の4モード形式で保存する。
+- `POST /api/questions/upload` / `POST /api/study-app/upload`: 旧形式APIのため使用不可。呼び出し時は410と新API案内を返す。
+- `GET /api/questions/status`: 4モード全体の保存状態、問題数、最終更新日時、ファイル名を返す。
 
 `study-app` は共通問題データAPIを正本として扱い、localStorageは取得済みデータの補助キャッシュに限定します。API取得失敗時のみ標準CSVを読み込みます。GitHub Pages版では `/api/questions/upload` が存在しないため、アップロード失敗時にサーバー保存不可とRender版URL （未確認のため未設定。Render Dashboardで正しいWeb Service URLを確認後、`https://<service>.onrender.com/study-app/` を設定） を表示します。
 
@@ -108,10 +108,10 @@ Render版では `server.js` が静的ファイルとAPIを同一オリジンで�
 
 - `GET /api/questions/current`: RPG本体が起動時に読む現在の共通問題データ。保存済みデータがなければ404。
 - `GET /api/questions/current?mode=word|chunk|phrase|definition`: 学習アプリがモード別に読む共通問題データ。従来のRender API利用を維持。
-- `POST /api/questions/upload`: RPG本体・学習アプリのどちらからアップロードしてもPersistent Disk上の同じJSONを更新する。
-- `GET /api/questions/status`: 現在の共通問題データの保存状態を返す。`?mode=...` 指定も可能。
+- `POST /api/questions/upload-workbook`: study-app正式アップロード用。`.xlsx` 4シートExcelをPersistent Disk上の同じJSONへ `schema_version: 2` 形式で保存する。
+- `GET /api/questions/status`: 4モード全体の保存状態、問題数、最終更新日時、ファイル名を返す。
 
-保存先JSONには、互換性維持のためモード別データ（`modes`）と、最後にアップロードされた現在データ（`current`）を保持します。RPG本体は `current` を優先し、未保存時は `modes.word` をフォールバックとして扱います。学習アプリは従来どおり `?mode=...` を使います。
+保存先JSONには `schema_version: 2`、`updatedAt`、`filename`、4モード分の `modes` を保持します。`current` は第2段階の保存形式では保持しません。`GET /api/questions/current` の `mode` 省略時は `word` を返します。学習アプリは従来どおり `?mode=...` を使います。
 
 RPG本体の起動順は以下です。
 
@@ -120,12 +120,12 @@ RPG本体の起動順は以下です。
 3. 取得失敗時のみ `data/default-words.csv` を読み込む。
 4. 標準CSVも失敗した場合だけ内蔵サンプルを利用する。
 
-RPG本体のアップロードは、CSV/ExcelをブラウザでCSV化して `POST /api/questions/upload` に送信します。保存成功後、同じ内容をRPG画面にも読み込みます。
+RPG本体の旧アップロード導線は旧 `POST /api/questions/upload` に依存していたため、第2段階では共通保存対象外です。旧APIは410を返し、保存はstudy-appの正式4シートExcelアップロードへ集約します。
 
 ### study-appのExcelブック読み込み
 
-`study-app/script.js` は、アップロードされたExcelブックを現在選択中モード基準で読み込みます。複数シートExcelではファイル名ではなくシート名を見て、`word` は `英単語` / `英単語テスト` / `word` / `word_mode` / `単語`、`chunk` は `チャンク` / `chunk` / `chunk_mode`、`definition` は `英文和訳` / `英文` / `和訳` / `definition` / `definition_mode` を対応シートとして扱います。既存教材互換のため `★英単語テスト_001_生成`、`★チャンク_001_生成`、`★英文和訳_001_生成` も許可します。
+`study-app/script.js` の正式アップロードは、アップロードされたExcelブックを完全一致の公式4シート（`★英単語` / `★チャンク` / `★文節和訳` / `★英文和訳`）として読み込みます。旧シート名・別名・`word_mode` / `chunk_mode` / `definition_mode` などは正式アップロードでは許可しません。
 
-複数シートExcelで現在選択中モードに対応するシートが存在しない場合、先頭シートへフォールバックせずエラーを表示します。これにより英単語モードが英文和訳シートを読み込む、チャンクモードが英単語シートを読み込む、といった混在を防ぎます。単一シートExcelは従来互換のため、現在モードの単一アップロードとして扱えます。
+公式4シートが不足している場合、または許可外シートが含まれる場合は、先頭シートへフォールバックせずエラーを表示します。単一CSV/単一シートExcelを読み込む場合も一時確認用に限定し、共通保存は行いません。
 
-ブラウザ上では、見つかったモード別シートを `state.localModeRows` に保持し、モード切替時は該当モードのシート由来データだけを `normalizeQuestions` に渡します。Render APIが利用できる場合は `/api/questions/upload` へモード別CSVとして個別送信し、サーバー側の保存形式は従来の `modes.{mode}` を維持します。
+ブラウザ上では、見つかったモード別シートを `state.localModeRows` に保持し、モード切替時は該当モードのシート由来データだけを `normalizeQuestions` に渡します。Render APIが利用できる場合は `/api/questions/upload-workbook` へExcelファイルを一括送信し、サーバー側は `schema_version: 2`、`updatedAt`、`filename`、`modes.word|chunk|phrase|definition` の形式で一括保存します。
