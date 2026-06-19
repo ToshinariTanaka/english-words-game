@@ -116,6 +116,8 @@ Render版では起動時・モード切替時に共通問題データAPIを優�
 
 正式アップロードは `.xlsx` の4シートExcelのみです。シート名は `★英単語` / `★チャンク` / `★文節和訳` / `★英文和訳` の完全一致だけを許可し、旧シート名・別名・`word_mode` / `chunk_mode` / `definition_mode` などは正式アップロードでは許可しません。Render版では `/api/questions/upload-workbook` へ一括保存し、保存JSONは `schema_version: 2` と `modes.word|chunk|phrase|definition` を持ちます。
 
+サーバー側の4シートExcel読み込みには `python3` と `openpyxl` が必要です。Render本番では `render.yaml` の `buildCommand` で `npm ci` に続けて `python3 -m pip install -r tools/requirements.txt` を実行し、`tools/requirements.txt` の `openpyxl>=3.1.0` をインストールします。デプロイ後は `/study-app/` から正式4シートExcelをアップロードし、4モードの件数が保存されることを確認してください。
+
 各シートは1行目をヘッダーとして扱い、A〜L列（`row_number`, `level`, `question`, `correct`, `choice1`, `choice2`, `choice3`, `total_correct`, `total_wrong`, `accuracy`, `current_streak`, `note`）だけを読み込みます。C列 `question`、D列 `correct`、E〜G列 `choice1`〜`choice3` がそろった行だけを出題対象にし、H〜L列の空欄、A列 `row_number` の空欄、M列以降の余分な列、空白行はエラーにしません。H〜L列に値があっても初期学習履歴としては読み込まず、localStorageの学習履歴とは分離します。
 
 ## ローカルPythonツール: study-app用Excelの選択肢自動補完
@@ -173,7 +175,7 @@ Renderでは `server.js` を起動し、静的ファイル配信と共通問題�
 
 ### Render設定
 
-`render.yaml` に、Node Web Service、`npm start`、Persistent Diskのマウント先 `/var/data` を定義しています。保存先は環境変数で変更できます。
+`render.yaml` に、Node Web Service、`npm start`、Persistent Diskのマウント先 `/var/data` を定義しています。保存先は環境変数で変更できます。 build時は `npm ci && python3 -m pip install -r tools/requirements.txt` を実行し、Node依存関係とExcel読み込み用のPython依存関係を同時に準備します。
 
 - `DATA_DIR`: 既定値 `/var/data/english_words_game`
 - `QUESTIONS_FILE`: 既定値 `${DATA_DIR}/current-questions.json`

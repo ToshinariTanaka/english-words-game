@@ -71,8 +71,15 @@ print(json.dumps(result, ensure_ascii=False))
 `, 'utf8');
   try {
     const parsed = spawnSync('python3', [scriptPath, workbookPath], { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 });
-    if (parsed.error) throw parsed.error;
-    if (parsed.status !== 0) throw new Error((parsed.stderr || 'Excelファイルの読み込みに失敗しました。').trim());
+    if (parsed.error) {
+      console.error('Excel workbook parser failed to start:', parsed.error.message);
+      throw new Error('Excelファイルの読み込みに失敗しました。Render環境で python3 / openpyxl が利用できるか確認してください。');
+    }
+    if (parsed.status !== 0) {
+      const detail = (parsed.stderr || parsed.stdout || '').trim();
+      if (detail) console.error('Excel workbook parser failed:', detail);
+      throw new Error('Excelファイルの読み込みに失敗しました。Render環境で python3 / openpyxl が利用できるか確認してください。');
+    }
     return JSON.parse(parsed.stdout || '{}');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

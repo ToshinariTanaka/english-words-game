@@ -45,3 +45,6 @@
 - `question_key` の接頭辞/桁数などの形式チェック、重複チェック、D〜G列重複チェックを追加する。
 - 専用エラーボックスと最大20件のエラー一覧表示を追加する。
 - 実ブラウザで `phrase` モード、音声読み上げ、効果音ON/OFF、復習、レベル範囲、ランダム出題を確認する。
+
+- Renderデプロイ後、build logで `python3 -m pip install -r tools/requirements.txt` が成功していることを確認し、`/study-app/` から正式4シートExcelを実アップロードする。
+- RPG本体の旧アップロード導線は `/api/questions/upload` が410になったため、第3段階とは別に新しい4シートExcel導線へ移行するか非表示にするか決める。
