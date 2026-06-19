@@ -43,3 +43,5 @@
 - 2026-06-19: localStorage学習履歴 `englishGameLearningStats` を `schema_version: 2` + `items` 形式に変更。履歴キーは `モード名::固定シート名::question_key` を優先し、旧schema履歴は読み込み時に削除する方針へ更新。
 
 - 2026-06-19: study-app第2段階として、正式アップロードを完全一致シート名4つを持つ `.xlsx` のみに限定し、`/api/questions/upload-workbook` で `schema_version: 2` の4モード保存形式へ一括保存するよう更新。旧 `/api/questions/upload` は使用不可に変更。
+
+- 2026-06-19: 第3.6段階として `GET /api/diagnostics/python` を追加し、Render本番で `python3` と `openpyxl` の利用可否・バージョンをHTTP 200のJSONで確認できるようにした。Excel読み込み失敗時のサーバーログには実行コマンド、cwd、PATH、spawnSyncのerror/status/stdout/stderrを出す方針へ更新。
