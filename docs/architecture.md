@@ -85,7 +85,7 @@ Render版の `study-app/` は共通問題データAPIを正本として扱いま
 
 ## Render共通問題データAPI
 
-Render版は `server.js` が静的ファイルとAPIを同一オリジンで提供します。アップロードされたCSV/Excelはサーバー側で行データへ変換し、Persistent Disk想定の `/var/data/english_words_game/current-questions.json` に保存します。
+Render版は `server.js` が静的ファイルとAPIを同一オリジンで提供します。アップロードされたCSV/Excelはサーバー側で行データへ変換し、Persistent Disk想定の `/var/data/english_words_game/current-questions.json` に保存します。 `.xlsx` の4シートExcel変換は `python3` と `openpyxl` を使うため、Render build時に `tools/requirements.txt` から `openpyxl>=3.1.0` をインストールします。
 
 - `GET /api/questions/current?mode=word|chunk|phrase|definition`: 保存済み行データを返す。未保存なら404。
 - `POST /api/questions/upload-workbook`: `multipart/form-data` の `.xlsx` 4シートExcelを受け取り、`schema_version: 2` の4モード形式で保存する。
