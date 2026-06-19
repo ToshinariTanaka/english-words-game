@@ -44,4 +44,5 @@
 
 - 2026-06-19: study-app第2段階として、正式アップロードを完全一致シート名4つを持つ `.xlsx` のみに限定し、`/api/questions/upload-workbook` で `schema_version: 2` の4モード保存形式へ一括保存するよう更新。旧 `/api/questions/upload` は使用不可に変更。
 
+- 2026-06-19: 第3.7段階として、Render本番のPython依存関係を `.python_packages` に固定配置する方式へ変更。`render.yaml` は `python3 -m pip install --target ./.python_packages -r tools/requirements.txt` を実行し、`server.js` は診断APIとExcel解析の両方で同じ `PYTHONPATH` を明示して `openpyxl` を参照する。
 - 2026-06-19: 第3.6段階として `GET /api/diagnostics/python` を追加し、Render本番で `python3` と `openpyxl` の利用可否・バージョンをHTTP 200のJSONで確認できるようにした。Excel読み込み失敗時のサーバーログには実行コマンド、cwd、PATH、spawnSyncのerror/status/stdout/stderrを出す方針へ更新。
