@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node tests_parseCsv.js && node tests_study_app_definition_mode.js && node tests_study_app_phase1_modes.js && node tests_question_count.js && node tests_study_app_level_range.js && node tests_study_app_workbook_modes.js && node tests_study_app_voice_filter.js && node tests_study_app_learning_stats.js && node tests_wordbookBatchPrompt.js && python3 tests_fill_excel_choices.py"
+    "test": "node tests_parseCsv.js && node tests_study_app_definition_mode.js && node tests_study_app_phase1_modes.js && node tests_question_count.js && node tests_study_app_level_range.js && node tests_study_app_workbook_modes.js && node tests_study_app_legacy_shared_questions.js && node tests_study_app_voice_filter.js && node tests_study_app_learning_stats.js && node tests_wordbookBatchPrompt.js && python3 tests_fill_excel_choices.py"
   },
   "dependencies": {},
   "devDependencies": {}

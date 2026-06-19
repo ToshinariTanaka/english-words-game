@@ -37,5 +37,6 @@
 - ランダム選択と自動選択は、Junior / Kathy / Ralph / Samantha / Daniel / Karen / Moria / Rishi / Tessa / Fred の固定許可リストに一致する取得済み音声だけを使います。
 - 保存済み固定音声が固定許可リスト内かつ取得済み候補内にあれば復元し、それ以外は自動選択へ戻して保存値をクリアします。許可候補が0件の場合のランダム・自動は Web Speech API の既定自動音声に任せます。
 
+- 2026-06-19: study-appで `GET /api/questions/current?mode=...` が409かつ `{ legacy: true }` を返した場合、レスポンスJSONを読んでから旧形式警告を判定し、標準CSVへフォールバックしつつ4シートExcelの再アップロード案内を表示するよう更新。
 - 2026-06-19: study-app第1段階として4モード化を実施。`phrase`（文節和訳）を追加し、表示順を英単語 / チャンク / 文節和訳 / 英文和訳へ変更。標準CSVは `word_mode.csv` / `chunk_mode.csv` / `phrase_mode.csv` / `definition_mode.csv` の4ファイル構成に更新し、A〜M列の `question_key` を読み込む基礎対応を追加。
 - 2026-06-19: localStorage学習履歴 `englishGameLearningStats` を `schema_version: 2` + `items` 形式に変更。履歴キーは `モード名::固定シート名::question_key` を優先し、旧schema履歴は読み込み時に削除する方針へ更新。
