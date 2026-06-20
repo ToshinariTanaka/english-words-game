@@ -4,6 +4,7 @@ const fs = require('fs');
 const http = require('http');
 const os = require('os');
 const path = require('path');
+const zlib = require('zlib');
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'english-words-audio-test-'));
 const audioDir = path.join(tmpDir, 'audio');
@@ -28,6 +29,58 @@ function request(method, pathname, { body = null, headers = {} } = {}) {
     if (body) req.write(body);
     req.end();
   });
+}
+
+
+function makeZip(entries) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name, 'utf8');
+    const data = Buffer.from(entry.content);
+    const compressed = zlib.deflateRawSync(data);
+    const crc = crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(compressed.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    localParts.push(local, name, compressed);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(compressed.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(offset, 42);
+    centralParts.push(central, name);
+    offset += local.length + name.length + compressed.length;
+  }
+  const centralOffset = offset;
+  const centralSize = centralParts.reduce((sum, part) => sum + part.length, 0);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt32LE(centralSize, 12);
+  eocd.writeUInt32LE(centralOffset, 16);
+  return Buffer.concat([...localParts, ...centralParts, eocd]);
+}
+
+function crc32(buffer) {
+  let crc = ~0;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let i = 0; i < 8; i += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+  }
+  return (~crc) >>> 0;
 }
 
 function makeMultipart(content, filename, contentType = 'audio/mpeg') {
@@ -78,6 +131,21 @@ function makeMultipart(content, filename, contentType = 'audio/mpeg') {
     const overwrite = await request('POST', '/api/audio/upload', { body: overwriteUpload.body, headers: { ...overwriteUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
     assert.strictEqual(overwrite.status, 200, overwrite.text);
     assert.strictEqual(fs.readFileSync(path.join(audioDir, 'w000001.mp3'), 'utf8'), 'new-mp3-data');
+
+
+    const zipBuffer = makeZip([
+      { name: 'nested/c000001.mp3', content: 'zip-mp3-data' },
+      { name: 'bad/x000001.mp3', content: 'bad-name' },
+      { name: 'empty/p000001.mp3', content: '' },
+      { name: 'notes.txt', content: 'not audio' },
+    ]);
+    const zipUpload = makeMultipart(zipBuffer, 'audio.zip', 'application/zip');
+    const zip = await request('POST', '/api/audio/upload-zip', { body: zipUpload.body, headers: { ...zipUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
+    assert.strictEqual(zip.status, 200, zip.text);
+    assert.strictEqual(zip.json.uploaded, 1, zip.text);
+    assert.strictEqual(zip.json.skipped, 3, zip.text);
+    assert.strictEqual(fs.readFileSync(path.join(audioDir, 'c000001.mp3'), 'utf8'), 'zip-mp3-data');
+    assert.ok(!fs.existsSync(path.join(audioDir, 'x000001.mp3')));
 
     console.log('tests_server_audio_upload: OK');
   } finally {
