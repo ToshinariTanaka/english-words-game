@@ -27,11 +27,15 @@
   - `study-app/data/phrase_mode.csv`（文節和訳モード。内部IDは `phrase`）
   - `study-app/data/definition_mode.csv`（英文和訳モード。内部IDは互換性維持のため `definition`）
 
-### 音声読み上げ（2026-06-18）
+### 音声読み上げ（2026-06-19）
+
+`study-app/` は問題カードの「🔊 もう一度聞く」ボタンを押したときだけ音声を再生します。問題表示時の自動読み上げチェックボックスは混乱防止のため非表示にしました。音声は `question_key` に対応する `/audio/{question_key}.mp3` を優先し、MP3が未配置・読み込み失敗・再生失敗の場合はブラウザ標準の Web Speech APIへフォールバックします。
+
+Render Persistent Disk のMP3保存先は `/var/data/audio` です。管理者は `/admin/audio-upload/` から `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式のMP3をアップロードできます。アップロードAPI `POST /api/audio/upload` は `AUDIO_UPLOAD_TOKEN` が設定され、ヘッダー `X-Audio-Upload-Token` と一致した場合だけ有効です。未設定時は安全のため無効化されます。
 
 `study-app/` はブラウザ標準の Web Speech API（`speechSynthesis`）で、現在表示中の C列相当 `question` の英語だけを読み上げます。英単語モードは英単語、チャンクモードは英語チャンク、文節和訳モードは英文中の文節、英文和訳モードは英文全体が対象です。日本語の正解・選択肢は読み上げません。
 
-- 新しい問題表示時は、出題設定の「自動読み上げ」がONの場合に自動再生します（初期値ON）。
+- 新しい問題表示時の自動再生は行いません。
 - 問題カード付近の「🔊 もう一度聞く」ボタンで、現在の問題を手動再生できます。
 - 音声選択は「自動選択」「ランダム」「各音声」の順に表示します。選択値は `englishWordsGame.studyApp.voiceURI` に保存され、再読み込み後も復元されます。
 - 手動の固定音声プルダウンは `speechSynthesis.getVoices()` で取得できた音声のうち、Junior / en-US、Kathy / en-US、Ralph / en-US、Samantha / en-US、Daniel / en-GB、Karen / en-AU、Moria / en-IE、Rishi / en-IN、Tessa / en-ZA、Fred / en-US に一致するものだけを指定順で表示します。

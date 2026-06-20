@@ -1,34 +1,43 @@
 ## 今回やったこと
-- `question_key` から `{API_BASE}/audio/{question_key}.mp3` を組み立て、手動の「もう一度聞く」操作でMP3を優先再生するようにしました。
-- MP3が存在しない、読み込み失敗、または再生失敗の場合は、従来のWeb Speech APIで現在表示中のC列相当 `question` の英語だけを読み上げるフォールバックを維持しました。
-- スマホ利用前提に合わせ、問題表示時の自動読み上げを停止し、ユーザー操作時だけ音声再生するようにしました。
-- 次の問題表示、読み込み状態、セッション終了時にMP3とWeb Speech APIの両方を停止する共通停止処理を追加しました。
-- Render側に `GET /audio/{filename}.mp3` を追加し、Persistent Diskの `/var/data/audio` から `audio/mpeg` と `access-control-allow-origin: *` 付きでMP3を配信するようにしました。
-- UIの見た目は変更していないため、スクリーンショット取得は不要と判断しました。
+- study-app用MP3をRender Persistent Diskへ保存する管理者API `POST /api/audio/upload` を追加しました。
+- `AUDIO_UPLOAD_TOKEN` とリクエストヘッダー `X-Audio-Upload-Token` が一致した場合だけアップロードを許可し、環境変数未設定時はAPIを無効化するようにしました。
+- アップロードファイル名を `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式に制限し、不正ファイル名・空ファイルを拒否するようにしました。
+- `/admin/audio-upload/` に最小構成のMP3アップロード管理画面を追加しました。
+- study-appの「自動読み上げ」チェックボックスを非表示（DOMから削除）にし、音声は問題カードの「🔊 もう一度聞く」ボタンで再生する旨を出題設定内に表示しました。
+- 既存のMP3優先再生、Web Speech APIフォールバック、`/audio/` 配信は維持しました。
+- UI変更は管理画面追加と文言追加です。`npx --yes playwright --version` でスクリーンショット準備を試みましたが、npm registry 403でPlaywrightを取得できずスクリーンショットは未取得です。画面上は `/admin/audio-upload/` にファイル選択・トークン入力・アップロードボタン・結果表示が出ます。
 
 ## 変更ファイル
-- `server.js`: `/audio/` 配信ルート、Persistent Disk音声ディレクトリ、CORS付き `audio/mpeg` レスポンスを追加。
-- `study-app/script.js`: MP3優先再生、Web Speech APIフォールバック、音声停止処理、自動再生停止を追加。
-- `README.md`: Render音声配信仕様とMP3配置ルールを追記。
-- `docs/project_status.md`: MP3音声配信対応の状態を追記。
-- `docs/architecture.md`: study-app音声再生とRender音声配信APIの設計を追記。
-- `docs/next_tasks.md`: Renderデプロイ後の音声配信確認項目を追記。
+- `server.js`: 音声アップロードAPI、トークン認証、ファイル名検証、Persistent Disk保存処理を追加。
+- `admin/audio-upload/index.html`: MP3アップロード管理画面を追加。
+- `admin/audio-upload/style.css`: 管理画面の最小スタイルを追加。
+- `admin/audio-upload/script.js`: 管理画面から `/api/audio/upload` へmultipart送信する処理を追加。
+- `study-app/index.html`: 「自動読み上げ」チェックボックスを削除し、手動再生案内文を追加。
+- `tests_server_audio_upload.js`: 音声アップロードAPIと管理画面、上書き、既存 `/audio/` 配信のテストを追加。
+- `package.json`: `npm test` に音声アップロードAPIテストを追加。
+- `README.md`: MP3配信・アップロード管理機能の説明を更新。
+- `docs/project_status.md`: 今回の対応状況を追記。
+- `docs/architecture.md`: 音声アップロードAPIと管理画面の設計を追記。
 - `docs/codex_report.md`: 今回の作業内容、テスト結果、注意点を更新。
 
 ## テスト結果
-- `node -c server.js` を実行し、構文エラーがないことを確認しました。
-- `node -c study-app/script.js` を実行し、構文エラーがないことを確認しました。
-- `npm test` を実行し、既存テストがすべて成功しました。
+- `node -c server.js`: 成功。
+- `node -c study-app/script.js`: 成功。
+- `node tests_server_audio_upload.js`: 成功。
+- `npm test`: 成功。
+- `npx --yes playwright --version`: npm registry 403によりPlaywright取得不可（スクリーンショット未取得）。
 
 ## 注意点
-- MP3生成処理やAPIキーはブラウザ側にもサーバー側にも追加していません。ブラウザは生成済みMP3を取得して再生するだけです。
-- `/audio/` の実ファイルはRender Persistent Diskの `/var/data/audio` に `{question_key}.mp3` 形式で配置する必要があります。
-- MP3が1つも存在しない場合でも、404後にWeb Speech APIへフォールバックするため既存読み上げとクイズは継続します。
-- `autoSpeak` チェックボックスは既存UIとして残っていますが、今回のスマホ前提仕様に合わせて問題表示時の自動再生には使っていません。
+- Render本番でアップロードAPIを有効化するには、必ず環境変数 `AUDIO_UPLOAD_TOKEN` を設定してください。未設定の場合は安全のため `POST /api/audio/upload` は503で無効化されます。
+- 管理画面は簡易認証トークンを入力して送信する最小構成です。ユーザー管理やログイン機能は追加していません。
+- MP3の中身の音声コーデック検査までは行っていません。サーバー側ではファイル名形式と空ファイル拒否で制限しています。
+- 既存ファイルは同名アップロードで上書きされます。
 
 ## 次にやるべきこと
-- Render Persistent Diskに `/var/data/audio/w000001.mp3` などの実ファイルを置き、`https://english-words-game-1ph3.onrender.com/audio/w000001.mp3` が `content-type: audio/mpeg` と CORS ヘッダー付きで返ることを確認してください。
-- GitHub Pages版の `/study-app/` から「もう一度聞く」を押し、RenderのMP3再生またはWeb Speech APIフォールバックが動くことを実機確認してください。
+- Render Dashboardで `AUDIO_UPLOAD_TOKEN` を設定し、デプロイ後に `/admin/audio-upload/` から `w000001.mp3` などをアップロードしてください。
+- アップロード後、`/audio/w000001.mp3` が再生でき、study-appの「🔊 もう一度聞く」ボタンでMP3優先再生されることを実機確認してください。
+- 必要に応じて、管理画面へのアクセスURLを運用者だけに共有してください。
 
 ## チャッピーに相談すべき点
-- 既存の「問題表示時に自動で読み上げ」チェックボックスを非表示または文言変更するか相談してください。
+- MP3ファイルの実体検査（ID3/MPEGフレーム確認など）やアップロードサイズ上限を、現状の10MBから変更する必要があるか相談してください。
+- 簡易トークン認証で十分か、将来的に管理者ログインへ拡張するか相談してください。

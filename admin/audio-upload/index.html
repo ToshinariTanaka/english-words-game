@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MP3音声アップロード</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="admin-shell">
+    <section class="upload-card">
+      <p class="eyebrow">Study App Admin</p>
+      <h1>MP3音声アップロード</h1>
+      <p class="hint">ファイル名は w000001.mp3 / c000001.mp3 / p000001.mp3 / s000001.mp3 形式のみ対応します。保存先は Render Persistent Disk の /var/data/audio です。</p>
+      <label class="field" for="audioFile">
+        <span>MP3ファイル</span>
+        <input id="audioFile" type="file" accept=".mp3,audio/mpeg">
+      </label>
+      <label class="field" for="uploadToken">
+        <span>アップロードトークン</span>
+        <input id="uploadToken" type="password" autocomplete="off" placeholder="AUDIO_UPLOAD_TOKEN">
+      </label>
+      <button id="uploadButton" type="button">アップロード</button>
+      <pre id="result" class="result" aria-live="polite">結果がここに表示されます。</pre>
+    </section>
+  </main>
+  <script src="./script.js"></script>
+</body>
+</html>
