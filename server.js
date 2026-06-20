@@ -266,6 +266,57 @@ function sendJson(res, status, data) { res.writeHead(status, { 'content-type': '
 function ensureAudioDir() { fs.mkdirSync(AUDIO_DIR, { recursive: true }); }
 function isAllowedAudioFilename(filename) { return /^[wcps]\d{6}\.mp3$/.test(String(filename || '')); }
 
+
+function readUInt(buffer, offset, bytes) {
+  if (offset < 0 || offset + bytes > buffer.length) throw new Error('ZIPファイルの構造が不正です。');
+  if (bytes === 2) return buffer.readUInt16LE(offset);
+  if (bytes === 4) return buffer.readUInt32LE(offset);
+  throw new Error('Unsupported integer size');
+}
+
+function parseZipMp3Entries(buffer) {
+  const entries = [];
+  const eocdMinOffset = Math.max(0, buffer.length - 0xffff - 22);
+  let eocdOffset = -1;
+  for (let offset = Math.max(0, buffer.length - 22); offset >= eocdMinOffset; offset -= 1) {
+    if (offset + 4 <= buffer.length && buffer.readUInt32LE(offset) === 0x06054b50) { eocdOffset = offset; break; }
+  }
+  if (eocdOffset < 0) throw new Error('ZIPファイルとして読み込めませんでした。');
+  const entryCount = readUInt(buffer, eocdOffset + 10, 2);
+  const centralDirectoryOffset = readUInt(buffer, eocdOffset + 16, 4);
+  let offset = centralDirectoryOffset;
+  for (let index = 0; index < entryCount; index += 1) {
+    if (readUInt(buffer, offset, 4) !== 0x02014b50) throw new Error('ZIP中央ディレクトリが不正です。');
+    const compressionMethod = readUInt(buffer, offset + 10, 2);
+    const compressedSize = readUInt(buffer, offset + 20, 4);
+    const uncompressedSize = readUInt(buffer, offset + 24, 4);
+    const filenameLength = readUInt(buffer, offset + 28, 2);
+    const extraLength = readUInt(buffer, offset + 30, 2);
+    const commentLength = readUInt(buffer, offset + 32, 2);
+    const localHeaderOffset = readUInt(buffer, offset + 42, 4);
+    const rawName = buffer.slice(offset + 46, offset + 46 + filenameLength).toString('utf8');
+    offset += 46 + filenameLength + extraLength + commentLength;
+    if (rawName.endsWith('/')) continue;
+    if (!/\.mp3$/i.test(path.basename(rawName))) {
+      entries.push({ originalName: rawName, filename: path.basename(rawName), skipped: true, reason: 'mp3以外のファイルです。' });
+      continue;
+    }
+    if (readUInt(buffer, localHeaderOffset, 4) !== 0x04034b50) throw new Error('ZIPローカルヘッダーが不正です。');
+    const localFilenameLength = readUInt(buffer, localHeaderOffset + 26, 2);
+    const localExtraLength = readUInt(buffer, localHeaderOffset + 28, 2);
+    const dataOffset = localHeaderOffset + 30 + localFilenameLength + localExtraLength;
+    const compressed = buffer.slice(dataOffset, dataOffset + compressedSize);
+    let data;
+    if (compressionMethod === 0) data = compressed;
+    else if (compressionMethod === 8) data = require('zlib').inflateRawSync(compressed);
+    else entries.push({ originalName: rawName, filename: path.basename(rawName), skipped: true, reason: `未対応のZIP圧縮方式です（method=${compressionMethod}）。` });
+    if (!data) continue;
+    if (data.length !== uncompressedSize) throw new Error(`ZIP内ファイルの展開サイズが不正です: ${rawName}`);
+    entries.push({ originalName: rawName, filename: path.basename(rawName), buffer: data });
+  }
+  return entries;
+}
+
 function sendAudioHeaders(res, status, extraHeaders = {}) {
   res.writeHead(status, {
     'content-type': 'audio/mpeg',
@@ -363,6 +414,39 @@ function handleAudioUpload(req, res) {
   });
 }
 
+
+function handleAudioZipUpload(req, res) {
+  const configuredToken = process.env.AUDIO_UPLOAD_TOKEN || '';
+  if (!configuredToken) return sendJson(res, 503, { ok: false, error: '音声アップロードAPIは無効です。AUDIO_UPLOAD_TOKENを設定してください。' });
+  const requestToken = req.headers['x-audio-upload-token'] || '';
+  if (requestToken !== configuredToken) return sendJson(res, 403, { ok: false, error: 'アップロードトークンが不正です。' });
+
+  return readMultipartRequest(req, res, (bodyBuffer, contentType) => {
+    try {
+      const { file } = parseMultipart(bodyBuffer, contentType);
+      if (!file?.buffer?.length) return sendJson(res, 400, { ok: false, error: '空ファイル、またはアップロードファイルがありません。' });
+      if (!/\.zip$/i.test(file.filename || '')) return sendJson(res, 400, { ok: false, error: 'ZIPファイル（.zip）をアップロードしてください。' });
+      ensureAudioDir();
+      const errors = [];
+      const saved = [];
+      let skipped = 0;
+      const entries = parseZipMp3Entries(file.buffer);
+      for (const entry of entries) {
+        if (entry.skipped) { skipped += 1; errors.push({ file: entry.originalName, reason: entry.reason }); continue; }
+        if (!isAllowedAudioFilename(entry.filename)) { skipped += 1; errors.push({ file: entry.originalName, reason: 'MP3ファイル名は w000001.mp3 / c000001.mp3 / p000001.mp3 / s000001.mp3 形式のみ許可されています。' }); continue; }
+        if (!entry.buffer?.length) { skipped += 1; errors.push({ file: entry.originalName, reason: '空ファイルです。' }); continue; }
+        const target = path.resolve(AUDIO_DIR, entry.filename);
+        if (!target.startsWith(path.resolve(AUDIO_DIR) + path.sep)) { skipped += 1; errors.push({ file: entry.originalName, reason: '保存先が不正です。' }); continue; }
+        fs.writeFileSync(target, entry.buffer);
+        saved.push({ file: entry.originalName, filename: entry.filename, url: `/audio/${entry.filename}` });
+      }
+      return sendJson(res, 200, { ok: true, uploaded: saved.length, skipped, errors, files: saved });
+    } catch (error) {
+      return sendJson(res, 400, { ok: false, error: error.message });
+    }
+  });
+}
+
 function handleWorkbookUpload(req, res) {
   return readMultipartRequest(req, res, (bodyBuffer, contentType) => {
     try {
@@ -396,6 +480,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname.startsWith('/audio/')) return handleAudio(req, res, url.pathname);
   if (req.method === 'POST' && url.pathname === '/api/questions/upload-workbook') return handleWorkbookUpload(req, res);
   if (req.method === 'POST' && url.pathname === '/api/audio/upload') return handleAudioUpload(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/audio/upload-zip') return handleAudioZipUpload(req, res);
   if (req.method === 'POST' && (url.pathname === '/api/questions/upload' || url.pathname === '/api/study-app/upload')) return handleUpload(req, res);
   return serveStatic(req, res, url.pathname);
 });

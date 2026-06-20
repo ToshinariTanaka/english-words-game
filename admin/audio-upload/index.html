@@ -20,7 +20,15 @@
         <span>アップロードトークン</span>
         <input id="uploadToken" type="password" autocomplete="off" placeholder="AUDIO_UPLOAD_TOKEN">
       </label>
-      <button id="uploadButton" type="button">アップロード</button>
+      <button id="uploadButton" type="button">単一MP3をアップロード</button>
+      <hr>
+      <h2>ZIP一括アップロード</h2>
+      <p class="hint">ZIP内の .mp3 のみ処理します。サブフォルダ内のファイルも保存時は basename を使い、同名ファイルは上書きします。</p>
+      <label class="field" for="zipFile">
+        <span>ZIPファイル</span>
+        <input id="zipFile" type="file" accept=".zip,application/zip">
+      </label>
+      <button id="zipUploadButton" type="button">ZIPを一括アップロード</button>
       <pre id="result" class="result" aria-live="polite">結果がここに表示されます。</pre>
     </section>
   </main>
