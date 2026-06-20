@@ -1,3 +1,4 @@
+- 2026-06-20: `/admin/audio-upload/` にExcelからMP3生成する管理機能を追加。`POST /api/audio/generate-from-workbook` は `AUDIO_UPLOAD_TOKEN` 認証後、Render側の `OPENAI_API_KEY` を使って4シートExcelのC列 `question` から最大10件のMP3を生成し、M列 `question_key` を `{question_key}.mp3` として `/var/data/audio` に保存する。既存MP3は標準でスキップし、上書き指定時のみ再生成する。
 - 2026-06-20: study-app用MP3管理機能にZIP一括アップロードを追加。`POST /api/audio/upload-zip` は既存の `AUDIO_UPLOAD_TOKEN` 認証を使い、ZIP内の `.mp3` だけを対象に `/var/data/audio` へbasename保存する。不正ファイル名・空ファイル・mp3以外はスキップし、成功数・スキップ数・エラー一覧をJSONで返す。`/admin/audio-upload/` にZIP欄を追加。
 - 2026-06-19: study-app用MP3管理機能を追加。`POST /api/audio/upload` は `AUDIO_UPLOAD_TOKEN` と `X-Audio-Upload-Token` の一致時のみ有効で、`w/c/p/s` + 6桁の `.mp3` を `/var/data/audio` へ上書き保存する。`/admin/audio-upload/` から最小構成の管理アップロードが可能。study-appの自動読み上げチェックボックスは非表示にし、音声は「もう一度聞く」ボタンで再生する方針に統一。
 # Project Status

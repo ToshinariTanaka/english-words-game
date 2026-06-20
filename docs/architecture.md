@@ -139,7 +139,7 @@ RPG本体のアップロード欄は第4段階で一時確認用に整理しま�
 
 ### study-app のMP3アップロード管理
 
-`server.js` は `POST /api/audio/upload` で `multipart/form-data` のMP3ファイルを受け取り、Render Persistent Disk の `/var/data/audio` へ保存します。加えて `POST /api/audio/upload-zip` でZIP一括アップロードを受け取り、ZIP内の `.mp3` だけを対象にします。どちらのAPIも `AUDIO_UPLOAD_TOKEN` が設定され、リクエストヘッダー `X-Audio-Upload-Token` と一致した場合だけ許可します。未設定時はAPIを無効化します。ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式だけを許可し、ZIP内のサブフォルダは保存時に無視してbasenameだけを使います。単一アップロードの空ファイルは拒否し、ZIP内の空ファイル・不正ファイル名・mp3以外はスキップして結果JSONへ記録します。同名ファイルは上書きします。`admin/audio-upload/` は単一MP3とZIP一括アップロードの管理画面です。
+`server.js` は `POST /api/audio/upload` で `multipart/form-data` のMP3ファイルを受け取り、Render Persistent Disk の `/var/data/audio` へ保存します。加えて `POST /api/audio/upload-zip` でZIP一括アップロードを受け取り、ZIP内の `.mp3` だけを対象にします。さらに `POST /api/audio/generate-from-workbook` は4シートExcelのC列 `question` とM列 `question_key` を使い、サーバー側環境変数 `OPENAI_API_KEY` でOpenAI TTSへ接続して最大10件の `{question_key}.mp3` を生成します。既存MP3は標準でスキップし、上書き指定時だけ再生成します。これらのAPIは `AUDIO_UPLOAD_TOKEN` が設定され、リクエストヘッダー `X-Audio-Upload-Token` と一致した場合だけ許可します。未設定時はAPIを無効化します。ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式だけを許可し、ZIP内のサブフォルダは保存時に無視してbasenameだけを使います。単一アップロードの空ファイルは拒否し、ZIP内の空ファイル・不正ファイル名・mp3以外はスキップして結果JSONへ記録します。同名ファイルは上書きします。`admin/audio-upload/` は単一MP3とZIP一括アップロードの管理画面です。
 
 ## ローカルTTS生成ツール
 

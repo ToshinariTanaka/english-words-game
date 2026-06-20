@@ -29,6 +29,30 @@
         <input id="zipFile" type="file" accept=".zip,application/zip">
       </label>
       <button id="zipUploadButton" type="button">ZIPを一括アップロード</button>
+      <hr>
+      <h2>ExcelからMP3生成</h2>
+      <p class="hint">4シートExcel（.xlsx）のC列 question を読み上げ、M列 question_key をファイル名にして /var/data/audio に保存します。安全のため一度に最大10件までです。APIキーはサーバー側の OPENAI_API_KEY を使います。</p>
+      <label class="field" for="workbookFile">
+        <span>Excelファイル</span>
+        <input id="workbookFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+      </label>
+      <label class="field" for="generateMode">
+        <span>対象モード</span>
+        <select id="generateMode">
+          <option value="word">word</option>
+          <option value="chunk">chunk</option>
+          <option value="phrase">phrase</option>
+          <option value="definition">definition</option>
+          <option value="all">all</option>
+        </select>
+      </label>
+      <div class="field-grid">
+        <label class="field" for="startKey"><span>開始キー</span><input id="startKey" type="text" placeholder="w000001"></label>
+        <label class="field" for="endKey"><span>終了キー</span><input id="endKey" type="text" placeholder="w000010"></label>
+        <label class="field" for="generateLimit"><span>生成件数上限</span><input id="generateLimit" type="number" min="1" max="10" value="10"></label>
+      </div>
+      <label class="checkbox-field" for="overwriteAudio"><input id="overwriteAudio" type="checkbox"> 既存MP3を上書きする</label>
+      <button id="generateButton" type="button">ExcelからMP3生成</button>
       <pre id="result" class="result" aria-live="polite">結果がここに表示されます。</pre>
     </section>
   </main>

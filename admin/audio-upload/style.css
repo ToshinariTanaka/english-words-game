@@ -13,3 +13,9 @@ button:disabled { opacity: .55; cursor: wait; }
 
 h2 { margin: 28px 0 8px; font-size: 1.3rem; }
 hr { margin: 28px 0; border: 0; border-top: 1px solid #e2e8f0; }
+select { font: inherit; padding: 12px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; }
+.field-grid { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.field-grid .field { margin: 0; }
+.checkbox-field { display: flex; gap: 8px; align-items: center; margin: 20px 0; font-weight: 700; }
+.checkbox-field input { width: 18px; height: 18px; }
+@media (max-width: 640px) { .field-grid { grid-template-columns: 1fr; } }

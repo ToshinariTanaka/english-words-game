@@ -187,7 +187,7 @@ python3 tools/fill_excel_choices.py input.xlsx \
 
 MP3が存在しない、読み込みに失敗した、または再生に失敗した場合は、従来どおり Web Speech API へフォールバックします。読み上げ対象はC列相当の `question` の英語だけで、正解や選択肢の日本語は読み上げません。スマホ利用を前提に、問題表示時の自動再生は行わず、ユーザーが「もう一度聞く」を押したときだけ再生します。
 
-Render側では `GET /audio/{filename}.mp3` を Persistent Disk の `/var/data/audio` から配信します。管理者向けに `POST /api/audio/upload` は単一MP3、`POST /api/audio/upload-zip` はZIP内MP3の一括保存に対応します。ZIP内のサブフォルダは保存時に無視してbasenameだけを使い、mp3以外・空ファイル・不正ファイル名はスキップしてJSONに記録します。MP3ファイル名は `{question_key}.mp3` です（例: `w000001.mp3`, `c000001.mp3`, `p000001.mp3`, `s000001.mp3`）。レスポンスは `content-type: audio/mpeg` と `access-control-allow-origin: *` を返すため、GitHub Pages版の学習アプリからもRender上のMP3を取得できます。APIキーやTTS生成処理はブラウザ側に置かず、ブラウザは生成済みMP3を取得して再生するだけです。
+Render側では `GET /audio/{filename}.mp3` を Persistent Disk の `/var/data/audio` から配信します。管理者向けに `POST /api/audio/upload` は単一MP3、`POST /api/audio/upload-zip` はZIP内MP3の一括保存に対応します。`/admin/audio-upload/` の「ExcelからMP3生成」では、4シートExcelをアップロードし、対象モード（word/chunk/phrase/definition/all）、開始キー、終了キー、生成件数上限（最大10件）、上書き有無を指定して、C列 `question` からM列 `question_key` 名のMP3を `/var/data/audio` に生成できます。TTS APIキーはブラウザには置かず、Render側の環境変数 `OPENAI_API_KEY` から読みます。ZIP内のサブフォルダは保存時に無視してbasenameだけを使い、mp3以外・空ファイル・不正ファイル名はスキップしてJSONに記録します。MP3ファイル名は `{question_key}.mp3` です（例: `w000001.mp3`, `c000001.mp3`, `p000001.mp3`, `s000001.mp3`）。レスポンスは `content-type: audio/mpeg` と `access-control-allow-origin: *` を返すため、GitHub Pages版の学習アプリからもRender上のMP3を取得できます。APIキーやTTS生成処理はブラウザ側に置かず、ブラウザは生成済みMP3を取得して再生するだけです。
 
 ## Render本番運用と共通問題データ
 

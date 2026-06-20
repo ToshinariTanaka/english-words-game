@@ -9,6 +9,7 @@ const zlib = require('zlib');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'english-words-audio-test-'));
 const audioDir = path.join(tmpDir, 'audio');
 const port = 33323 + Math.floor(Math.random() * 1000);
+const ttsPort = 35323 + Math.floor(Math.random() * 1000);
 
 function wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
@@ -91,8 +92,33 @@ function makeMultipart(content, filename, contentType = 'audio/mpeg') {
 }
 
 (async () => {
+  const ttsServer = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => {
+      const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      res.writeHead(200, { 'content-type': 'audio/mpeg' });
+      res.end(`mock-mp3:${payload.input}`);
+    });
+  });
+  await new Promise((resolve) => ttsServer.listen(ttsPort, '127.0.0.1', resolve));
+  const workbookPath = path.join(tmpDir, 'audio.xlsx');
+  childProcess.execFileSync('python3', ['-c', `
+from openpyxl import Workbook
+wb = Workbook()
+sheets = [('★英単語', 'w', 'Hello'), ('★チャンク', 'c', 'Good morning'), ('★文節和訳', 'p', 'Nice to meet you'), ('★英文和訳', 's', 'This is a pen')]
+for i, (name, prefix, text) in enumerate(sheets):
+    ws = wb.active if i == 0 else wb.create_sheet()
+    ws.title = name
+    ws.append(['row_number','level','question','correct','choice1','choice2','choice3','total_correct','total_wrong','accuracy','current_streak','note','question_key'])
+    for n in range(1, 4):
+        ws.append([n, 'A1', f'{text} {n}', 'a', 'b', 'c', 'd', '', '', '', '', '', f'{prefix}{n:06d}'])
+wb.save(r'''${workbookPath}''')
+`]);
+  let generationServer = null;
+  let uploadServer = null;
   const server = childProcess.spawn(process.execPath, ['server.js'], {
-    env: { ...process.env, PORT: String(port), AUDIO_DIR: audioDir, AUDIO_UPLOAD_TOKEN: 'secret' },
+    env: { ...process.env, PORT: String(port), AUDIO_DIR: audioDir, AUDIO_UPLOAD_TOKEN: 'secret', OPENAI_API_KEY: '', OPENAI_TTS_ENDPOINT: `http://127.0.0.1:${ttsPort}/v1/audio/speech` },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   try {
@@ -103,6 +129,41 @@ function makeMultipart(content, filename, contentType = 'audio/mpeg') {
     const admin = await request('GET', '/admin/audio-upload/');
     assert.strictEqual(admin.status, 200, admin.text);
     assert.ok(admin.text.includes('MP3音声アップロード'));
+    assert.ok(admin.text.includes('ExcelからMP3生成'));
+
+    const noApiKeyWorkbook = makeMultipart('not-xlsx', 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const noApiKey = await request('POST', '/api/audio/generate-from-workbook', { body: noApiKeyWorkbook.body, headers: { ...noApiKeyWorkbook.headers, 'X-Audio-Upload-Token': 'secret' } });
+    assert.strictEqual(noApiKey.status, 503, noApiKey.text);
+    assert.ok(noApiKey.json.error.includes('OPENAI_API_KEY'), noApiKey.text);
+
+    server.kill();
+    await wait(100);
+    generationServer = childProcess.spawn(process.execPath, ['server.js'], {
+      env: { ...process.env, PORT: String(port), AUDIO_DIR: audioDir, AUDIO_UPLOAD_TOKEN: 'secret', OPENAI_API_KEY: 'dummy-key', OPENAI_TTS_ENDPOINT: `http://127.0.0.1:${ttsPort}/v1/audio/speech` },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    for (let i = 0; i < 50; i += 1) {
+      try { await request('GET', '/admin/audio-upload/'); break; } catch (error) { await wait(100); }
+    }
+    const workbookUpload = makeMultipart(fs.readFileSync(workbookPath), 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const generated = await request('POST', '/api/audio/generate-from-workbook', { body: workbookUpload.body, headers: { ...workbookUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
+    assert.strictEqual(generated.status, 200, generated.text);
+    assert.strictEqual(generated.json.generated, 3, generated.text);
+    assert.strictEqual(generated.json.total, 3, generated.text);
+    assert.strictEqual(fs.readFileSync(path.join(audioDir, 'w000001.mp3'), 'utf8'), 'mock-mp3:Hello 1');
+    const skippedWorkbookUpload = makeMultipart(fs.readFileSync(workbookPath), 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const skippedGenerated = await request('POST', '/api/audio/generate-from-workbook', { body: skippedWorkbookUpload.body, headers: { ...skippedWorkbookUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
+    assert.strictEqual(skippedGenerated.status, 200, skippedGenerated.text);
+    assert.strictEqual(skippedGenerated.json.skipped, 3, skippedGenerated.text);
+    generationServer.kill();
+    await wait(100);
+    uploadServer = childProcess.spawn(process.execPath, ['server.js'], {
+      env: { ...process.env, PORT: String(port), AUDIO_DIR: audioDir, AUDIO_UPLOAD_TOKEN: 'secret' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    for (let i = 0; i < 50; i += 1) {
+      try { await request('GET', '/admin/audio-upload/'); break; } catch (error) { await wait(100); }
+    }
 
     const missingTokenUpload = makeMultipart('mp3-data', 'w000001.mp3');
     const missingToken = await request('POST', '/api/audio/upload', missingTokenUpload);
@@ -150,6 +211,9 @@ function makeMultipart(content, filename, contentType = 'audio/mpeg') {
     console.log('tests_server_audio_upload: OK');
   } finally {
     server.kill();
+    if (generationServer) generationServer.kill();
+    if (uploadServer) uploadServer.kill();
+    ttsServer.close();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 })().catch((error) => {
