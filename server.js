@@ -263,6 +263,8 @@ function writeStore(store) {
   fs.renameSync(tmp, DATA_FILE);
 }
 function sendJson(res, status, data) { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); }
+function ensureAudioDir() { fs.mkdirSync(AUDIO_DIR, { recursive: true }); }
+function isAllowedAudioFilename(filename) { return /^[wcps]\d{6}\.mp3$/.test(String(filename || '')); }
 
 function sendAudioHeaders(res, status, extraHeaders = {}) {
   res.writeHead(status, {
@@ -336,6 +338,31 @@ function handleUpload(req, res) {
   });
 }
 
+function handleAudioUpload(req, res) {
+  const configuredToken = process.env.AUDIO_UPLOAD_TOKEN || '';
+  if (!configuredToken) return sendJson(res, 503, { ok: false, error: '音声アップロードAPIは無効です。AUDIO_UPLOAD_TOKENを設定してください。' });
+  const requestToken = req.headers['x-audio-upload-token'] || '';
+  if (requestToken !== configuredToken) return sendJson(res, 403, { ok: false, error: 'アップロードトークンが不正です。' });
+
+  return readMultipartRequest(req, res, (bodyBuffer, contentType) => {
+    try {
+      const { file } = parseMultipart(bodyBuffer, contentType);
+      if (!file?.buffer?.length) return sendJson(res, 400, { ok: false, error: '空ファイル、またはアップロードファイルがありません。' });
+      const filename = path.basename(file.filename || '');
+      if (!isAllowedAudioFilename(filename)) {
+        return sendJson(res, 400, { ok: false, error: 'MP3ファイル名は w000001.mp3 / c000001.mp3 / p000001.mp3 / s000001.mp3 形式にしてください。' });
+      }
+      ensureAudioDir();
+      const target = path.resolve(AUDIO_DIR, filename);
+      if (!target.startsWith(path.resolve(AUDIO_DIR) + path.sep)) return sendJson(res, 403, { ok: false, error: '保存先が不正です。' });
+      fs.writeFileSync(target, file.buffer);
+      return sendJson(res, 200, { ok: true, filename, url: `/audio/${filename}` });
+    } catch (error) {
+      return sendJson(res, 400, { ok: false, error: error.message });
+    }
+  });
+}
+
 function handleWorkbookUpload(req, res) {
   return readMultipartRequest(req, res, (bodyBuffer, contentType) => {
     try {
@@ -368,6 +395,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/diagnostics/python') return handlePythonDiagnostics(req, res);
   if (req.method === 'GET' && url.pathname.startsWith('/audio/')) return handleAudio(req, res, url.pathname);
   if (req.method === 'POST' && url.pathname === '/api/questions/upload-workbook') return handleWorkbookUpload(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/audio/upload') return handleAudioUpload(req, res);
   if (req.method === 'POST' && (url.pathname === '/api/questions/upload' || url.pathname === '/api/study-app/upload')) return handleUpload(req, res);
   return serveStatic(req, res, url.pathname);
 });

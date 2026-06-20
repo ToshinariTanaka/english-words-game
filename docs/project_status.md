@@ -1,3 +1,4 @@
+- 2026-06-19: study-app用MP3管理機能を追加。`POST /api/audio/upload` は `AUDIO_UPLOAD_TOKEN` と `X-Audio-Upload-Token` の一致時のみ有効で、`w/c/p/s` + 6桁の `.mp3` を `/var/data/audio` へ上書き保存する。`/admin/audio-upload/` から最小構成の管理アップロードが可能。study-appの自動読み上げチェックボックスは非表示にし、音声は「もう一度聞く」ボタンで再生する方針に統一。
 # Project Status
 
 - 2026-06-19: study-appの音声再生をMP3優先に更新。`question_key` から `https://english-words-game-1ph3.onrender.com/audio/{question_key}.mp3` を取得し、失敗時はWeb Speech APIへフォールバックする。スマホ前提のため問題表示時の自動再生は行わず、手動の「もう一度聞く」操作時のみ再生する。Render側は `/audio/{filename}.mp3` を `/var/data/audio` から `audio/mpeg` と CORS `*` 付きで配信する。

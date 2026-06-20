@@ -136,3 +136,7 @@ RPG本体のアップロード欄は第4段階で一時確認用に整理しま�
 公式4シートが不足している場合、または許可外シートが含まれる場合は、先頭シートへフォールバックせずエラーを表示します。単一CSV/単一シートExcelを読み込む場合も一時確認用に限定し、共通保存は行いません。
 
 ブラウザ上では、見つかったモード別シートを `state.localModeRows` に保持し、モード切替時は該当モードのシート由来データだけを `normalizeQuestions` に渡します。Render APIが利用できる場合は `/api/questions/upload-workbook` へExcelファイルを一括送信し、サーバー側は `schema_version: 2`、`updatedAt`、`filename`、`modes.word|chunk|phrase|definition` の形式で一括保存します。
+
+### study-app のMP3アップロード管理
+
+`server.js` は `POST /api/audio/upload` で `multipart/form-data` のMP3ファイルを受け取り、Render Persistent Disk の `/var/data/audio` へ保存します。APIは `AUDIO_UPLOAD_TOKEN` が設定され、リクエストヘッダー `X-Audio-Upload-Token` と一致した場合だけ許可します。未設定時はAPIを無効化します。ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式だけを許可し、空ファイルは拒否します。同名ファイルは上書きします。`admin/audio-upload/` はこのAPIを呼ぶ最小管理画面です。
