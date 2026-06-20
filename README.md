@@ -263,3 +263,51 @@ row_number,level,question,correct,choice1,choice2,choice3,total_correct,total_wr
 - M列 `question_key` を読み込み、学習履歴キーは `モード名::固定シート名::question_key` を優先します。例: `チャンク::★チャンク::c000001` / `文節和訳::★文節和訳::p000001`。
 - localStorageの `englishGameLearningStats` は `schema_version: 2` と `items` を持つ形式です。`schema_version: 2` がない旧履歴は読み込み時に削除します。
 - 第2段階では正式アップロードを `.xlsx` の4シートExcelだけにし、`POST /api/questions/upload-workbook` で `schema_version: 2` 形式へ一括保存します。単一CSV/単一シートExcelは一時確認用で、共通保存しません。`question_key` の接頭辞・重複検証も実施します。
+
+## ローカルPythonツール: study-app用MP3音声一括生成
+
+`tools/generate_study_audio.py` は、study-app正式形式の4シートExcelからC列 `question` とM列 `question_key` を読み取り、`{question_key}.mp3` をローカルで一括生成する管理者向けツールです。APIキーは環境変数からだけ読み込み、ブラウザ側やGitHubに置きません。
+
+### 対象シートとキー形式
+
+| `--mode` | シート名 | 許可する `question_key` |
+| --- | --- | --- |
+| `word` | `★英単語` | `w000001` 形式 |
+| `chunk` | `★チャンク` | `c000001` 形式 |
+| `phrase` | `★文節和訳` | `p000001` 形式 |
+| `definition` | `★英文和訳` | `s000001` 形式 |
+| `all` | 上記4シートすべて | 上記すべて |
+
+生成対象は、C列 `question`、M列 `question_key`、D〜G列 `correct` / `choice1` / `choice2` / `choice3` がすべて空でない行だけです。キー形式がモードに合わない行はスキップします。
+
+### セットアップ
+
+```bash
+python3 -m pip install -r tools/requirements.txt
+export OPENAI_API_KEY="sk-..."
+```
+
+任意で `OPENAI_TTS_MODEL`（既定 `tts-1`）と `OPENAI_TTS_VOICE`（既定 `alloy`）を環境変数で変更できます。
+
+### 実行例
+
+```bash
+python3 tools/generate_study_audio.py input.xlsx --mode all --output audio_output
+```
+
+主なオプション:
+
+```bash
+python3 tools/generate_study_audio.py input.xlsx \
+  --mode definition \
+  --output audio_output \
+  --start-key s000001 \
+  --end-key s000050 \
+  --limit 10
+```
+
+- 既に同名MP3がある場合、既定では `skipped` として上書きしません。
+- 上書きしたい場合だけ `--overwrite` を付けます。
+- API未設定時や事前確認だけしたい場合は `--dry-run` を付けると、MP3を作らず対象一覧だけを `audio_output/generation_log.csv` に出力します。
+- ログCSVの列は `question_key,mode,question,output_file,status,message` です。
+- TTS生成部分は `synthesize_text_to_mp3(text, output_path)` 関数に分離しているため、将来別TTS APIへ差し替えやすい構成です。

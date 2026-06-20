@@ -140,3 +140,7 @@ RPG本体のアップロード欄は第4段階で一時確認用に整理しま�
 ### study-app のMP3アップロード管理
 
 `server.js` は `POST /api/audio/upload` で `multipart/form-data` のMP3ファイルを受け取り、Render Persistent Disk の `/var/data/audio` へ保存します。APIは `AUDIO_UPLOAD_TOKEN` が設定され、リクエストヘッダー `X-Audio-Upload-Token` と一致した場合だけ許可します。未設定時はAPIを無効化します。ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式だけを許可し、空ファイルは拒否します。同名ファイルは上書きします。`admin/audio-upload/` はこのAPIを呼ぶ最小管理画面です。
+
+## ローカルTTS生成ツール
+
+`tools/generate_study_audio.py` は、study-app正式4シートExcelを入力にして、ブラウザへAPIキーを渡さずローカル環境でMP3を生成する管理者向けCLIです。Excel読み取りは `openpyxl`、TTS provider境界は `synthesize_text_to_mp3(text, output_path)` に分離しています。現在は `OPENAI_API_KEY` を環境変数から読むOpenAI TTS実装ですが、将来別providerへ差し替える場合もCLIのExcel抽出・ログ出力・skip/overwrite制御を維持できます。
