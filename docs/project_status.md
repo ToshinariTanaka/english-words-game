@@ -51,3 +51,10 @@
 - 2026-06-19: 第3.7段階として、Render本番のPython依存関係を `.python_packages` に固定配置する方式へ変更。`render.yaml` は `python3 -m pip install --target ./.python_packages -r tools/requirements.txt` を実行し、`server.js` は診断APIとExcel解析の両方で同じ `PYTHONPATH` を明示して `openpyxl` を参照する。
 - 2026-06-19: 第3.6段階として `GET /api/diagnostics/python` を追加し、Render本番で `python3` と `openpyxl` の利用可否・バージョンをHTTP 200のJSONで確認できるようにした。Excel読み込み失敗時のサーバーログには実行コマンド、cwd、PATH、spawnSyncのerror/status/stdout/stderrを出す方針へ更新。
 - 2026-06-19: hotfixとしてPR #79の3モード化を取り消し、study-appを `word` / `chunk` / `phrase` / `definition` の4モードへ復旧。`chunk` は `★チャンク` / `chunk_mode.csv`、`phrase` は `★文節和訳` / `phrase_mode.csv` として分離し、`phrase` API指定を `chunk` に寄せない。
+
+## 2026-06-20: study-app用MP3一括生成ローカルツール
+
+- `tools/generate_study_audio.py` を追加し、正式4シートExcelから `question_key.mp3` を一括生成できるようにしました。
+- 対象はC列 `question`、D〜G列、M列 `question_key` がそろった行だけで、`word/chunk/phrase/definition/all` のモード選択に対応しています。
+- 既存MP3は既定でスキップし、`--overwrite` 指定時だけ上書きします。
+- `--dry-run` とCSVログ出力により、APIキー未設定でも生成対象確認ができます。

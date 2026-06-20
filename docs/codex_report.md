@@ -1,43 +1,36 @@
 ## 今回やったこと
-- study-app用MP3をRender Persistent Diskへ保存する管理者API `POST /api/audio/upload` を追加しました。
-- `AUDIO_UPLOAD_TOKEN` とリクエストヘッダー `X-Audio-Upload-Token` が一致した場合だけアップロードを許可し、環境変数未設定時はAPIを無効化するようにしました。
-- アップロードファイル名を `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式に制限し、不正ファイル名・空ファイルを拒否するようにしました。
-- `/admin/audio-upload/` に最小構成のMP3アップロード管理画面を追加しました。
-- study-appの「自動読み上げ」チェックボックスを非表示（DOMから削除）にし、音声は問題カードの「🔊 もう一度聞く」ボタンで再生する旨を出題設定内に表示しました。
-- 既存のMP3優先再生、Web Speech APIフォールバック、`/audio/` 配信は維持しました。
-- UI変更は管理画面追加と文言追加です。`npx --yes playwright --version` でスクリーンショット準備を試みましたが、npm registry 403でPlaywrightを取得できずスクリーンショットは未取得です。画面上は `/admin/audio-upload/` にファイル選択・トークン入力・アップロードボタン・結果表示が出ます。
+- study-app正式形式の4シートExcelからMP3音声を一括生成するローカルPythonツール `tools/generate_study_audio.py` を追加しました。
+- C列 `question`、M列 `question_key`、D〜G列の選択肢がそろった出題対象行だけを読み取り、`w/c/p/s + 6桁` のキー形式をモード別に検証するようにしました。
+- `--mode`、`--output`、`--overwrite`、`--limit`、`--start-key`、`--end-key`、`--dry-run` に対応しました。
+- TTS生成処理を `synthesize_text_to_mp3(text, output_path)` に分離し、現時点では環境変数 `OPENAI_API_KEY` を使うOpenAI TTS実装にしました。APIキーはブラウザ側やリポジトリには置きません。
+- 生成結果を `audio_output/generation_log.csv` 形式で出力するようにしました。
+- READMEにセットアップ、実行例、対象シート、キー形式、dry-run、ログ仕様を追記しました。
 
 ## 変更ファイル
-- `server.js`: 音声アップロードAPI、トークン認証、ファイル名検証、Persistent Disk保存処理を追加。
-- `admin/audio-upload/index.html`: MP3アップロード管理画面を追加。
-- `admin/audio-upload/style.css`: 管理画面の最小スタイルを追加。
-- `admin/audio-upload/script.js`: 管理画面から `/api/audio/upload` へmultipart送信する処理を追加。
-- `study-app/index.html`: 「自動読み上げ」チェックボックスを削除し、手動再生案内文を追加。
-- `tests_server_audio_upload.js`: 音声アップロードAPIと管理画面、上書き、既存 `/audio/` 配信のテストを追加。
-- `package.json`: `npm test` に音声アップロードAPIテストを追加。
-- `README.md`: MP3配信・アップロード管理機能の説明を更新。
-- `docs/project_status.md`: 今回の対応状況を追記。
-- `docs/architecture.md`: 音声アップロードAPIと管理画面の設計を追記。
+- `tools/generate_study_audio.py`: study-app用ExcelからMP3を一括生成するCLIツールを新規追加。
+- `README.md`: ローカルPython音声生成ツールの使い方を追記。
+- `docs/project_status.md`: 今回の追加ツールの状況を追記。
+- `docs/architecture.md`: ローカルTTS生成ツールとprovider分離方針を追記。
 - `docs/codex_report.md`: 今回の作業内容、テスト結果、注意点を更新。
 
 ## テスト結果
-- `node -c server.js`: 成功。
-- `node -c study-app/script.js`: 成功。
-- `node tests_server_audio_upload.js`: 成功。
+- `python3 -m py_compile tools/generate_study_audio.py`: 成功。
+- `python3 /tmp/make_audio_test_workbook.py`: 成功。正式4シート形式の最小テストExcelを作成。
+- `python3 tools/generate_study_audio.py /tmp/study_audio_test.xlsx --mode all --output /tmp/study_audio_output --dry-run`: 成功。4件のdry-runログを生成。
+- `python3 tools/generate_study_audio.py /tmp/study_audio_test.xlsx --mode definition --output /tmp/study_audio_output --dry-run --start-key s000001 --end-key s000050 --limit 1`: 成功。範囲指定とlimitで1件のdry-runログを生成。
 - `npm test`: 成功。
-- `npx --yes playwright --version`: npm registry 403によりPlaywright取得不可（スクリーンショット未取得）。
 
 ## 注意点
-- Render本番でアップロードAPIを有効化するには、必ず環境変数 `AUDIO_UPLOAD_TOKEN` を設定してください。未設定の場合は安全のため `POST /api/audio/upload` は503で無効化されます。
-- 管理画面は簡易認証トークンを入力して送信する最小構成です。ユーザー管理やログイン機能は追加していません。
-- MP3の中身の音声コーデック検査までは行っていません。サーバー側ではファイル名形式と空ファイル拒否で制限しています。
-- 既存ファイルは同名アップロードで上書きされます。
+- 実MP3生成には `OPENAI_API_KEY` が必要です。未設定で `--dry-run` を付けない場合、対象ごとに `failed` としてログへ記録します。
+- 現在のprovider実装はOpenAI TTSです。別TTS APIへ変更する場合は `synthesize_text_to_mp3` を差し替えてください。
+- `--start-key` / `--end-key` は選択したモードのキー形式に合う値だけを受け付けます。`--mode all` の場合は複数prefixをまたげますが、文字列順での範囲判定です。通常は単一モードで使う方が安全です。
+- 今回はローカルCLIとREADME中心の変更で、Web UI変更はありません。スクリーンショットは不要です。
 
 ## 次にやるべきこと
-- Render Dashboardで `AUDIO_UPLOAD_TOKEN` を設定し、デプロイ後に `/admin/audio-upload/` から `w000001.mp3` などをアップロードしてください。
-- アップロード後、`/audio/w000001.mp3` が再生でき、study-appの「🔊 もう一度聞く」ボタンでMP3優先再生されることを実機確認してください。
-- 必要に応じて、管理画面へのアクセスURLを運用者だけに共有してください。
+- 実際の本番Excelで `--dry-run` を実行し、生成対象件数とログ内容を確認してください。
+- 少数件数で `--limit` を付けて実MP3生成を試し、study-appの `/audio/{question_key}.mp3` 配信・再生と組み合わせて確認してください。
+- 必要に応じて `OPENAI_TTS_MODEL` / `OPENAI_TTS_VOICE` の運用標準値を決めてください。
 
 ## チャッピーに相談すべき点
-- MP3ファイルの実体検査（ID3/MPEGフレーム確認など）やアップロードサイズ上限を、現状の10MBから変更する必要があるか相談してください。
-- 簡易トークン認証で十分か、将来的に管理者ログインへ拡張するか相談してください。
+- OpenAI TTSの音声・モデルをどれに固定するか、また英単語/英文で音声を変える必要があるか相談してください。
+- `--mode all` でprefixをまたぐ `--start-key` / `--end-key` の扱いを、運用上は単一モード推奨で十分か相談してください。
