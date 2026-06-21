@@ -287,7 +287,7 @@ python3 -m pip install -r tools/requirements.txt
 export OPENAI_API_KEY="sk-..."
 ```
 
-任意で `OPENAI_TTS_MODEL`（既定 `tts-1`）と `OPENAI_TTS_VOICE`（既定 `alloy`）を環境変数で変更できます。
+任意で `OPENAI_TTS_MODEL`（既定 `gpt-4o-mini-tts`）と `OPENAI_TTS_VOICE`（既定 `alloy`）を環境変数で変更できます。
 
 ### 実行例
 

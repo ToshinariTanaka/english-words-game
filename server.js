@@ -22,7 +22,7 @@ const PUBLIC_DIR = __dirname;
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 10 * 1024 * 1024);
 const MAX_AUDIO_GENERATION_ITEMS = 10;
 const OPENAI_TTS_ENDPOINT = process.env.OPENAI_TTS_ENDPOINT || 'https://api.openai.com/v1/audio/speech';
-const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'tts-1';
+const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
 const OPENAI_TTS_VOICE = process.env.OPENAI_TTS_VOICE || 'alloy';
 const PYTHON_PACKAGE_DIR = process.env.PYTHON_PACKAGE_DIR || path.join(__dirname, '.python_packages');
 
