@@ -271,6 +271,12 @@ function writeStore(store) {
 function sendJson(res, status, data) { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); }
 function ensureAudioDir() { fs.mkdirSync(AUDIO_DIR, { recursive: true }); }
 function isAllowedAudioFilename(filename) { return /^[wcps]\d{6}\.mp3$/.test(String(filename || '')); }
+function isAllowedAudioKey(key) { return /^[wcps]\d{6}$/.test(String(key || '')); }
+function validateAudioKeyRange(startKey, endKey) {
+  if (startKey && !isAllowedAudioKey(startKey)) throw new Error('キーは w000021 のように、英字1文字 + 6桁で入力してください。0が多すぎる可能性があります。');
+  if (endKey && !isAllowedAudioKey(endKey)) throw new Error('キーは w000021 のように、英字1文字 + 6桁で入力してください。0が多すぎる可能性があります。');
+  if (startKey && endKey && startKey > endKey) throw new Error('開始キーは終了キー以下にしてください。');
+}
 function isGeneratedAudioFile(filename) {
   const target = path.resolve(AUDIO_DIR, filename);
   if (!target.startsWith(path.resolve(AUDIO_DIR) + path.sep)) return false;
@@ -577,7 +583,7 @@ function handleAudioGenerateFromWorkbook(req, res) {
       const modes = selectedAudioModes(fields.mode);
       const startKey = String(fields.startKey || '').trim();
       const endKey = String(fields.endKey || '').trim();
-      if (startKey && endKey && startKey > endKey) return sendJson(res, 400, { ok: false, error: '開始キーは終了キー以下にしてください。' });
+      validateAudioKeyRange(startKey, endKey);
       const limit = parsePositiveLimit(fields.limit);
       const overwrite = String(fields.overwrite || '') === 'true';
       const voice = parseAudioVoice(fields.voice);
@@ -625,7 +631,7 @@ function handleAudioGenerationStatus(req, res) {
       const modes = selectedAudioModes(fields.mode);
       const startKey = String(fields.startKey || '').trim();
       const endKey = String(fields.endKey || '').trim();
-      if (startKey && endKey && startKey > endKey) return sendJson(res, 400, { ok: false, error: '開始キーは終了キー以下にしてください。' });
+      validateAudioKeyRange(startKey, endKey);
       const modeRows = parseOfficialWorkbookRows(file.buffer);
       ensureAudioDir();
       return sendJson(res, 200, { ok: true, requestedMode: fields.mode || 'word', outputDir: AUDIO_DIR, ...buildAudioGenerationStatus(modeRows, modes, startKey, endKey) });
