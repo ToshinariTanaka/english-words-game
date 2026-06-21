@@ -4,6 +4,7 @@ const fs = require('fs');
 const http = require('http');
 const os = require('os');
 const path = require('path');
+const vm = require('vm');
 const zlib = require('zlib');
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'english-words-audio-test-'));
@@ -32,6 +33,55 @@ function request(method, pathname, { body = null, headers = {} } = {}) {
   });
 }
 
+
+
+async function testAudioUploadNextRangeButton() {
+  const elements = new Map();
+  function element(id) {
+    if (!elements.has(id)) {
+      elements.set(id, {
+        id,
+        value: '',
+        checked: false,
+        disabled: false,
+        files: [],
+        textContent: '',
+        listeners: {},
+        addEventListener(type, handler) { this.listeners[type] = handler; },
+      });
+    }
+    return elements.get(id);
+  }
+  element('uploadToken').value = 'secret';
+  element('workbookFile').files = [{ name: 'audio.xlsx' }];
+  element('generateMode').value = 'word';
+  element('generateLimit').value = '10';
+  element('ttsVoice').value = 'marin';
+
+  class MockFormData {
+    constructor() { this.entries = []; }
+    append(name, value, filename) { this.entries.push({ name, value, filename }); }
+  }
+
+  const source = fs.readFileSync(path.join(__dirname, 'admin/audio-upload/script.js'), 'utf8');
+  const context = {
+    document: { getElementById: element },
+    FormData: MockFormData,
+    fetch: async () => ({
+      json: async () => ({
+        ok: true,
+        nextStartKey: 'w0000021',
+        nextEndKey: 'w0000030',
+        nextMissingKeys: ['w000021', 'w000022', 'w000023', 'w000024', 'w000025', 'w000026', 'w000027', 'w000028', 'w000029', 'w000030'],
+      }),
+    }),
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context);
+  await element('fillNextRangeButton').listeners.click();
+  assert.strictEqual(element('startKey').value, 'w000021');
+  assert.strictEqual(element('endKey').value, 'w000030');
+}
 
 function makeZip(entries) {
   const localParts = [];
@@ -97,6 +147,7 @@ function makeMultipart(content, filename, contentType = 'audio/mpeg', fields = {
 }
 
 (async () => {
+  await testAudioUploadNextRangeButton();
   const ttsServer = http.createServer((req, res) => {
     const chunks = [];
     req.on('data', (chunk) => chunks.push(chunk));
@@ -177,6 +228,15 @@ wb.save(r'''${workbookPath}''')
     assert.strictEqual(status.json.nextStartKey, 'w000011', status.text);
     assert.strictEqual(status.json.nextEndKey, 'w000020', status.text);
     assert.deepStrictEqual(status.json.nextMissingKeys, ['w000011', 'w000012', 'w000013', 'w000014', 'w000015', 'w000016', 'w000017', 'w000018', 'w000019', 'w000020'], status.text);
+    const invalidStatusWorkbookUpload = makeMultipart(fs.readFileSync(workbookPath), 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', { mode: 'word', startKey: 'w0000021' });
+    const invalidStatus = await request('POST', '/api/audio/generation-status', { body: invalidStatusWorkbookUpload.body, headers: { ...invalidStatusWorkbookUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
+    assert.strictEqual(invalidStatus.status, 400, invalidStatus.text);
+    assert.ok(invalidStatus.json.error.includes('英字1文字 + 6桁'), invalidStatus.text);
+
+    const invalidGenerateWorkbookUpload = makeMultipart(fs.readFileSync(workbookPath), 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', { mode: 'word', startKey: 'w0000021' });
+    const invalidGenerate = await request('POST', '/api/audio/generate-from-workbook', { body: invalidGenerateWorkbookUpload.body, headers: { ...invalidGenerateWorkbookUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
+    assert.strictEqual(invalidGenerate.status, 400, invalidGenerate.text);
+    assert.ok(invalidGenerate.json.error.includes('英字1文字 + 6桁'), invalidGenerate.text);
     generationServer.kill();
     await wait(100);
     uploadServer = childProcess.spawn(process.execPath, ['server.js'], {

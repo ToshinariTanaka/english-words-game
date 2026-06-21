@@ -13,11 +13,38 @@ const ttsVoiceInput = document.getElementById('ttsVoice');
 const checkStatusButton = document.getElementById('checkStatusButton');
 const fillNextRangeButton = document.getElementById('fillNextRangeButton');
 let lastGenerationStatus = null;
+const AUDIO_KEY_MESSAGE = 'キーは w000021 のように、英字1文字 + 6桁で入力してください。0が多すぎる可能性があります。';
+const AUDIO_KEY_PATTERN = /^[wcps]\d{6}$/;
 const generateButton = document.getElementById('generateButton');
 const result = document.getElementById('result');
 
 function showResult(value) {
   result.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+}
+
+function isValidAudioKey(value) {
+  return !value || AUDIO_KEY_PATTERN.test(value);
+}
+
+function validateKeyInputs() {
+  const startKey = startKeyInput.value.trim();
+  const endKey = endKeyInput.value.trim();
+  if (!isValidAudioKey(startKey) || !isValidAudioKey(endKey)) {
+    showResult(AUDIO_KEY_MESSAGE);
+    return false;
+  }
+  return true;
+}
+
+function getNextRangeFromStatus(status) {
+  const nextMissingKeys = Array.isArray(status?.nextMissingKeys) ? status.nextMissingKeys.filter(Boolean) : [];
+  if (nextMissingKeys.length) {
+    return { startKey: nextMissingKeys[0], endKey: nextMissingKeys[nextMissingKeys.length - 1], nextMissingKeys };
+  }
+  if (status?.nextStartKey && status?.nextEndKey) {
+    return { startKey: status.nextStartKey, endKey: status.nextEndKey, nextMissingKeys };
+  }
+  return null;
 }
 
 async function uploadFile({ file, endpoint, button, emptyMessage }) {
@@ -70,6 +97,7 @@ generateButton.addEventListener('click', async () => {
   const file = workbookFileInput.files?.[0];
   if (!file) return showResult('Excelファイルを選択してください。');
   if (!token) return showResult('アップロードトークンを入力してください。');
+  if (!validateKeyInputs()) return;
 
   const formData = new FormData();
   formData.append('file', file, file.name);
@@ -102,6 +130,7 @@ async function checkGenerationStatus() {
   const file = workbookFileInput.files?.[0];
   if (!file) return showResult('Excelファイルを選択してください。');
   if (!token) return showResult('アップロードトークンを入力してください。');
+  if (!validateKeyInputs()) return;
 
   const formData = new FormData();
   formData.append('file', file, file.name);
@@ -130,9 +159,10 @@ async function checkGenerationStatus() {
 checkStatusButton.addEventListener('click', checkGenerationStatus);
 fillNextRangeButton.addEventListener('click', async () => {
   if (!lastGenerationStatus) await checkGenerationStatus();
-  if (!lastGenerationStatus?.nextStartKey || !lastGenerationStatus?.nextEndKey) return showResult('次に作成すべき未作成MP3はありません。');
-  startKeyInput.value = lastGenerationStatus.nextStartKey;
-  endKeyInput.value = lastGenerationStatus.nextEndKey;
+  const nextRange = getNextRangeFromStatus(lastGenerationStatus);
+  if (!nextRange) return showResult('次に作成すべき未作成MP3はありません。');
+  startKeyInput.value = nextRange.startKey;
+  endKeyInput.value = nextRange.endKey;
   generateLimitInput.value = '10';
-  showResult({ message: '次の10件を入力しました。', nextStartKey: lastGenerationStatus.nextStartKey, nextEndKey: lastGenerationStatus.nextEndKey, nextMissingKeys: lastGenerationStatus.nextMissingKeys });
+  showResult({ message: '次の10件を入力しました。', nextStartKey: nextRange.startKey, nextEndKey: nextRange.endKey, nextMissingKeys: nextRange.nextMissingKeys });
 });
