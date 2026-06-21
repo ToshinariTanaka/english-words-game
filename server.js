@@ -23,7 +23,8 @@ const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 10 * 1024 * 1024
 const MAX_AUDIO_GENERATION_ITEMS = 10;
 const OPENAI_TTS_ENDPOINT = process.env.OPENAI_TTS_ENDPOINT || 'https://api.openai.com/v1/audio/speech';
 const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
-const OPENAI_TTS_VOICE = process.env.OPENAI_TTS_VOICE || 'alloy';
+const OPENAI_TTS_VOICE = process.env.OPENAI_TTS_VOICE || 'marin';
+const OPENAI_TTS_VOICES = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar']);
 const PYTHON_PACKAGE_DIR = process.env.PYTHON_PACKAGE_DIR || path.join(__dirname, '.python_packages');
 
 const MIME_TYPES = {
@@ -270,6 +271,22 @@ function writeStore(store) {
 function sendJson(res, status, data) { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); }
 function ensureAudioDir() { fs.mkdirSync(AUDIO_DIR, { recursive: true }); }
 function isAllowedAudioFilename(filename) { return /^[wcps]\d{6}\.mp3$/.test(String(filename || '')); }
+function isGeneratedAudioFile(filename) {
+  const target = path.resolve(AUDIO_DIR, filename);
+  if (!target.startsWith(path.resolve(AUDIO_DIR) + path.sep)) return false;
+  try { return fs.statSync(target).isFile() && fs.statSync(target).size > 0; }
+  catch (error) { return false; }
+}
+function parseAudioVoice(value) {
+  const voice = String(value || OPENAI_TTS_VOICE).trim() || OPENAI_TTS_VOICE;
+  if (!OPENAI_TTS_VOICES.has(voice)) throw new Error(`音声 voice は ${Array.from(OPENAI_TTS_VOICES).join(' / ')} から選択してください。`);
+  return voice;
+}
+function keyWithOffset(key, offset) {
+  const match = String(key || '').match(/^([wcps])(\d{6})$/);
+  if (!match) return '';
+  return `${match[1]}${String(Number(match[2]) + offset).padStart(6, '0')}`;
+}
 
 
 function readUInt(buffer, offset, bytes) {
@@ -472,7 +489,7 @@ function keyInRange(key, startKey, endKey) {
   return true;
 }
 
-function collectAudioGenerationItems(modeRows, modes, startKey, endKey, limit) {
+function collectAudioGenerationItems(modeRows, modes, startKey, endKey, limit = Number.POSITIVE_INFINITY) {
   const items = [];
   for (const mode of modes) {
     const prefix = MODE_KEY_PREFIXES[mode];
@@ -490,11 +507,37 @@ function collectAudioGenerationItems(modeRows, modes, startKey, endKey, limit) {
   return items;
 }
 
-function synthesizeTextToMp3(text, timeoutMs = 60000) {
+function buildAudioGenerationStatus(modeRows, modes, startKey, endKey) {
+  const items = collectAudioGenerationItems(modeRows, modes, startKey, endKey, Number.POSITIVE_INFINITY);
+  const generatedItems = items.filter((item) => isGeneratedAudioFile(item.filename));
+  const missingItems = items.filter((item) => !isGeneratedAudioFile(item.filename));
+  let lastContiguousGeneratedKey = null;
+  for (const item of items) {
+    if (!isGeneratedAudioFile(item.filename)) break;
+    lastContiguousGeneratedKey = item.questionKey;
+  }
+  const firstMissingKey = missingItems[0]?.questionKey || null;
+  const nextMissingKeys = missingItems.slice(0, MAX_AUDIO_GENERATION_ITEMS).map((item) => item.questionKey);
+  return {
+    total: items.length,
+    generated: generatedItems.length,
+    missing: missingItems.length,
+    generatedRate: items.length ? generatedItems.length / items.length : 0,
+    firstKey: items[0]?.questionKey || null,
+    lastKey: items[items.length - 1]?.questionKey || null,
+    lastContiguousGeneratedKey,
+    firstMissingKey,
+    nextStartKey: firstMissingKey,
+    nextEndKey: firstMissingKey ? keyWithOffset(firstMissingKey, MAX_AUDIO_GENERATION_ITEMS - 1) : null,
+    nextMissingKeys,
+  };
+}
+
+function synthesizeTextToMp3(text, voice = OPENAI_TTS_VOICE, timeoutMs = 60000) {
   const apiKey = process.env.OPENAI_API_KEY || '';
   if (!apiKey) return Promise.reject(new Error('OPENAI_API_KEY が未設定です。Render側の環境変数に設定してください。'));
   const endpoint = new URL(OPENAI_TTS_ENDPOINT);
-  const body = Buffer.from(JSON.stringify({ model: OPENAI_TTS_MODEL, voice: OPENAI_TTS_VOICE, input: text, response_format: 'mp3' }), 'utf8');
+  const body = Buffer.from(JSON.stringify({ model: OPENAI_TTS_MODEL, voice, input: text, response_format: 'mp3' }), 'utf8');
   const transport = endpoint.protocol === 'http:' ? http : https;
   return new Promise((resolve, reject) => {
     const req = transport.request(endpoint, {
@@ -537,6 +580,7 @@ function handleAudioGenerateFromWorkbook(req, res) {
       if (startKey && endKey && startKey > endKey) return sendJson(res, 400, { ok: false, error: '開始キーは終了キー以下にしてください。' });
       const limit = parsePositiveLimit(fields.limit);
       const overwrite = String(fields.overwrite || '') === 'true';
+      const voice = parseAudioVoice(fields.voice);
       const modeRows = parseOfficialWorkbookRows(file.buffer);
       const items = collectAudioGenerationItems(modeRows, modes, startKey, endKey, limit);
       ensureAudioDir();
@@ -547,9 +591,9 @@ function handleAudioGenerateFromWorkbook(req, res) {
       for (const item of items) {
         const target = path.resolve(AUDIO_DIR, item.filename);
         if (!target.startsWith(path.resolve(AUDIO_DIR) + path.sep)) { failed += 1; results.push({ ...item, status: 'failed', message: '保存先が不正です。' }); continue; }
-        if (fs.existsSync(target) && !overwrite) { skipped += 1; results.push({ ...item, status: 'skipped', message: '既存MP3があるためスキップしました。', url: `/audio/${item.filename}` }); continue; }
+        if (isGeneratedAudioFile(item.filename) && !overwrite) { skipped += 1; results.push({ ...item, status: 'skipped', message: '既存MP3があるためスキップしました。', url: `/audio/${item.filename}` }); continue; }
         try {
-          const mp3 = await synthesizeTextToMp3(item.question);
+          const mp3 = await synthesizeTextToMp3(item.question, voice);
           if (!mp3.length) throw new Error('TTS APIから空の音声が返されました。');
           fs.writeFileSync(target, mp3);
           generated += 1;
@@ -559,7 +603,32 @@ function handleAudioGenerateFromWorkbook(req, res) {
           results.push({ ...item, status: 'failed', message: error.message });
         }
       }
-      return sendJson(res, failed ? 207 : 200, { ok: failed === 0, requestedMode: fields.mode || 'word', limit, overwrite, outputDir: AUDIO_DIR, total: items.length, generated, skipped, failed, results });
+      return sendJson(res, failed ? 207 : 200, { ok: failed === 0, requestedMode: fields.mode || 'word', limit, overwrite, voice, outputDir: AUDIO_DIR, total: items.length, generated, skipped, failed, results });
+    } catch (error) {
+      return sendJson(res, 400, { ok: false, error: error.message });
+    }
+  });
+}
+
+
+function handleAudioGenerationStatus(req, res) {
+  const configuredToken = process.env.AUDIO_UPLOAD_TOKEN || '';
+  if (!configuredToken) return sendJson(res, 503, { ok: false, error: '音声管理APIは無効です。AUDIO_UPLOAD_TOKENを設定してください。' });
+  const requestToken = req.headers['x-audio-upload-token'] || '';
+  if (requestToken !== configuredToken) return sendJson(res, 403, { ok: false, error: 'アップロードトークンが不正です。' });
+
+  return readMultipartRequest(req, res, (bodyBuffer, contentType) => {
+    try {
+      const { fields, file } = parseMultipart(bodyBuffer, contentType);
+      if (!file?.buffer?.length) return sendJson(res, 400, { ok: false, error: 'Excelファイルを選択してください。' });
+      if (!/\.xlsx$/i.test(file.filename || '')) return sendJson(res, 400, { ok: false, error: '.xlsx の4シートExcelをアップロードしてください。' });
+      const modes = selectedAudioModes(fields.mode);
+      const startKey = String(fields.startKey || '').trim();
+      const endKey = String(fields.endKey || '').trim();
+      if (startKey && endKey && startKey > endKey) return sendJson(res, 400, { ok: false, error: '開始キーは終了キー以下にしてください。' });
+      const modeRows = parseOfficialWorkbookRows(file.buffer);
+      ensureAudioDir();
+      return sendJson(res, 200, { ok: true, requestedMode: fields.mode || 'word', outputDir: AUDIO_DIR, ...buildAudioGenerationStatus(modeRows, modes, startKey, endKey) });
     } catch (error) {
       return sendJson(res, 400, { ok: false, error: error.message });
     }
@@ -600,6 +669,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && url.pathname === '/api/questions/upload-workbook') return handleWorkbookUpload(req, res);
   if (req.method === 'POST' && url.pathname === '/api/audio/upload') return handleAudioUpload(req, res);
   if (req.method === 'POST' && url.pathname === '/api/audio/upload-zip') return handleAudioZipUpload(req, res);
+  if (req.method === 'POST' && url.pathname === '/api/audio/generation-status') return handleAudioGenerationStatus(req, res);
   if (req.method === 'POST' && url.pathname === '/api/audio/generate-from-workbook') return handleAudioGenerateFromWorkbook(req, res);
   if (req.method === 'POST' && (url.pathname === '/api/questions/upload' || url.pathname === '/api/study-app/upload')) return handleUpload(req, res);
   return serveStatic(req, res, url.pathname);

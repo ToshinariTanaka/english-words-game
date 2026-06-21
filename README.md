@@ -31,7 +31,7 @@
 
 `study-app/` は問題カードの「🔊 もう一度聞く」ボタンを押したときだけ音声を再生します。問題表示時の自動読み上げチェックボックスは混乱防止のため非表示にしました。音声は `question_key` に対応する `/audio/{question_key}.mp3` を優先し、MP3が未配置・読み込み失敗・再生失敗の場合はブラウザ標準の Web Speech APIへフォールバックします。
 
-Render Persistent Disk のMP3保存先は `/var/data/audio` です。管理者は `/admin/audio-upload/` から `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式のMP3を単一アップロード、またはZIPで一括アップロードできます。単一アップロードAPI `POST /api/audio/upload` とZIP一括アップロードAPI `POST /api/audio/upload-zip` は `AUDIO_UPLOAD_TOKEN` が設定され、ヘッダー `X-Audio-Upload-Token` と一致した場合だけ有効です。未設定時は安全のため無効化されます。
+Render Persistent Disk のMP3保存先は `/var/data/audio` です。管理者は `/admin/audio-upload/` から `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式のMP3を単一アップロード、またはZIPで一括アップロードできます。単一アップロードAPI `POST /api/audio/upload` とZIP一括アップロードAPI `POST /api/audio/upload-zip` は `AUDIO_UPLOAD_TOKEN` が設定され、ヘッダー `X-Audio-Upload-Token` と一致した場合だけ有効です。未設定時は安全のため無効化されます。 ExcelからのMP3生成ではOpenAI TTSの `voice` を13種類から選択でき、初期値は `marin` です。`POST /api/audio/generation-status` はExcel上の対象キーと `/var/data/audio` の実ファイルを照合し、0バイトMP3を未作成扱いにして `nextStartKey` / `nextEndKey` / `nextMissingKeys` など次に作るべき10件の情報を返します。
 
 `study-app/` はブラウザ標準の Web Speech API（`speechSynthesis`）で、現在表示中の C列相当 `question` の英語だけを読み上げます。英単語モードは英単語、チャンクモードは英語チャンク、文節和訳モードは英文中の文節、英文和訳モードは英文全体が対象です。日本語の正解・選択肢は読み上げません。
 
@@ -187,7 +187,7 @@ python3 tools/fill_excel_choices.py input.xlsx \
 
 MP3が存在しない、読み込みに失敗した、または再生に失敗した場合は、従来どおり Web Speech API へフォールバックします。読み上げ対象はC列相当の `question` の英語だけで、正解や選択肢の日本語は読み上げません。スマホ利用を前提に、問題表示時の自動再生は行わず、ユーザーが「もう一度聞く」を押したときだけ再生します。
 
-Render側では `GET /audio/{filename}.mp3` を Persistent Disk の `/var/data/audio` から配信します。管理者向けに `POST /api/audio/upload` は単一MP3、`POST /api/audio/upload-zip` はZIP内MP3の一括保存に対応します。`/admin/audio-upload/` の「ExcelからMP3生成」では、4シートExcelをアップロードし、対象モード（word/chunk/phrase/definition/all）、開始キー、終了キー、生成件数上限（最大10件）、上書き有無を指定して、C列 `question` からM列 `question_key` 名のMP3を `/var/data/audio` に生成できます。TTS APIキーはブラウザには置かず、Render側の環境変数 `OPENAI_API_KEY` から読みます。ZIP内のサブフォルダは保存時に無視してbasenameだけを使い、mp3以外・空ファイル・不正ファイル名はスキップしてJSONに記録します。MP3ファイル名は `{question_key}.mp3` です（例: `w000001.mp3`, `c000001.mp3`, `p000001.mp3`, `s000001.mp3`）。レスポンスは `content-type: audio/mpeg` と `access-control-allow-origin: *` を返すため、GitHub Pages版の学習アプリからもRender上のMP3を取得できます。APIキーやTTS生成処理はブラウザ側に置かず、ブラウザは生成済みMP3を取得して再生するだけです。
+Render側では `GET /audio/{filename}.mp3` を Persistent Disk の `/var/data/audio` から配信します。管理者向けに `POST /api/audio/upload` は単一MP3、`POST /api/audio/upload-zip` はZIP内MP3の一括保存に対応します。`/admin/audio-upload/` の「MP3作成状況を確認」では、4シートExcelの対象キーと `/var/data/audio` の実ファイルを照合し、0バイトMP3を未作成扱いにしたうえで `total` / `generated` / `missing` / `generatedRate` / `firstKey` / `lastKey` / `lastContiguousGeneratedKey` / `firstMissingKey` / `nextStartKey` / `nextEndKey` / `nextMissingKeys` を返します。「次の10件を入力」はこの `nextStartKey` / `nextEndKey` を入力欄に反映します。`/admin/audio-upload/` の「ExcelからMP3生成」では、4シートExcelをアップロードし、対象モード（word/chunk/phrase/definition/all）、開始キー、終了キー、生成件数上限（最大10件）、上書き有無、OpenAI TTS voice（13種類、初期値 `marin`）を指定して、C列 `question` からM列 `question_key` 名のMP3を `/var/data/audio` に生成できます。TTS APIキーはブラウザには置かず、Render側の環境変数 `OPENAI_API_KEY` から読みます。ZIP内のサブフォルダは保存時に無視してbasenameだけを使い、mp3以外・空ファイル・不正ファイル名はスキップしてJSONに記録します。MP3ファイル名は `{question_key}.mp3` です（例: `w000001.mp3`, `c000001.mp3`, `p000001.mp3`, `s000001.mp3`）。レスポンスは `content-type: audio/mpeg` と `access-control-allow-origin: *` を返すため、GitHub Pages版の学習アプリからもRender上のMP3を取得できます。APIキーやTTS生成処理はブラウザ側に置かず、ブラウザは生成済みMP3を取得して再生するだけです。
 
 ## Render本番運用と共通問題データ
 
