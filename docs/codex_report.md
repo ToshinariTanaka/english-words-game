@@ -1,29 +1,33 @@
 ## 今回やったこと
-- サーバー側の `OPENAI_TTS_MODEL` 既定値を `tts-1` から `gpt-4o-mini-tts` に変更しました。
-- ローカル一括生成ツールの `OPENAI_TTS_MODEL` 既定値も同じく `gpt-4o-mini-tts` にそろえました。
-- READMEのTTSモデル既定値の説明を更新しました。
-- 管理画面の初期voice `marin` や `cedar` を含む13種類voice対応仕様に合わせ、デフォルトモデルを13種類voice対応のモデルへ変更しました。
+- `/admin/audio-upload/` のMP3作成状況確認を、Excel上の対象キーと `/var/data/audio` の実MP3ファイル存在・サイズ確認に基づく仕様へ戻しました。
+- 0バイトMP3は作成済みではなく未作成として扱うようにしました。
+- 状況確認APIのレスポンスに `total` / `generated` / `missing` / `generatedRate` / `firstKey` / `lastKey` / `lastContiguousGeneratedKey` / `firstMissingKey` / `nextStartKey` / `nextEndKey` / `nextMissingKeys` を含めました。
+- 「次の10件を入力」ボタンは、状況確認APIの `nextStartKey` / `nextEndKey` を使って開始キー・終了キーを入力するようにしました。
+- OpenAI TTS用voice選択（13種類、初期値 `marin`）を管理画面・FormData・サーバー検証・TTSリクエストに反映しました。
+- Samantha / en-US などの Web Speech API フォールバック音声候補は既存仕様のまま維持しました。
 
 ## 変更ファイル
-- `server.js`: OpenAI TTS API呼び出しで使うモデル既定値を `gpt-4o-mini-tts` に変更。
-- `tools/generate_study_audio.py`: ExcelからMP3を一括生成するローカルツールのモデル既定値を `gpt-4o-mini-tts` に変更。
-- `README.md`: `OPENAI_TTS_MODEL` の既定値説明を更新。
-- `docs/codex_report.md`: 今回の作業内容とテスト結果を記録。
-- `docs/project_status.md`: 今回の変更状況を追記。
+- `server.js`: MP3生成状況API、0バイト除外、voice検証、TTS voice指定を追加。
+- `admin/audio-upload/index.html`: voiceセレクト、状況確認ボタン、次の10件入力ボタンを追加。
+- `admin/audio-upload/style.css`: 追加ボタンの横並び表示を追加。
+- `admin/audio-upload/script.js`: 状況確認API呼び出し、API返却範囲の入力反映、voice送信を追加。
+- `tests_server_audio_upload.js`: w000001〜w000010作成済み、w000011が0バイトの場合の `nextStartKey=w000011` / `nextEndKey=w000020` を検証するテストを追加。
+- `README.md`: 管理画面のMP3作成状況確認とvoice選択仕様を更新。
+- `docs/project_status.md`: 今回のMP3状況確認・voice選択更新を追記。
 
 ## テスト結果
+- `node --check server.js`: 成功。
 - `node tests_server_audio_upload.js`: 成功。
 - `npm test`: 成功。
 
 ## 注意点
-- 環境変数 `OPENAI_TTS_MODEL` が設定されている環境では、その値が引き続き優先されます。
-- `OPENAI_TTS_VOICE` の既定値は今回変更していません。
-- UI変更はないためスクリーンショットは取得していません。
+- UI変更がありますが、この環境にはブラウザ実行コマンド（Chromium/Google Chrome）が見つからなかったため、スクリーンショット取得は未実施です。
+- 状況確認はアップロードされたExcelの対象行を正とし、`/var/data/audio/{question_key}.mp3` が存在し、かつサイズが1バイト以上の場合のみ作成済み扱いにします。
+- `nextEndKey` は最初の未作成キーから10件分の末尾キーとして計算します。
 
 ## 次にやるべきこと
-- Render本番環境で `OPENAI_TTS_MODEL` を明示設定している場合は、必要に応じて `gpt-4o-mini-tts` へ更新してください。
-- 本番で `marin` / `cedar` を含む音声を使ったMP3生成を少数件で確認してください。
+- 本番Renderの `/var/data/audio` で、実ファイルを使って状況確認APIと「次の10件を入力」ボタンの動作を確認してください。
+- 13種類voiceのうち、本番で利用予定のvoiceを少数件で生成確認してください。
 
 ## チャッピーに相談すべき点
-- 本番環境変数で `OPENAI_TTS_MODEL` を固定する運用にするか、アプリ既定値に任せる運用にするか。
-- `OPENAI_TTS_VOICE` の既定値も管理画面の初期voice `marin` に合わせるべきか。
+- `nextEndKey` を「最初の未作成キーから10連番固定」にする現仕様で、途中に生成済みファイルが混ざるケースでも運用上問題ないか確認してください。

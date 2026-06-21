@@ -61,3 +61,4 @@
 - 対象はC列 `question`、D〜G列、M列 `question_key` がそろった行だけで、`word/chunk/phrase/definition/all` のモード選択に対応しています。
 - 既存MP3は既定でスキップし、`--overwrite` 指定時だけ上書きします。
 - `--dry-run` とCSVログ出力により、APIキー未設定でも生成対象確認ができます。
+- 2026-06-21: `/admin/audio-upload/` のMP3作成状況確認を `/var/data/audio` の実ファイル存在・サイズ確認ベースに更新。0バイトMP3は未作成扱いとし、`nextStartKey` / `nextEndKey` / `nextMissingKeys` を返すAPI結果を「次の10件を入力」ボタンに反映するようにした。OpenAI TTSのvoice選択（13種類、既定 `marin`）も管理画面からサーバー検証・TTSリクエストまで維持。

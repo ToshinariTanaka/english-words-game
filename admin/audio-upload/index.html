@@ -51,7 +51,29 @@
         <label class="field" for="endKey"><span>終了キー</span><input id="endKey" type="text" placeholder="w000010"></label>
         <label class="field" for="generateLimit"><span>生成件数上限</span><input id="generateLimit" type="number" min="1" max="10" value="10"></label>
       </div>
+      <label class="field" for="ttsVoice">
+        <span>音声 voice</span>
+        <select id="ttsVoice">
+          <option value="marin" selected>marin</option>
+          <option value="alloy">alloy</option>
+          <option value="ash">ash</option>
+          <option value="ballad">ballad</option>
+          <option value="coral">coral</option>
+          <option value="echo">echo</option>
+          <option value="fable">fable</option>
+          <option value="nova">nova</option>
+          <option value="onyx">onyx</option>
+          <option value="sage">sage</option>
+          <option value="shimmer">shimmer</option>
+          <option value="verse">verse</option>
+          <option value="cedar">cedar</option>
+        </select>
+      </label>
       <label class="checkbox-field" for="overwriteAudio"><input id="overwriteAudio" type="checkbox"> 既存MP3を上書きする</label>
+      <div class="button-row">
+        <button id="checkStatusButton" type="button">MP3作成状況を確認</button>
+        <button id="fillNextRangeButton" type="button">次の10件を入力</button>
+      </div>
       <button id="generateButton" type="button">ExcelからMP3生成</button>
       <pre id="result" class="result" aria-live="polite">結果がここに表示されます。</pre>
     </section>

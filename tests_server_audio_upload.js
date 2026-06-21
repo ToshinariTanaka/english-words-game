@@ -84,11 +84,16 @@ function crc32(buffer) {
   return (~crc) >>> 0;
 }
 
-function makeMultipart(content, filename, contentType = 'audio/mpeg') {
+function makeMultipart(content, filename, contentType = 'audio/mpeg', fields = {}) {
   const boundary = `----englishWordsAudio${Date.now()}${Math.random()}`;
-  const head = Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`, 'utf8');
-  const tail = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
-  return { body: Buffer.concat([head, Buffer.from(content), tail]), headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } };
+  const parts = [];
+  for (const [name, value] of Object.entries(fields)) {
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`, 'utf8'));
+  }
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`, 'utf8'));
+  parts.push(Buffer.from(content));
+  parts.push(Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8'));
+  return { body: Buffer.concat(parts), headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } };
 }
 
 (async () => {
@@ -111,7 +116,8 @@ for i, (name, prefix, text) in enumerate(sheets):
     ws = wb.active if i == 0 else wb.create_sheet()
     ws.title = name
     ws.append(['row_number','level','question','correct','choice1','choice2','choice3','total_correct','total_wrong','accuracy','current_streak','note','question_key'])
-    for n in range(1, 4):
+    max_n = 20 if prefix == 'w' else 3
+    for n in range(1, max_n + 1):
         ws.append([n, 'A1', f'{text} {n}', 'a', 'b', 'c', 'd', '', '', '', '', '', f'{prefix}{n:06d}'])
 wb.save(r'''${workbookPath}''')
 `]);
@@ -145,16 +151,32 @@ wb.save(r'''${workbookPath}''')
     for (let i = 0; i < 50; i += 1) {
       try { await request('GET', '/admin/audio-upload/'); break; } catch (error) { await wait(100); }
     }
-    const workbookUpload = makeMultipart(fs.readFileSync(workbookPath), 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    const workbookUpload = makeMultipart(fs.readFileSync(workbookPath), 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', { endKey: 'w000003', voice: 'nova' });
     const generated = await request('POST', '/api/audio/generate-from-workbook', { body: workbookUpload.body, headers: { ...workbookUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
     assert.strictEqual(generated.status, 200, generated.text);
     assert.strictEqual(generated.json.generated, 3, generated.text);
     assert.strictEqual(generated.json.total, 3, generated.text);
     assert.strictEqual(fs.readFileSync(path.join(audioDir, 'w000001.mp3'), 'utf8'), 'mock-mp3:Hello 1');
-    const skippedWorkbookUpload = makeMultipart(fs.readFileSync(workbookPath), 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    assert.strictEqual(generated.json.voice, 'nova', generated.text);
+    const skippedWorkbookUpload = makeMultipart(fs.readFileSync(workbookPath), 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', { endKey: 'w000003' });
     const skippedGenerated = await request('POST', '/api/audio/generate-from-workbook', { body: skippedWorkbookUpload.body, headers: { ...skippedWorkbookUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
     assert.strictEqual(skippedGenerated.status, 200, skippedGenerated.text);
     assert.strictEqual(skippedGenerated.json.skipped, 3, skippedGenerated.text);
+    for (let n = 4; n <= 10; n += 1) fs.writeFileSync(path.join(audioDir, `w${String(n).padStart(6, '0')}.mp3`), 'existing-mp3');
+    fs.writeFileSync(path.join(audioDir, 'w000011.mp3'), '');
+    const statusWorkbookUpload = makeMultipart(fs.readFileSync(workbookPath), 'audio.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', { mode: 'word', endKey: 'w000020' });
+    const status = await request('POST', '/api/audio/generation-status', { body: statusWorkbookUpload.body, headers: { ...statusWorkbookUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
+    assert.strictEqual(status.status, 200, status.text);
+    assert.strictEqual(status.json.total, 20, status.text);
+    assert.strictEqual(status.json.generated, 10, status.text);
+    assert.strictEqual(status.json.missing, 10, status.text);
+    assert.strictEqual(status.json.firstKey, 'w000001', status.text);
+    assert.strictEqual(status.json.lastKey, 'w000020', status.text);
+    assert.strictEqual(status.json.lastContiguousGeneratedKey, 'w000010', status.text);
+    assert.strictEqual(status.json.firstMissingKey, 'w000011', status.text);
+    assert.strictEqual(status.json.nextStartKey, 'w000011', status.text);
+    assert.strictEqual(status.json.nextEndKey, 'w000020', status.text);
+    assert.deepStrictEqual(status.json.nextMissingKeys, ['w000011', 'w000012', 'w000013', 'w000014', 'w000015', 'w000016', 'w000017', 'w000018', 'w000019', 'w000020'], status.text);
     generationServer.kill();
     await wait(100);
     uploadServer = childProcess.spawn(process.execPath, ['server.js'], {
