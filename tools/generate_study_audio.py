@@ -36,7 +36,7 @@ MODE_CHOICES = ["all", *SHEET_CONFIGS.keys()]
 DEFAULT_OUTPUT_DIR = "audio_output"
 LOG_FILENAME = "generation_log.csv"
 OPENAI_TTS_ENDPOINT = "https://api.openai.com/v1/audio/speech"
-DEFAULT_OPENAI_TTS_MODEL = "tts-1"
+DEFAULT_OPENAI_TTS_MODEL = "gpt-4o-mini-tts"
 DEFAULT_OPENAI_TTS_VOICE = "alloy"
 
 
