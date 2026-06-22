@@ -64,3 +64,5 @@
 - 既存MP3は既定でスキップし、`--overwrite` 指定時だけ上書きします。
 - `--dry-run` とCSVログ出力により、APIキー未設定でも生成対象確認ができます。
 - 2026-06-21: `/admin/audio-upload/` のMP3作成状況確認を `/var/data/audio` の実ファイル存在・サイズ確認ベースに更新。0バイトMP3は未作成扱いとし、`nextStartKey` / `nextEndKey` / `nextMissingKeys` を返すAPI結果を「次の10件を入力」ボタンに反映するようにした。OpenAI TTSのvoice選択（13種類、既定 `marin`）も管理画面からサーバー検証・TTSリクエストまで維持。
+
+- 2026-06-22: study-appのMP3音声再生でHEAD確認を追加し、MP3未生成・HTTPエラー・fetch失敗・audio.play()失敗・question_keyなしの全ケースでWeb Speech APIへフォールバックするよう修正。`voiceStatus` にMP3再生中/ブラウザ音声フォールバック/ブラウザ音声利用不可を表示し、script.jsのキャッシュバスターも更新。
