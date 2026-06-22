@@ -560,8 +560,32 @@ h1 {
 .study-counts-grid dd {
   margin: 0;
   color: #ffffff;
-  font-size: 1.2rem;
+}
+
+.study-count-period {
+  display: grid;
+  gap: 6px;
+}
+
+.study-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.95rem;
+}
+
+.study-count-row strong {
+  font-size: 1rem;
   font-weight: 900;
+  white-space: nowrap;
+}
+
+.study-count-row-total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  color: #bfdbfe;
 }
 
 @media (max-width: 520px) {

@@ -314,10 +314,11 @@ python3 tools/generate_study_audio.py input.xlsx \
 
 ### study-app 勉強数カウンター
 
-- セッション終了後の結果画面に、今日・今月・今年・累計の勉強数を表示します。
-- 勉強数は正解・不正解に関係なく、ユーザーが1問解答した時点で1カウントします。同じ問題で選択肢を複数回押しても、1問につき1回だけ加算します。
-- 保存先は専用のlocalStorageキー `englishWordsGame.studyApp.studyCounts.v1` です。既存の学習履歴 `englishGameLearningStats` とは分けて保存します。
-- 保存形式は `{ "version": 1, "total": number, "byDate": { "YYYY-MM-DD": number } }` です。今日・今月・今年の表示値はブラウザのローカル日付で `byDate` から集計します。
+- セッション終了後の結果画面に、今日・今月・今年・累計の勉強数を表示します。各カード内で `word`=英単語、`chunk`=チャンク、`phrase`=文節、`definition`=英文、合計を縦並びで確認できます。
+- 勉強数は正解・不正解に関係なく、ユーザーが1問解答した時点で現在の `state.mode` に応じて1カウントします。同じ問題で選択肢を複数回押しても、1問につき1回だけ加算します。
+- 保存先は専用のlocalStorageキー `englishWordsGame.studyApp.studyCounts.v1` のままです。既存の学習履歴 `englishGameLearningStats` とは分けて保存します。
+- 保存形式は同じキーのまま `{ "version": 2, "total": number, "byDate": { "YYYY-MM-DD": number }, "byMode": { "word": number, "chunk": number, "phrase": number, "definition": number }, "byDateMode": { "YYYY-MM-DD": { ... } } }` へ拡張しています。version 1 の `{ total, byDate }` も読み込み時に保持し、過去分のモード別内訳は無理に分配しません。
+- 今日・今月・今年は `byDateMode`、累計は `byMode` から集計します。累計の合計だけは、version 1 由来などで既存 `total` がモード別合計より大きい場合に既存 `total` を表示して、過去の合計が消えたように見えないようにしています。
 
 ### study-app 音声再生
 
