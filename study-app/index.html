@@ -67,6 +67,10 @@
             <input id="randomOrder" type="checkbox">
             <span>ランダム出題</span>
           </label>
+          <label class="random-toggle auto-speak-toggle" for="autoSpeak">
+            <input id="autoSpeak" type="checkbox">
+            <span>自動読上げ</span>
+          </label>
           <label class="setting-field voice-setting-field" for="voiceSelect">
             <span>音声選択</span>
             <select id="voiceSelect">
@@ -75,7 +79,7 @@
             </select>
             <small id="voiceCandidateCount" class="voice-candidate-count">音声候補：0件</small>
             <small class="voice-select-help">音声候補は指定した10種類のうち、このブラウザで利用できるものだけを表示します。</small>
-            <small class="voice-select-help">音声は問題カードの「もう一度聞く」ボタンで再生します。</small>
+            <small class="voice-select-help">自動読上げON時は問題表示時にも再生します。</small>
           </label>
           <label class="random-toggle" for="soundEffects">
             <input id="soundEffects" type="checkbox">
@@ -154,6 +158,6 @@
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="./script.js?v=20260622-audio-fallback"></script>
+  <script src="./script.js?v=20260622-auto-speak"></script>
 </body>
 </html>

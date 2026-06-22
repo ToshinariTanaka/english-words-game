@@ -8,10 +8,8 @@ const end = source.indexOf('function setLoadingState');
 const snippet = source.slice(start, end);
 
 const voiceStatus = { textContent: '' };
-let fetchCalls = [];
-let fetchOk = true;
-let fetchReject = false;
 let audioPlayReject = false;
+let audioPlayPending = false;
 let audioPlayCalls = [];
 let spokenTexts = [];
 let cancelled = 0;
@@ -33,9 +31,11 @@ class MockAudio {
     this.preload = '';
     this.crossOrigin = '';
     audioPlayCalls.push(src);
+    MockAudio.last = this;
   }
   addEventListener(type, callback) { this.listeners[type] = callback; }
   play() {
+    if (audioPlayPending) return new Promise(() => {});
     return audioPlayReject ? Promise.reject(new Error('blocked')) : Promise.resolve();
   }
   pause() {}
@@ -45,6 +45,8 @@ class MockAudio {
 
 const sandbox = {
   console,
+  setTimeout,
+  clearTimeout,
   localStorage: { getItem: () => null, setItem: () => {} },
   document: {
     querySelectorAll: () => [],
@@ -61,11 +63,6 @@ const sandbox = {
   },
   SpeechSynthesisUtterance: MockUtterance,
   Audio: MockAudio,
-  fetch: async (url, options) => {
-    fetchCalls.push({ url, options });
-    if (fetchReject) throw new Error('network');
-    return { ok: fetchOk, status: fetchOk ? 200 : 404 };
-  },
 };
 
 vm.createContext(sandbox);
@@ -78,35 +75,28 @@ this.getCurrentQuestionAudioUrl = getCurrentQuestionAudioUrl;
 async function reset(question) {
   sandbox.state.questions = [question];
   sandbox.state.index = 0;
-  fetchCalls = [];
   audioPlayCalls = [];
   spokenTexts = [];
   cancelled = 0;
-  fetchOk = true;
-  fetchReject = false;
   audioPlayReject = false;
+  audioPlayPending = false;
   voiceStatus.textContent = '';
 }
 
 (async () => {
   await reset({ question: 'reconnaissance', questionKey: 'w000001' });
   await sandbox.speakCurrentQuestion();
-  assert.deepStrictEqual(fetchCalls.map((call) => call.options.method), ['HEAD'], 'MP3 URLの存在確認はHEADで行う');
-  assert.strictEqual(fetchCalls[0].url, 'http://localhost/audio/w000001.mp3');
   assert.deepStrictEqual(audioPlayCalls, ['http://localhost/audio/w000001.mp3'], 'MP3 URLが存在する場合はMP3再生を試す');
   assert.deepStrictEqual(spokenTexts, [], 'MP3再生成功時はWeb Speechへフォールバックしない');
   assert.strictEqual(voiceStatus.textContent, 'MP3を再生しています');
 
-  await reset({ question: 'uncreated word', questionKey: 'w999999' });
-  fetchOk = false;
-  await sandbox.speakCurrentQuestion();
-  assert.deepStrictEqual(audioPlayCalls, [], '404の場合はMP3再生を試さない');
-  assert.deepStrictEqual(spokenTexts, ['uncreated word'], 'MP3 URLが404の場合はWeb Speech APIへフォールバックする');
-  assert.ok(voiceStatus.textContent.startsWith('MP3が未作成のため、ブラウザ音声で読み上げます'), 'フォールバック状態を表示する');
+  await reset({ question: 'auto status', questionKey: 'w000010' });
+  await sandbox.speakCurrentQuestion({ statusPrefix: '自動読上げ：' });
+  assert.strictEqual(voiceStatus.textContent, '自動読上げ：MP3を再生しています', '自動読上げ時は状態を区別して表示する');
+
 
   await reset({ question: 'question without key' });
   await sandbox.speakCurrentQuestion();
-  assert.deepStrictEqual(fetchCalls, [], 'question_keyがない場合はMP3確認を行わない');
   assert.deepStrictEqual(audioPlayCalls, [], 'question_keyがない場合はMP3再生しない');
   assert.deepStrictEqual(spokenTexts, ['question without key'], 'question_keyがない場合はWeb Speech APIへフォールバックする');
 
@@ -117,11 +107,15 @@ async function reset(question) {
   assert.deepStrictEqual(audioPlayCalls, ['http://localhost/audio/w000002.mp3'], 'MP3 URLが存在する場合は再生を試す');
   assert.deepStrictEqual(spokenTexts, ['play reject'], 'audio.play()が失敗した場合もWeb Speech APIへフォールバックする');
 
-  await reset({ question: 'network fail', questionKey: 'w000003' });
-  fetchReject = true;
-  await sandbox.speakCurrentQuestion();
-  assert.deepStrictEqual(audioPlayCalls, [], 'fetch失敗時はMP3再生しない');
-  assert.deepStrictEqual(spokenTexts, ['network fail'], 'fetch失敗時もWeb Speech APIへフォールバックする');
+  await reset({ question: 'error event', questionKey: 'w000003' });
+  audioPlayPending = true;
+  const errorEventPromise = sandbox.speakCurrentQuestion();
+  await Promise.resolve();
+  sandbox.Audio.last.listeners.error();
+  await errorEventPromise;
+  await Promise.resolve();
+  assert.deepStrictEqual(audioPlayCalls, ['http://localhost/audio/w000003.mp3'], 'HEAD確認なしでMP3再生を実際に試す');
+  assert.deepStrictEqual(spokenTexts, ['error event'], 'errorイベント時もWeb Speech APIへフォールバックする');
 
   console.log('tests_study_app_audio_fallback: OK');
 })().catch((error) => {
