@@ -50,6 +50,7 @@ const LEVEL_RANGE_START_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeStart
 const LEVEL_RANGE_END_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeEnd';
 const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
 const LEARNING_STATS_STORAGE_KEY = 'englishGameLearningStats';
+const STUDY_COUNTS_STORAGE_KEY = 'englishWordsGame.studyApp.studyCounts.v1';
 const DEFAULT_QUESTION_COUNT = '10';
 const LEVEL_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const DEFAULT_LEVEL_START = 'A1';
@@ -191,6 +192,11 @@ const els = {
   backToSettingsButton: document.getElementById('backToSettingsButton'),
   weakChecked: document.getElementById('weakChecked'),
   clearLearningStatsButton: document.getElementById('clearLearningStatsButton'),
+  studyCountsSummary: document.getElementById('studyCountsSummary'),
+  studyCountToday: document.getElementById('studyCountToday'),
+  studyCountMonth: document.getElementById('studyCountMonth'),
+  studyCountYear: document.getElementById('studyCountYear'),
+  studyCountTotal: document.getElementById('studyCountTotal'),
 };
 
 let audioContext = null;
@@ -199,6 +205,90 @@ let lastRandomVoiceURI = '';
 let currentQuestionAudio = null;
 let questionPlaybackToken = 0;
 
+function getLocalDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function createEmptyStudyCounts() {
+  return { version: 1, total: 0, byDate: {} };
+}
+
+function normalizeStudyCounts(value) {
+  const counts = createEmptyStudyCounts();
+  if (!value || typeof value !== 'object') return counts;
+  counts.total = Math.max(0, Number(value.total || 0));
+  if (value.byDate && typeof value.byDate === 'object') {
+    Object.entries(value.byDate).forEach(([dateKey, count]) => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+        counts.byDate[dateKey] = Math.max(0, Number(count || 0));
+      }
+    });
+  }
+  return counts;
+}
+
+function readStudyCounts() {
+  try {
+    if (typeof localStorage === 'undefined') return createEmptyStudyCounts();
+    const raw = localStorage.getItem(STUDY_COUNTS_STORAGE_KEY);
+    if (!raw) return createEmptyStudyCounts();
+    return normalizeStudyCounts(JSON.parse(raw));
+  } catch (error) {
+    console.warn('Failed to load study counts:', error);
+    return createEmptyStudyCounts();
+  }
+}
+
+function writeStudyCounts(counts) {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(STUDY_COUNTS_STORAGE_KEY, JSON.stringify(normalizeStudyCounts(counts)));
+  } catch (error) {
+    console.warn('Failed to save study counts:', error);
+  }
+}
+
+function incrementStudyCount(date = new Date()) {
+  const dateKey = getLocalDateKey(date);
+  const counts = readStudyCounts();
+  counts.version = 1;
+  counts.total = Number(counts.total || 0) + 1;
+  counts.byDate[dateKey] = Number(counts.byDate[dateKey] || 0) + 1;
+  writeStudyCounts(counts);
+  return counts;
+}
+
+function aggregateStudyCounts(counts = readStudyCounts(), date = new Date()) {
+  const normalized = normalizeStudyCounts(counts);
+  const todayKey = getLocalDateKey(date);
+  const monthKey = todayKey.slice(0, 7);
+  const yearKey = todayKey.slice(0, 4);
+  return Object.entries(normalized.byDate).reduce((summary, [dateKey, count]) => {
+    const numericCount = Number(count || 0);
+    if (dateKey === todayKey) summary.today += numericCount;
+    if (dateKey.slice(0, 7) === monthKey) summary.month += numericCount;
+    if (dateKey.slice(0, 4) === yearKey) summary.year += numericCount;
+    return summary;
+  }, { today: 0, month: 0, year: 0, total: Number(normalized.total || 0) });
+}
+
+function renderStudyCountsSummary(date = new Date()) {
+  if (!els.studyCountsSummary) return aggregateStudyCounts(readStudyCounts(), date);
+  const summary = aggregateStudyCounts(readStudyCounts(), date);
+  if (els.studyCountToday) els.studyCountToday.textContent = String(summary.today);
+  if (els.studyCountMonth) els.studyCountMonth.textContent = String(summary.month);
+  if (els.studyCountYear) els.studyCountYear.textContent = String(summary.year);
+  if (els.studyCountTotal) els.studyCountTotal.textContent = String(summary.total);
+  els.studyCountsSummary.hidden = false;
+  return summary;
+}
+
+function hideStudyCountsSummary() {
+  if (els.studyCountsSummary) els.studyCountsSummary.hidden = true;
+}
 
 function loadStoredBoolean(key, defaultValue) {
   try {
@@ -1112,6 +1202,7 @@ function resetSessionStats() {
   state.reviewMode = false;
   state.selected = false;
   updateStats();
+  if (typeof hideStudyCountsSummary === 'function') hideStudyCountsSummary();
 }
 
 function hideBackToSettingsButton() {
@@ -1518,6 +1609,7 @@ function answer(choice) {
     }
   }
   updateLearningStat(current, isCorrect);
+  incrementStudyCount();
 
   document.querySelectorAll('.choice-button').forEach((button) => {
     button.disabled = true;
@@ -1539,6 +1631,7 @@ function finishSession() {
   els.choices.innerHTML = '';
   els.feedback.className = 'feedback';
   els.feedback.textContent = `${state.answered}問中${state.correct}問正解、正答率${rate}%です。`;
+  renderStudyCountsSummary();
   els.feedback.hidden = false;
   els.nextButton.disabled = true;
   els.nextButton.textContent = '次の問題へ';
