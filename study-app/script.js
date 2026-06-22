@@ -328,7 +328,7 @@ function aggregateStudyCounts(counts = readStudyCounts(), date = new Date()) {
     summary[period].total = sumModeCounts(summary[period].byMode);
   });
   const modeTotal = sumModeCounts(summary.total.byMode);
-  summary.total.total = Math.max(modeTotal, Number(normalized.total || 0));
+  summary.total.total = modeTotal;
   return summary;
 }
 

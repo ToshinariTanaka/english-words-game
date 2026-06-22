@@ -318,7 +318,7 @@ python3 tools/generate_study_audio.py input.xlsx \
 - 勉強数は正解・不正解に関係なく、ユーザーが1問解答した時点で現在の `state.mode` に応じて1カウントします。同じ問題で選択肢を複数回押しても、1問につき1回だけ加算します。
 - 保存先は専用のlocalStorageキー `englishWordsGame.studyApp.studyCounts.v1` のままです。既存の学習履歴 `englishGameLearningStats` とは分けて保存します。
 - 保存形式は同じキーのまま `{ "version": 2, "total": number, "byDate": { "YYYY-MM-DD": number }, "byMode": { "word": number, "chunk": number, "phrase": number, "definition": number }, "byDateMode": { "YYYY-MM-DD": { ... } } }` へ拡張しています。version 1 の `{ total, byDate }` も読み込み時に保持し、過去分のモード別内訳は無理に分配しません。
-- 今日・今月・今年は `byDateMode`、累計は `byMode` から集計します。累計の合計だけは、version 1 由来などで既存 `total` がモード別合計より大きい場合に既存 `total` を表示して、過去の合計が消えたように見えないようにしています。
+- 今日・今月・今年は `byDateMode`、累計は `byMode` から集計します。各期間の合計は常に表示中のモード別内訳（`word + chunk + phrase + definition`）の合算です。version 1 由来の `total` / `byDate` は互換データとして保持しますが、モード別表示の合計には使いません。
 
 ### study-app 音声再生
 
