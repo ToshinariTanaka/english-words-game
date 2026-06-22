@@ -1,3 +1,4 @@
+- 2026-06-22: study-appの自動読上げチェックボックスを復活。設定は `englishWordsGame.studyApp.autoSpeak` に保存し初期ON。問題表示時はONの場合だけC列相当 `question` を読み上げる。音声再生は「もう一度聞く」と共通化し、HEAD確認ではなくAudio要素でMP3を実再生試行してから、失敗時のみWeb Speech APIへフォールバックする。
 - 2026-06-21: study-appの結果画面に勉強数カウンターを追加。専用localStorageキー `englishWordsGame.studyApp.studyCounts.v1` に `{ version, total, byDate }` 形式で保存し、ブラウザローカル日付の `byDate` から今日・今月・今年を表示時に集計する。既存学習履歴 `englishGameLearningStats` は削除・初期化しない。
 - 2026-06-21: `/admin/audio-upload/` の「次の10件を入力」を `nextMissingKeys` 優先に修正し、`w0000021` のような桁数過多のキーをクライアント・サーバー両方で拒否する検証を追加。
 - 2026-06-20: `/admin/audio-upload/` にExcelからMP3生成する管理機能を追加。`POST /api/audio/generate-from-workbook` は `AUDIO_UPLOAD_TOKEN` 認証後、Render側の `OPENAI_API_KEY` を使って4シートExcelのC列 `question` から最大10件のMP3を生成し、M列 `question_key` を `{question_key}.mp3` として `/var/data/audio` に保存する。既存MP3は標準でスキップし、上書き指定時のみ再生成する。

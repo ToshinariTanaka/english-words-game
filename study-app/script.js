@@ -49,6 +49,7 @@ const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
 const LEVEL_RANGE_START_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeStart';
 const LEVEL_RANGE_END_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeEnd';
 const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
+const AUTO_SPEAK_STORAGE_KEY = 'englishWordsGame.studyApp.autoSpeak';
 const LEARNING_STATS_STORAGE_KEY = 'englishGameLearningStats';
 const STUDY_COUNTS_STORAGE_KEY = 'englishWordsGame.studyApp.studyCounts.v1';
 const DEFAULT_QUESTION_COUNT = '10';
@@ -201,6 +202,7 @@ const els = {
 
 let audioContext = null;
 let soundEnabled = loadStoredBoolean(SOUND_ENABLED_STORAGE_KEY, true);
+let autoSpeakEnabled = loadStoredBoolean(AUTO_SPEAK_STORAGE_KEY, true);
 let lastRandomVoiceURI = '';
 let currentQuestionAudio = null;
 let questionPlaybackToken = 0;
@@ -560,6 +562,17 @@ function playWrongSound() {
   playSoundPattern([220, 147], 'sawtooth', 0.06);
 }
 
+function setupAutoSpeakSetting() {
+  if (!els.autoSpeak) return;
+  els.autoSpeak.checked = autoSpeakEnabled;
+  setVoiceStatusMessage(autoSpeakEnabled ? '自動読上げON' : '自動読上げOFF');
+  els.autoSpeak.addEventListener('change', (event) => {
+    autoSpeakEnabled = event.target.checked;
+    saveStoredBoolean(AUTO_SPEAK_STORAGE_KEY, autoSpeakEnabled);
+    setVoiceStatusMessage(autoSpeakEnabled ? '自動読上げON' : '自動読上げOFF');
+  });
+}
+
 function setupSoundSetting() {
   if (!els.soundEffects) return;
   els.soundEffects.checked = soundEnabled;
@@ -692,22 +705,11 @@ function speakCurrentQuestionWithWebSpeech(statusLabel = '現在の音声') {
   synthesis.speak(utterance);
 }
 
-async function canLoadQuestionAudio(src) {
-  if (!src) return false;
-  if (typeof fetch !== 'function') return true;
-  try {
-    const response = await fetch(src, { method: 'HEAD', cache: 'no-store' });
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-}
-
 function setVoiceStatusMessage(message) {
   if (els.voiceStatus) els.voiceStatus.textContent = message;
 }
 
-function playAudioElement(src) {
+function playAudioElement(src, statusPrefix = '') {
   return new Promise((resolve, reject) => {
     if (!src) {
       reject(new Error('MP3 URL is empty.'));
@@ -716,7 +718,7 @@ function playAudioElement(src) {
     stopQuestionAudio();
     const synthesis = getSpeechSynthesis();
     if (synthesis) synthesis.cancel();
-    setVoiceStatusMessage('MP3を再生しています');
+    setVoiceStatusMessage(`${statusPrefix}MP3を再生しています`);
     const audio = new Audio(src);
     currentQuestionAudio = audio;
     audio.preload = 'auto';
@@ -724,27 +726,46 @@ function playAudioElement(src) {
     audio.addEventListener('ended', () => {
       if (currentQuestionAudio === audio) currentQuestionAudio = null;
     }, { once: true });
+    let settled = false;
+    const timeoutId = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      if (currentQuestionAudio === audio) currentQuestionAudio = null;
+      reject(new Error('MP3 playback timed out.'));
+    }, 5000);
     audio.addEventListener('error', () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
       if (currentQuestionAudio === audio) currentQuestionAudio = null;
       reject(new Error('MP3 failed to load.'));
     }, { once: true });
-    audio.play().then(resolve).catch((error) => {
+    audio.play().then(() => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      resolve();
+    }).catch((error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
       if (currentQuestionAudio === audio) currentQuestionAudio = null;
       reject(error);
     });
   });
 }
 
-async function speakCurrentQuestion() {
+async function speakCurrentQuestion(options = {}) {
   const text = getCurrentQuestionText();
   if (!text) return;
   const playbackToken = questionPlaybackToken + 1;
   questionPlaybackToken = playbackToken;
+  const statusPrefix = options.statusPrefix || '';
   const audioUrl = getCurrentQuestionAudioUrl();
   const fallbackToWebSpeech = () => {
     if (playbackToken !== questionPlaybackToken) return;
     stopQuestionAudio();
-    speakCurrentQuestionWithWebSpeech('MP3が未作成のため、ブラウザ音声で読み上げます');
+    speakCurrentQuestionWithWebSpeech(`${statusPrefix}MP3が再生できないため、ブラウザ音声で読み上げます`);
   };
 
   if (!audioUrl) {
@@ -752,14 +773,7 @@ async function speakCurrentQuestion() {
     return;
   }
 
-  const canLoadAudio = await canLoadQuestionAudio(audioUrl);
-  if (playbackToken !== questionPlaybackToken) return;
-  if (!canLoadAudio) {
-    fallbackToWebSpeech();
-    return;
-  }
-
-  playAudioElement(audioUrl).catch(() => {
+  playAudioElement(audioUrl, statusPrefix).catch(() => {
     fallbackToWebSpeech();
   });
 }
@@ -1623,8 +1637,13 @@ function showQuestion() {
   els.nextButton.textContent = state.index === state.questions.length - 1 ? '結果を見る' : '次の問題へ';
   updateModeUi();
   updateSpeakButton();
-  // スマホでは自動再生が失敗しやすいため、問題表示時は再生しない。
-  // 音声は「もう一度聞く」ボタンのユーザー操作時だけ再生する。
+  if (autoSpeakEnabled) {
+    speakCurrentQuestion({ statusPrefix: '自動読上げ：' }).catch((error) => {
+      console.warn('Auto speak failed:', error);
+    });
+  } else {
+    setVoiceStatusMessage('自動読上げOFF');
+  }
 }
 
 function answer(choice) {
@@ -1713,6 +1732,7 @@ els.clearLearningStatsButton?.addEventListener('click', () => {
 
 setupQuestionCountSetting();
 setupLevelRangeSetting();
+setupAutoSpeakSetting();
 setupSoundSetting();
 setupVoiceSelect();
 setupAudioUnlock();

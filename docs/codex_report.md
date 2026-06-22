@@ -1,31 +1,37 @@
 ## 今回やったこと
-- study-app の「もう一度聞く」で、question_key がある場合は MP3 URL を HEAD で確認してから MP3 再生を試すようにしました。
-- MP3 が 404/403/500 などの非 200 系、fetch 失敗、audio.play() 失敗、question_key なしの場合に、必ず C列相当の question テキストだけを Web Speech API で読み上げるフォールバックを追加しました。
-- voiceStatus に「MP3を再生しています」「MP3が未作成のため、ブラウザ音声で読み上げます」「ブラウザ音声が利用できません」を表示できるようにしました。
-- study-app/index.html の script.js にキャッシュ対策用クエリ `v=20260622-audio-fallback` を追加しました。
-- MP3存在時、404時、question_keyなし、audio.play() reject、fetch失敗の音声フォールバック回帰テストを追加し、npm test に組み込みました。
+- study-app の出題設定欄に「自動読上げ」チェックボックスを復活させました。
+- 自動読上げ設定を `englishWordsGame.studyApp.autoSpeak` に保存し、初期値はON、ユーザーがOFFにした場合は次回以降もOFFを保持するようにしました。
+- 問題表示時、自動読上げONの場合だけ現在の C列相当 `question` の英語を読み上げるようにしました。セッション終了画面や問題なし状態では読み上げません。
+- 「もう一度聞く」と自動読上げを同じ `speakCurrentQuestion` 経路に統一し、`question_key` がある場合は HEAD 確認をせず Audio 要素でMP3再生を実際に試すようにしました。
+- MP3の未生成・読み込み失敗・`audio.play()` reject・`error`イベント・タイムアウト・`question_key` なしの場合だけ Web Speech API へフォールバックするようにしました。
+- 問題切り替え時に、前のMP3再生とWeb Speech API読み上げを停止する既存処理を維持し、自動読上げでも利用するようにしました。
+- `voiceStatus` に自動読上げON/OFF、MP3再生中、Web Speechフォールバック、ブラウザ音声利用不可の状態を表示するようにしました。
+- `script.js` のキャッシュバスターを `v=20260622-auto-speak` に更新しました。
+- 自動読上げとMP3優先/フォールバックの回帰テストを追加・更新しました。
 
 ## 変更ファイル
-- `study-app/script.js`: MP3のHEAD確認、MP3再生失敗時のWeb Speech APIフォールバック、voiceStatus表示を追加。
-- `study-app/index.html`: `script.js` のキャッシュバスターを追加。
-- `tests_study_app_audio_fallback.js`: 音声フォールバックの回帰テストを追加。
-- `package.json`: 新規テストを `npm test` に追加。
-- `docs/architecture.md`: study-app音声仕様にHEAD確認とフォールバック条件を追記。
-- `docs/project_status.md`: 2026-06-22の音声フォールバック修正状況を追記。
-- `README.md`: study-appの音声再生仕様を追記。
-- `docs/codex_report.md`: 本作業内容へ更新。
+- `study-app/index.html`
+- `study-app/script.js`
+- `tests_study_app_audio_fallback.js`
+- `tests_study_app_auto_speak.js`
+- `package.json`
+- `docs/codex_report.md`
+- `docs/architecture.md`
+- `docs/project_status.md`
 
 ## テスト結果
-- `npm test`: 成功。
+- `node tests_study_app_auto_speak.js`: 成功
+- `node tests_study_app_audio_fallback.js`: 成功
+- `npm test`: 成功
 
 ## 注意点
-- MP3未生成時のWeb Speech APIフォールバックはブラウザの `speechSynthesis` に依存します。ブラウザや端末設定でWeb Speech API自体が使えない場合は `voiceStatus` に「ブラウザ音声が利用できません」と表示します。
-- UIの見た目を変える変更ではないため、スクリーンショットは取得していません。
-- HEADリクエストが失敗した場合は、無音回避を優先してMP3再生へ進まずWeb Speech APIにフォールバックします。
+- スマホブラウザでは自動再生制限により、自動読上げONでも初回や状況によってMP3/Web Speech APIの再生がブロックされる可能性があります。その場合でも出題進行と4択回答は止めない設計です。
+- Web Speech APIの音声候補はブラウザ・OS依存です。指定10種類が端末にない場合はブラウザ自動選択へフォールバックします。
+- MP3判定はHEADではなく実再生試行に変更したため、直接URLで再生できるMP3がHEAD制限で誤って除外される問題を避けます。
 
 ## 次にやるべきこと
-- Render本番で、MP3がある問題・未生成の問題・iPhone Safariの各パターンを実機確認してください。
-- 必要であれば、HEAD非対応サーバー向けに通常GETでの存在確認へ切り替える追加フォールバックを検討してください。
+- iPhone Safari / Android Chrome の実機で、自動読上げON/OFF、初回ユーザー操作後の再生可否、voiceStatus表示を確認してください。
+- Render上の実MP3配置済みデータで、MP3優先再生とWeb Speechフォールバックを確認してください。
 
 ## チャッピーに相談すべき点
-- MP3未生成時に `voiceStatus` だけで十分か、追加で小さなトースト表示やログ表示が必要か相談してください。
+- スマホで自動再生がブロックされた場合、voiceStatus以外に「もう一度聞くを押してください」の案内を常時表示するか相談してください。
