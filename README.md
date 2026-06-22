@@ -318,3 +318,7 @@ python3 tools/generate_study_audio.py input.xlsx \
 - 勉強数は正解・不正解に関係なく、ユーザーが1問解答した時点で1カウントします。同じ問題で選択肢を複数回押しても、1問につき1回だけ加算します。
 - 保存先は専用のlocalStorageキー `englishWordsGame.studyApp.studyCounts.v1` です。既存の学習履歴 `englishGameLearningStats` とは分けて保存します。
 - 保存形式は `{ "version": 1, "total": number, "byDate": { "YYYY-MM-DD": number } }` です。今日・今月・今年の表示値はブラウザのローカル日付で `byDate` から集計します。
+
+### study-app 音声再生
+
+`study-app/` は `question_key` がある問題では `{question_key}.mp3` を優先して再生します。MP3 URLをHEADで確認し、未生成・HTTPエラー・fetch失敗・`audio.play()` 失敗時は、無音で終わらせず Web Speech API で現在の `question` だけを読み上げます。`question_key` がない問題も Web Speech API にフォールバックします。

@@ -666,10 +666,13 @@ function getCurrentQuestionAudioUrl() {
   return `${API_BASE}/audio/${encodeURIComponent(questionKey)}.mp3`;
 }
 
-function speakCurrentQuestionWithWebSpeech() {
+function speakCurrentQuestionWithWebSpeech(statusLabel = '現在の音声') {
   const synthesis = getSpeechSynthesis();
   const text = getCurrentQuestionText();
-  if (!synthesis || !text || typeof SpeechSynthesisUtterance === 'undefined') return;
+  if (!synthesis || !text || typeof SpeechSynthesisUtterance === 'undefined') {
+    if (els.voiceStatus) els.voiceStatus.textContent = 'ブラウザ音声が利用できません';
+    return;
+  }
 
   synthesis.cancel();
 
@@ -682,11 +685,26 @@ function speakCurrentQuestionWithWebSpeech() {
     utterance.voice = selectedVoice;
     utterance.lang = selectedVoice.lang || utterance.lang;
   }
-  updateVoiceStatus(selectedVoice, isRandomVoice ? '今回の音声' : '現在の音声');
+  updateVoiceStatus(selectedVoice, statusLabel || (isRandomVoice ? '今回の音声' : '現在の音声'));
   utterance.rate = 0.9;
   utterance.pitch = 1.0;
 
   synthesis.speak(utterance);
+}
+
+async function canLoadQuestionAudio(src) {
+  if (!src) return false;
+  if (typeof fetch !== 'function') return true;
+  try {
+    const response = await fetch(src, { method: 'HEAD', cache: 'no-store' });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
+function setVoiceStatusMessage(message) {
+  if (els.voiceStatus) els.voiceStatus.textContent = message;
 }
 
 function playAudioElement(src) {
@@ -698,6 +716,7 @@ function playAudioElement(src) {
     stopQuestionAudio();
     const synthesis = getSpeechSynthesis();
     if (synthesis) synthesis.cancel();
+    setVoiceStatusMessage('MP3を再生しています');
     const audio = new Audio(src);
     currentQuestionAudio = audio;
     audio.preload = 'auto';
@@ -716,16 +735,32 @@ function playAudioElement(src) {
   });
 }
 
-function speakCurrentQuestion() {
+async function speakCurrentQuestion() {
   const text = getCurrentQuestionText();
   if (!text) return;
   const playbackToken = questionPlaybackToken + 1;
   questionPlaybackToken = playbackToken;
   const audioUrl = getCurrentQuestionAudioUrl();
-  playAudioElement(audioUrl).catch(() => {
+  const fallbackToWebSpeech = () => {
     if (playbackToken !== questionPlaybackToken) return;
     stopQuestionAudio();
-    speakCurrentQuestionWithWebSpeech();
+    speakCurrentQuestionWithWebSpeech('MP3が未作成のため、ブラウザ音声で読み上げます');
+  };
+
+  if (!audioUrl) {
+    fallbackToWebSpeech();
+    return;
+  }
+
+  const canLoadAudio = await canLoadQuestionAudio(audioUrl);
+  if (playbackToken !== questionPlaybackToken) return;
+  if (!canLoadAudio) {
+    fallbackToWebSpeech();
+    return;
+  }
+
+  playAudioElement(audioUrl).catch(() => {
+    fallbackToWebSpeech();
   });
 }
 
