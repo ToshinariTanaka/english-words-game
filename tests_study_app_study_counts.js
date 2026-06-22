@@ -54,7 +54,7 @@ this.renderStudyCountsSummary = renderStudyCountsSummary;`, sandbox);
 
 function assertModeCounts(actual, expected, message) {
   assert.strictEqual(JSON.stringify(actual.byMode), JSON.stringify({ word: 0, chunk: 0, phrase: 0, definition: 0, ...expected }), message);
-  assert.strictEqual(actual.total, Object.values(expected).reduce((sum, value) => sum + value, 0), `${message}: 合計`);
+  assert.strictEqual(actual.total, Object.values({ word: 0, chunk: 0, phrase: 0, definition: 0, ...expected }).reduce((sum, value) => sum + value, 0), `${message}: 合計`);
 }
 
 for (const mode of ['word', 'chunk', 'phrase', 'definition']) {
@@ -88,8 +88,25 @@ assert.strictEqual(migrated.version, 2, 'version 1は読み込み時にversion 2
 assert.strictEqual(migrated.total, 1234, 'version 1のtotalを保持する');
 assert.strictEqual(migrated.byDate['2026-06-22'], 25, 'version 1のbyDateを保持する');
 summary = sandbox.aggregateStudyCounts(migrated, today);
-assert.strictEqual(summary.total.total, 1234, '累計合計は既存totalを尊重する');
+assert.strictEqual(summary.total.total, 0, '累計合計は既存totalではなくbyMode合計を使う');
 assert.strictEqual(JSON.stringify(summary.total.byMode), JSON.stringify({ word: 0, chunk: 0, phrase: 0, definition: 0 }));
+
+const legacyWithMode = {
+  version: 1,
+  total: 30,
+  byDate: { '2026-06-22': 30 },
+  byMode: { word: 10, chunk: 0, phrase: 0, definition: 0 },
+  byDateMode: { '2026-06-22': { word: 10, chunk: 0, phrase: 0, definition: 0 } },
+};
+sandbox = createSandbox(createStorage({ 'englishWordsGame.studyApp.studyCounts.v1': JSON.stringify(legacyWithMode) }));
+summary = sandbox.aggregateStudyCounts(sandbox.readStudyCounts(), today);
+assertModeCounts(summary.total, { word: 10, chunk: 0, phrase: 0, definition: 0 }, '累計でword=10ならtotalは10になる');
+assert.strictEqual(summary.total.total, 10, '既存version 1のtotalが30でもbyMode合計10を表示上の累計合計にする');
+['today', 'month', 'year', 'total'].forEach((period) => {
+  assert.strictEqual(summary[period].total, Object.values(summary[period].byMode).reduce((sum, value) => sum + value, 0), `${period}はモード別合計とtotalが一致する`);
+});
+
+sandbox = createSandbox(createStorage({ 'englishWordsGame.studyApp.studyCounts.v1': JSON.stringify(legacy) }));
 sandbox.incrementStudyCount(today, 'word');
 const afterIncrement = sandbox.readStudyCounts();
 assert.strictEqual(afterIncrement.total, 1235, 'version 1由来のtotalに新規回答分を加算する');
