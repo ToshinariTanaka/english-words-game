@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>英語学習アプリ</title>
-  <link rel="stylesheet" href="./style.css?v=20260619-phase1">
+  <link rel="stylesheet" href="./style.css?v=20260622-study-counts-mode">
 </head>
 <body>
   <main class="app-shell">
@@ -129,19 +129,19 @@
         <dl class="study-counts-grid">
           <div>
             <dt>今日の勉強数</dt>
-            <dd><span id="studyCountToday">0</span>問</dd>
+            <dd id="studyCountToday" class="study-count-period"></dd>
           </div>
           <div>
             <dt>今月の勉強数</dt>
-            <dd><span id="studyCountMonth">0</span>問</dd>
+            <dd id="studyCountMonth" class="study-count-period"></dd>
           </div>
           <div>
             <dt>今年の勉強数</dt>
-            <dd><span id="studyCountYear">0</span>問</dd>
+            <dd id="studyCountYear" class="study-count-period"></dd>
           </div>
           <div>
             <dt>累計の勉強数</dt>
-            <dd><span id="studyCountTotal">0</span>問</dd>
+            <dd id="studyCountTotal" class="study-count-period"></dd>
           </div>
         </dl>
       </section>
@@ -158,6 +158,6 @@
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="./script.js?v=20260622-auto-speak"></script>
+  <script src="./script.js?v=20260622-study-counts-mode"></script>
 </body>
 </html>

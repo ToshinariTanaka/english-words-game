@@ -1,37 +1,30 @@
 ## 今回やったこと
-- study-app の出題設定欄に「自動読上げ」チェックボックスを復活させました。
-- 自動読上げ設定を `englishWordsGame.studyApp.autoSpeak` に保存し、初期値はON、ユーザーがOFFにした場合は次回以降もOFFを保持するようにしました。
-- 問題表示時、自動読上げONの場合だけ現在の C列相当 `question` の英語を読み上げるようにしました。セッション終了画面や問題なし状態では読み上げません。
-- 「もう一度聞く」と自動読上げを同じ `speakCurrentQuestion` 経路に統一し、`question_key` がある場合は HEAD 確認をせず Audio 要素でMP3再生を実際に試すようにしました。
-- MP3の未生成・読み込み失敗・`audio.play()` reject・`error`イベント・タイムアウト・`question_key` なしの場合だけ Web Speech API へフォールバックするようにしました。
-- 問題切り替え時に、前のMP3再生とWeb Speech API読み上げを停止する既存処理を維持し、自動読上げでも利用するようにしました。
-- `voiceStatus` に自動読上げON/OFF、MP3再生中、Web Speechフォールバック、ブラウザ音声利用不可の状態を表示するようにしました。
-- `script.js` のキャッシュバスターを `v=20260622-auto-speak` に更新しました。
-- 自動読上げとMP3優先/フォールバックの回帰テストを追加・更新しました。
+- study-app の勉強数カウンターを、今日・今月・今年・累計それぞれで英単語 / チャンク / 文節 / 英文 / 合計を表示するUIへ変更しました。
+- 保存キー `englishWordsGame.studyApp.studyCounts.v1` は維持したまま、保存形式を version 2 として `byMode` / `byDateMode` を追加しました。
+- version 1 の `total` / `byDate` を読み込んでも消さず、累計合計では既存 `total` を尊重する互換処理を追加しました。
+- 1問解答時に現在の `state.mode` だけを1加算し、同じ問題の二重加算を防ぐ既存ガードが効くことをテストで確認しました。
+- README / docs/project_status.md を更新しました。
 
 ## 変更ファイル
-- `study-app/index.html`
 - `study-app/script.js`
-- `tests_study_app_audio_fallback.js`
-- `tests_study_app_auto_speak.js`
-- `package.json`
-- `docs/codex_report.md`
-- `docs/architecture.md`
+- `study-app/index.html`
+- `study-app/style.css`
+- `tests_study_app_study_counts.js`
+- `README.md`
 - `docs/project_status.md`
+- `docs/codex_report.md`
 
 ## テスト結果
-- `node tests_study_app_auto_speak.js`: 成功
-- `node tests_study_app_audio_fallback.js`: 成功
-- `npm test`: 成功
+- `npm test` を実行し、全テストが成功しました。
+- 実行時に npm の `Unknown env config "http-proxy"` 警告が表示されましたが、テスト自体は成功しています。
 
 ## 注意点
-- スマホブラウザでは自動再生制限により、自動読上げONでも初回や状況によってMP3/Web Speech APIの再生がブロックされる可能性があります。その場合でも出題進行と4択回答は止めない設計です。
-- Web Speech APIの音声候補はブラウザ・OS依存です。指定10種類が端末にない場合はブラウザ自動選択へフォールバックします。
-- MP3判定はHEADではなく実再生試行に変更したため、直接URLで再生できるMP3がHEAD制限で誤って除外される問題を避けます。
+- 既存 version 1 データの過去分にはモード別内訳がないため、仕様どおり過去分を各モードへ分配していません。
+- そのため、移行直後の今日・今月・今年のモード別表示は、新しく解答した分から反映されます。累計合計だけは既存 `total` を尊重します。
+- UI変更はコード・テストで確認しましたが、このコンテナにはブラウザ/スクリーンショット取得ツールがなく、スクリーンショット撮影は未実施です。
 
 ## 次にやるべきこと
-- iPhone Safari / Android Chrome の実機で、自動読上げON/OFF、初回ユーザー操作後の再生可否、voiceStatus表示を確認してください。
-- Render上の実MP3配置済みデータで、MP3優先再生とWeb Speechフォールバックを確認してください。
+- 実機ブラウザで、複数モードをまたいで回答したときの表示バランスを確認するとより安心です。
 
 ## チャッピーに相談すべき点
-- スマホで自動再生がブロックされた場合、voiceStatus以外に「もう一度聞くを押してください」の案内を常時表示するか相談してください。
+- version 1 由来の過去合計を、将来的に「内訳不明」行としてUIに出すべきかどうか。

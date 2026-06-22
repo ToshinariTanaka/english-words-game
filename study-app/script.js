@@ -98,6 +98,8 @@ const WORKBOOK_SHEET_ALIASES = {
 };
 const OFFICIAL_WORKBOOK_SHEETS = { word: '★英単語', chunk: '★チャンク', phrase: '★文節和訳', definition: '★英文和訳' };
 const MODE_KEY_PREFIXES = { word: 'w', chunk: 'c', phrase: 'p', definition: 's' };
+const STUDY_COUNT_MODES = ['word', 'chunk', 'phrase', 'definition'];
+const STUDY_COUNT_MODE_LABELS = { word: '英単語', chunk: 'チャンク', phrase: '文節', definition: '英文' };
 const ALLOWED_OFFICIAL_LEVELS = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 const MAX_SHOWN_UPLOAD_ERRORS = 20;
 
@@ -214,18 +216,40 @@ function getLocalDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function createEmptyModeCounts() {
+  return Object.fromEntries(STUDY_COUNT_MODES.map((mode) => [mode, 0]));
+}
+
+function normalizeModeCounts(value) {
+  const counts = createEmptyModeCounts();
+  if (!value || typeof value !== 'object') return counts;
+  STUDY_COUNT_MODES.forEach((mode) => {
+    counts[mode] = Math.max(0, Number(value[mode] || 0));
+  });
+  return counts;
+}
+
 function createEmptyStudyCounts() {
-  return { version: 1, total: 0, byDate: {} };
+  return { version: 2, total: 0, byDate: {}, byMode: createEmptyModeCounts(), byDateMode: {} };
 }
 
 function normalizeStudyCounts(value) {
   const counts = createEmptyStudyCounts();
   if (!value || typeof value !== 'object') return counts;
+  counts.version = 2;
   counts.total = Math.max(0, Number(value.total || 0));
   if (value.byDate && typeof value.byDate === 'object') {
     Object.entries(value.byDate).forEach(([dateKey, count]) => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
         counts.byDate[dateKey] = Math.max(0, Number(count || 0));
+      }
+    });
+  }
+  counts.byMode = normalizeModeCounts(value.byMode);
+  if (value.byDateMode && typeof value.byDateMode === 'object') {
+    Object.entries(value.byDateMode).forEach(([dateKey, modeCounts]) => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+        counts.byDateMode[dateKey] = normalizeModeCounts(modeCounts);
       }
     });
   }
@@ -253,14 +277,27 @@ function writeStudyCounts(counts) {
   }
 }
 
-function incrementStudyCount(date = new Date()) {
+function incrementStudyCount(date = new Date(), mode = state.mode) {
   const dateKey = getLocalDateKey(date);
+  const countMode = STUDY_COUNT_MODES.includes(mode) ? mode : 'word';
   const counts = readStudyCounts();
-  counts.version = 1;
+  counts.version = 2;
   counts.total = Number(counts.total || 0) + 1;
   counts.byDate[dateKey] = Number(counts.byDate[dateKey] || 0) + 1;
+  counts.byMode[countMode] = Number(counts.byMode[countMode] || 0) + 1;
+  counts.byDateMode[dateKey] = normalizeModeCounts(counts.byDateMode[dateKey]);
+  counts.byDateMode[dateKey][countMode] = Number(counts.byDateMode[dateKey][countMode] || 0) + 1;
   writeStudyCounts(counts);
   return counts;
+}
+
+function sumModeCounts(modeCounts) {
+  return STUDY_COUNT_MODES.reduce((sum, mode) => sum + Number(modeCounts?.[mode] || 0), 0);
+}
+
+function createStudyCountPeriodSummary() {
+  const byMode = createEmptyModeCounts();
+  return { byMode, total: 0 };
 }
 
 function aggregateStudyCounts(counts = readStudyCounts(), date = new Date()) {
@@ -268,22 +305,48 @@ function aggregateStudyCounts(counts = readStudyCounts(), date = new Date()) {
   const todayKey = getLocalDateKey(date);
   const monthKey = todayKey.slice(0, 7);
   const yearKey = todayKey.slice(0, 4);
-  return Object.entries(normalized.byDate).reduce((summary, [dateKey, count]) => {
-    const numericCount = Number(count || 0);
-    if (dateKey === todayKey) summary.today += numericCount;
-    if (dateKey.slice(0, 7) === monthKey) summary.month += numericCount;
-    if (dateKey.slice(0, 4) === yearKey) summary.year += numericCount;
-    return summary;
-  }, { today: 0, month: 0, year: 0, total: Number(normalized.total || 0) });
+  const summary = {
+    today: createStudyCountPeriodSummary(),
+    month: createStudyCountPeriodSummary(),
+    year: createStudyCountPeriodSummary(),
+    total: { byMode: normalizeModeCounts(normalized.byMode), total: 0 },
+  };
+
+  Object.entries(normalized.byDateMode).forEach(([dateKey, modeCounts]) => {
+    const normalizedModeCounts = normalizeModeCounts(modeCounts);
+    const addTo = (period) => {
+      STUDY_COUNT_MODES.forEach((mode) => {
+        summary[period].byMode[mode] += normalizedModeCounts[mode];
+      });
+    };
+    if (dateKey === todayKey) addTo('today');
+    if (dateKey.slice(0, 7) === monthKey) addTo('month');
+    if (dateKey.slice(0, 4) === yearKey) addTo('year');
+  });
+
+  ['today', 'month', 'year'].forEach((period) => {
+    summary[period].total = sumModeCounts(summary[period].byMode);
+  });
+  const modeTotal = sumModeCounts(summary.total.byMode);
+  summary.total.total = Math.max(modeTotal, Number(normalized.total || 0));
+  return summary;
+}
+
+function renderStudyCountPeriod(container, periodSummary) {
+  if (!container) return;
+  const rows = STUDY_COUNT_MODES.map((mode) => `
+    <div class="study-count-row"><span>${STUDY_COUNT_MODE_LABELS[mode]}</span><strong>${Number(periodSummary.byMode[mode] || 0)}問</strong></div>`).join('');
+  container.innerHTML = `${rows}
+    <div class="study-count-row study-count-row-total"><span>合計</span><strong>${Number(periodSummary.total || 0)}問</strong></div>`;
 }
 
 function renderStudyCountsSummary(date = new Date()) {
   if (!els.studyCountsSummary) return aggregateStudyCounts(readStudyCounts(), date);
   const summary = aggregateStudyCounts(readStudyCounts(), date);
-  if (els.studyCountToday) els.studyCountToday.textContent = String(summary.today);
-  if (els.studyCountMonth) els.studyCountMonth.textContent = String(summary.month);
-  if (els.studyCountYear) els.studyCountYear.textContent = String(summary.year);
-  if (els.studyCountTotal) els.studyCountTotal.textContent = String(summary.total);
+  renderStudyCountPeriod(els.studyCountToday, summary.today);
+  renderStudyCountPeriod(els.studyCountMonth, summary.month);
+  renderStudyCountPeriod(els.studyCountYear, summary.year);
+  renderStudyCountPeriod(els.studyCountTotal, summary.total);
   els.studyCountsSummary.hidden = false;
   return summary;
 }
