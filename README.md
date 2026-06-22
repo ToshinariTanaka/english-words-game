@@ -311,3 +311,10 @@ python3 tools/generate_study_audio.py input.xlsx \
 - API未設定時や事前確認だけしたい場合は `--dry-run` を付けると、MP3を作らず対象一覧だけを `audio_output/generation_log.csv` に出力します。
 - ログCSVの列は `question_key,mode,question,output_file,status,message` です。
 - TTS生成部分は `synthesize_text_to_mp3(text, output_path)` 関数に分離しているため、将来別TTS APIへ差し替えやすい構成です。
+
+### study-app 勉強数カウンター
+
+- セッション終了後の結果画面に、今日・今月・今年・累計の勉強数を表示します。
+- 勉強数は正解・不正解に関係なく、ユーザーが1問解答した時点で1カウントします。同じ問題で選択肢を複数回押しても、1問につき1回だけ加算します。
+- 保存先は専用のlocalStorageキー `englishWordsGame.studyApp.studyCounts.v1` です。既存の学習履歴 `englishGameLearningStats` とは分けて保存します。
+- 保存形式は `{ "version": 1, "total": number, "byDate": { "YYYY-MM-DD": number } }` です。今日・今月・今年の表示値はブラウザのローカル日付で `byDate` から集計します。
