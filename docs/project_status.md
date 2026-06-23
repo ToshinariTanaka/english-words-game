@@ -1,3 +1,4 @@
+- 2026-06-23: study-app の学習画面で、問題ID・レベル・学習履歴の情報ブロックを「次の問題へ」ボタン直下へ移動。判定メッセージとは別の `questionMeta` として表示し、表示内容・計算ロジック・文言は変更しない。
 - 2026-06-22: study-appの勉強数カウンターの累計合計を、既存`total`ではなく表示中のモード別内訳（`word + chunk + phrase + definition`）の合算に統一。version 1の`total` / `byDate`はlocalStorage上保持するが、今日・今月・今年・累計の表示合計はいずれもモード別合計と一致する。
 - 2026-06-22: study-appの勉強数カウンターをモード別表示へ拡張。localStorageキー `englishWordsGame.studyApp.studyCounts.v1` は維持し、保存形式をversion 2（`byMode` / `byDateMode`追加）として読み書きする。version 1の`total` / `byDate`は保持し、過去分は分配せず新規回答分から現在モードへ加算する。結果画面は今日・今月・今年・累計カード内に英単語/チャンク/文節/英文/合計を表示する。
 - 2026-06-22: study-appの自動読上げチェックボックスを復活。設定は `englishWordsGame.studyApp.autoSpeak` に保存し初期ON。問題表示時はONの場合だけC列相当 `question` を読み上げる。音声再生は「もう一度聞く」と共通化し、HEAD確認ではなくAudio要素でMP3を実再生試行してから、失敗時のみWeb Speech APIへフォールバックする。
