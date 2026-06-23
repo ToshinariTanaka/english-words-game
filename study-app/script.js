@@ -842,6 +842,13 @@ async function speakCurrentQuestion(options = {}) {
   });
 }
 
+function handleManualSpeakQuestionClick() {
+  return speakCurrentQuestion({ statusPrefix: '手動再生：' }).catch((error) => {
+    console.warn('Manual speak failed:', error);
+    setVoiceStatusMessage(`音声再生に失敗しました: ${error.message || error}`);
+  });
+}
+
 function initializeSpeech() {
   const synthesis = getSpeechSynthesis();
   if (!synthesis) return;
@@ -1798,7 +1805,9 @@ els.nextButton.addEventListener('click', nextQuestion);
 els.reviewButton.addEventListener('click', startReview);
 els.fileInput.addEventListener('change', handleUpload);
 els.startQuizButton.addEventListener('click', handleStartQuizClick);
-els.speakQuestionButton.addEventListener('click', speakCurrentQuestion);
+if (els.speakQuestionButton) {
+  els.speakQuestionButton.addEventListener('click', handleManualSpeakQuestionClick);
+}
 els.backToSettingsButton?.addEventListener('click', scrollToQuizSettings);
 els.weakChecked?.addEventListener('change', () => {
   const current = state.questions[state.index];

@@ -496,12 +496,15 @@ h1 {
 }
 
 .speak-question-button {
+  position: relative;
+  z-index: 1;
   width: auto;
   min-width: 44px;
   min-height: 36px;
   margin-top: 0;
   padding: 6px 10px;
   line-height: 1;
+  pointer-events: auto;
 }
 
 .back-to-settings-button {

@@ -77,6 +77,7 @@ vm.runInContext(`${snippet};
 this.state = state;
 this.showQuestion = showQuestion;
 this.speakCurrentQuestion = speakCurrentQuestion;
+this.handleManualSpeakQuestionClick = handleManualSpeakQuestionClick;
 this.stopQuestionPlayback = stopQuestionPlayback;
 this.setupAutoSpeakSetting = setupAutoSpeakSetting;
 `, sandbox);
@@ -106,10 +107,12 @@ function resetForQuestion(storedAutoSpeak) {
   await Promise.resolve();
   assert.deepStrictEqual(audioPlayCalls, [], '自動読上げOFFでは問題表示時に音声再生しない');
   assert.strictEqual(elements.voiceStatus.textContent, '自動読上げOFF');
+  assert.strictEqual(elements.speakQuestionButton.disabled, false, '自動読上げOFFでも現在の問題があれば手動スピーカーボタンは有効');
 
-  await sandbox.speakCurrentQuestion();
+  await sandbox.handleManualSpeakQuestionClick();
   await Promise.resolve();
-  assert.deepStrictEqual(audioPlayCalls, ['http://localhost/audio/w000001.mp3'], '自動読上げOFFでも「もう一度聞く」相当の手動再生はできる');
+  assert.deepStrictEqual(audioPlayCalls, ['http://localhost/audio/w000001.mp3'], '自動読上げOFFでもスピーカーボタンクリック相当の手動再生はできる');
+  assert.strictEqual(elements.voiceStatus.textContent, '手動再生：MP3を再生しています', '手動再生時は状態表示に手動再生プレフィックスを付ける');
 
   resetForQuestion(true);
   const firstPlayback = sandbox.speakCurrentQuestion();
