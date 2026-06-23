@@ -174,6 +174,7 @@ const els = {
   questionText: document.getElementById('questionText'),
   choices: document.getElementById('choices'),
   feedback: document.getElementById('feedback'),
+  questionMeta: document.getElementById('questionMeta'),
   nextButton: document.getElementById('nextButton'),
   reviewSummary: document.getElementById('reviewSummary'),
   reviewButton: document.getElementById('reviewButton'),
@@ -1335,6 +1336,17 @@ function scrollToQuizSettings() {
   target.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function setQuestionMeta(message = '') {
+  if (!els.questionMeta) return;
+  els.questionMeta.className = 'feedback question-meta';
+  els.questionMeta.textContent = message;
+  els.questionMeta.hidden = message === '';
+}
+
+function hideQuestionMeta() {
+  setQuestionMeta('');
+}
+
 function setLoadingState(message) {
   cancelSpeech();
   state.questionPool = [];
@@ -1343,6 +1355,7 @@ function setLoadingState(message) {
   els.questionText.textContent = message;
   els.choices.innerHTML = '';
   els.feedback.hidden = true;
+  hideQuestionMeta();
   els.progressLabel.textContent = '0 / 0';
   els.nextButton.disabled = true;
   els.nextButton.textContent = '次の問題へ';
@@ -1421,6 +1434,7 @@ function showEmptyState() {
   els.feedback.textContent = '正解と3つの誤答選択肢がそろっている行だけを出題します。';
   els.feedback.className = 'feedback';
   els.feedback.hidden = false;
+  hideQuestionMeta();
   els.nextButton.disabled = true;
   hideBackToSettingsButton();
   els.startQuizButton.disabled = true;
@@ -1448,6 +1462,7 @@ function applyQuestions(rows, sourceLabel, options = {}) {
     els.questionText.textContent = '選択したレベル範囲に出題できる問題がありません。';
     els.choices.innerHTML = '';
     els.feedback.hidden = true;
+    hideQuestionMeta();
     els.nextButton.disabled = true;
     hideBackToSettingsButton();
     updateStartButtonForFilteredCount(0);
@@ -1670,6 +1685,7 @@ function showQuestion() {
   hideBackToSettingsButton();
   state.selected = false;
   els.feedback.hidden = true;
+  hideQuestionMeta();
   els.nextButton.disabled = true;
   const current = state.questions[state.index];
   els.progressLabel.textContent = state.questions.length === 0 ? '0 / 0' : `${state.index + 1} / ${state.questions.length}`;
@@ -1685,9 +1701,7 @@ function showQuestion() {
     els.weakChecked.checked = Boolean(learningStat.weak_checked);
     els.weakChecked.disabled = false;
   }
-  els.feedback.className = 'feedback';
-  els.feedback.textContent = `問題ID: ${current.questionKey || current.id} / レベル: ${current.level || '未設定'} / 学習履歴: 正解 ${learningStat.total_correct}・不正解 ${learningStat.total_wrong}・累計正解率 ${learningStat.accuracy}%・直近10回 ${learningStat.recent10_accuracy}%`;
-  els.feedback.hidden = false;
+  setQuestionMeta(`問題ID: ${current.questionKey || current.id} / レベル: ${current.level || '未設定'} / 学習履歴: 正解 ${learningStat.total_correct}・不正解 ${learningStat.total_wrong}・累計正解率 ${learningStat.accuracy}%・直近10回 ${learningStat.recent10_accuracy}%`);
   els.choices.innerHTML = '';
   current.choices.forEach((choice) => {
     const button = document.createElement('button');
@@ -1750,6 +1764,7 @@ function finishSession() {
   els.feedback.textContent = `${state.answered}問中${state.correct}問正解、正答率${rate}%です。`;
   renderStudyCountsSummary();
   els.feedback.hidden = false;
+  hideQuestionMeta();
   els.nextButton.disabled = true;
   els.nextButton.textContent = '次の問題へ';
   showBackToSettingsButton();
