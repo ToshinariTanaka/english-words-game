@@ -114,14 +114,13 @@
 
     <section class="quiz-card mode-word" aria-live="polite">
       <div class="quiz-topline">
-        <span id="modeLabel">英単語モード</span>
+        <div class="quiz-mode-tools">
+          <span id="modeLabel">英単語モード</span>
+          <button id="speakQuestionButton" class="secondary-button speak-question-button" type="button" aria-label="音声を再生" title="音声を再生" disabled>🔊</button>
+        </div>
         <span id="progressLabel">0 / 0</span>
       </div>
       <h2 id="questionText">CSVを読み込み中...</h2>
-      <div class="question-tools">
-        <button id="speakQuestionButton" class="secondary-button speak-question-button" type="button" disabled>🔊 もう一度聞く</button>
-        <p id="voiceStatus" class="voice-status">現在の音声：ブラウザ自動選択</p>
-      </div>
       <div id="choices" class="choices"></div>
       <div id="feedback" class="feedback" hidden></div>
       <section id="studyCountsSummary" class="study-counts-summary" aria-label="勉強数カウンター" hidden>
@@ -147,6 +146,7 @@
       </section>
       <button id="nextButton" class="primary-button" type="button" disabled>次の問題へ</button>
       <div id="questionMeta" class="feedback question-meta" hidden></div>
+      <p id="voiceStatus" class="voice-status">現在の音声：ブラウザ自動選択</p>
       <button id="backToSettingsButton" class="secondary-button back-to-settings-button" type="button" hidden>問題設定へ戻る</button>
     </section>
 

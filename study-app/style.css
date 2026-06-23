@@ -255,10 +255,26 @@ h1 {
 
 .quiz-topline {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   color: #d8e6ff;
   font-weight: 700;
+}
+
+.quiz-mode-tools {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+#modeLabel {
+  min-width: 0;
+}
+
+#progressLabel {
+  flex-shrink: 0;
 }
 
 #questionText {
@@ -432,6 +448,20 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .quiz-topline {
+    gap: 8px;
+  }
+
+  .quiz-mode-tools {
+    gap: 6px;
+  }
+
+  .speak-question-button {
+    min-width: 40px;
+    min-height: 34px;
+    padding: 6px 8px;
+  }
+
   .choice-button {
     min-height: 56px;
   }
@@ -465,17 +495,13 @@ h1 {
   color: #fff4cf;
 }
 
-.question-tools {
-  display: flex;
-  justify-content: flex-start;
-  margin: -6px 0 16px;
-}
-
 .speak-question-button {
   width: auto;
-  min-height: 44px;
+  min-width: 44px;
+  min-height: 36px;
   margin-top: 0;
-  padding: 10px 14px;
+  padding: 6px 10px;
+  line-height: 1;
 }
 
 .back-to-settings-button {
