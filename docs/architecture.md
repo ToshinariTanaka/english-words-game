@@ -32,7 +32,7 @@
 
 ### study-app のMP3音声配信
 
-`study-app/script.js` は現在表示中の問題の `questionKey` を使い、`{API_BASE}/audio/{question_key}.mp3` を `HTMLAudioElement` で実際に再生試行します。HEAD確認だけではMP3なしと判定しません。対象テキストはC列相当の `question` の英語だけで、正解や選択肢の日本語は読み上げません。MP3の未生成・読み込み失敗・`audio.play()` reject・`error`イベント・タイムアウト・`question_key` なしの場合だけ Web Speech API へフォールバックします。自動読上げは `englishWordsGame.studyApp.autoSpeak` に保存するON/OFF選択制で初期値はONです。問題表示時は自動読上げONの場合だけ読み上げ、「もう一度聞く」ボタンは自動読上げOFFでも同じ音声再生関数で利用できます。問題遷移、読み込み状態、セッション終了時はMP3とWeb Speech APIの両方を停止します。
+`study-app/script.js` は現在表示中の問題の `questionKey` を使い、`{API_BASE}/audio/{question_key}.mp3` を `HTMLAudioElement` で実際に再生試行します。HEAD確認だけではMP3なしと判定しません。対象テキストはC列相当の `question` の英語だけで、正解や選択肢の日本語は読み上げません。MP3の未生成・読み込み失敗・`audio.play()` reject・`error`イベント・タイムアウト・`question_key` なしの場合だけ Web Speech API へフォールバックします。自動読上げは `englishWordsGame.studyApp.autoSpeak` に保存するON/OFF選択制で初期値はONです。問題表示時は自動読上げONの場合だけ読み上げ、スピーカーアイコンのみの手動再生ボタンは自動読上げOFFでも同じ音声再生関数で利用できます。問題遷移、読み込み状態、セッション終了時はMP3とWeb Speech APIの両方を停止します。
 
 Renderサーバーの `server.js` は `GET /audio/{filename}.mp3` を Persistent Disk の `/var/data/audio` から配信します。レスポンスは `content-type: audio/mpeg` と `access-control-allow-origin: *` を付与し、GitHub Pages版の学習アプリからも取得できるようにします。MP3ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` のように `{question_key}.mp3` とします。TTS生成処理やAPIキーはブラウザには置かず、生成済みMP3だけを配置する方針です。
 
