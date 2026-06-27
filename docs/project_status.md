@@ -73,3 +73,9 @@
 - 2026-06-22: study-appのMP3音声再生でHEAD確認を追加し、MP3未生成・HTTPエラー・fetch失敗・audio.play()失敗・question_keyなしの全ケースでWeb Speech APIへフォールバックするよう修正。`voiceStatus` にMP3再生中/ブラウザ音声フォールバック/ブラウザ音声利用不可を表示し、script.jsのキャッシュバスターも更新。
 
 - 2026-06-23: study-appの上部モード名横に移動した `speakQuestionButton` の手動クリック処理を専用ハンドラー化し、nullチェック付きでイベント登録するよう修正。自動読上げOFFでも現在の問題があれば手動ボタンは有効で、既存のMP3優先再生→Web Speech APIフォールバックを使って再生できることをテストで固定。ボタンのクリック可能性を補強するCSSも追加。
+
+## 2026-06-27: 中学生専用版の環境変数切り替え
+
+- `APP_VARIANT=junior` で中学生専用版として表示・保存先・localStorageキーを分離する実装を追加しました。
+- `APP_VARIANT` 未設定または `default` では、通常版の既存保存先と画面表示を維持します。
+- Renderでは通常版とは別Web Serviceを作成し、同じGitHubリポジトリ・同じmainブランチに対して中学生版専用の環境変数とPersistent Diskを設定する運用です。

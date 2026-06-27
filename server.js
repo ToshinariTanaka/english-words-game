@@ -6,10 +6,16 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 
 const PORT = Number(process.env.PORT || 3000);
-const DATA_DIR = process.env.DATA_DIR || '/var/data/english_words_game';
+const APP_VARIANT = String(process.env.APP_VARIANT || 'default').trim() || 'default';
+const IS_JUNIOR_VARIANT = APP_VARIANT === 'junior';
+const APP_TITLE = process.env.APP_TITLE || (IS_JUNIOR_VARIANT ? '中学生英単語アプリ' : '英語学習アプリ');
+const APP_SUBTITLE = process.env.APP_SUBTITLE || (IS_JUNIOR_VARIANT ? '中学生専用・英単語／チャンク／文節／英文トレーニング' : 'English Study');
+const DATA_DIR = process.env.DATA_DIR || (IS_JUNIOR_VARIANT ? '/var/data/junior' : '/var/data/english_words_game');
+// Keep QUESTIONS_FILE as the JSON store override. QUESTION_FILE stores the uploaded workbook copy.
 const DATA_FILE = process.env.QUESTIONS_FILE || path.join(DATA_DIR, 'current-questions.json');
-const STUDY_APP_DATA_DIR = process.env.STUDY_APP_DATA_DIR || '/var/data/study-app';
-const AUDIO_DIR = process.env.AUDIO_DIR || '/var/data/audio';
+const QUESTION_FILE = process.env.QUESTION_FILE || path.join(DATA_DIR, 'questions.xlsx');
+const STUDY_APP_DATA_DIR = process.env.STUDY_APP_DATA_DIR || (IS_JUNIOR_VARIANT ? path.join(DATA_DIR, 'study-app') : '/var/data/study-app');
+const AUDIO_DIR = process.env.AUDIO_DIR || (IS_JUNIOR_VARIANT ? path.join(DATA_DIR, 'audio') : '/var/data/audio');
 const STUDY_APP_FILES = { word: 'word_mode.csv', chunk: 'chunk_mode.csv', phrase: 'phrase_mode.csv', definition: 'definition_mode.csv' };
 const MODES = ['word', 'chunk', 'phrase', 'definition'];
 const MODE_ALIASES = { vocabulary: 'word', sentence: 'definition', translation: 'definition' };
@@ -258,6 +264,13 @@ function parseMultipart(buffer, contentType) {
 
 
 function ensureDataDir() { fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true }); }
+function writeUploadedQuestionFile(buffer) {
+  if (!QUESTION_FILE) return;
+  fs.mkdirSync(path.dirname(QUESTION_FILE), { recursive: true });
+  const tmp = `${QUESTION_FILE}.tmp`;
+  fs.writeFileSync(tmp, buffer);
+  fs.renameSync(tmp, QUESTION_FILE);
+}
 function readStore() {
   try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); }
   catch (error) { if (error.code === 'ENOENT') return { schema_version: 2, modes: {}, updatedAt: null, filename: null }; throw error; }
@@ -387,6 +400,16 @@ function handleCurrent(req, res, url) {
 function handlePythonDiagnostics(req, res) {
   return sendJson(res, 200, buildPythonDiagnostics());
 }
+function handleAppConfig(req, res) {
+  return sendJson(res, 200, {
+    ok: true,
+    variant: APP_VARIANT,
+    title: APP_TITLE,
+    subtitle: APP_SUBTITLE,
+    modes: MODES,
+  });
+}
+
 function handleStatus(req, res, url) {
   const store = readStore();
   if (!hasSchemaVersion2(store)) return sendJson(res, 200, { ok: true, schema_version: null, legacy: true, saved: false, modes: Object.fromEntries(MODES.map((mode) => [mode, { count: 0 }])), updatedAt: null, filename: null });
@@ -653,6 +676,7 @@ function handleWorkbookUpload(req, res) {
       const now = new Date().toISOString();
       const store = buildSchemaV2Store(validation.playableRows, file.filename, now);
       writeStore(store);
+      writeUploadedQuestionFile(file.buffer);
       return sendJson(res, 200, { ok: true, schema_version: 2, modes: Object.fromEntries(MODES.map((mode) => [mode, { count: validation.playableRows[mode].length }])), updatedAt: now, filename: file.filename });
     } catch (error) { return sendJson(res, 400, { ok: false, error: error.message }); }
   });
@@ -668,6 +692,7 @@ function serveStatic(req, res, pathname) {
 }
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  if (req.method === 'GET' && url.pathname === '/api/app-config') return handleAppConfig(req, res);
   if (req.method === 'GET' && url.pathname === '/api/questions/current') return handleCurrent(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/questions/status') return handleStatus(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/diagnostics/python') return handlePythonDiagnostics(req, res);
