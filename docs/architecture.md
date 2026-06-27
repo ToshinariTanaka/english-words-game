@@ -144,3 +144,17 @@ RPG本体のアップロード欄は第4段階で一時確認用に整理しま�
 ## ローカルTTS生成ツール
 
 `tools/generate_study_audio.py` は、study-app正式4シートExcelを入力にして、ブラウザへAPIキーを渡さずローカル環境でMP3を生成する管理者向けCLIです。Excel読み取りは `openpyxl`、TTS provider境界は `synthesize_text_to_mp3(text, output_path)` に分離しています。現在は `OPENAI_API_KEY` を環境変数から読むOpenAI TTS実装ですが、将来別providerへ差し替える場合もCLIのExcel抽出・ログ出力・skip/overwrite制御を維持できます。
+
+## 環境変数による中学生専用版（2026-06-27）
+
+通常版と中学生専用版はブランチを分けず、同じ `main` ブランチの `server.js` と `study-app/` を使います。サーバーは `APP_VARIANT` を読み、未設定または `default` の場合は従来の通常版保存先を維持します。`APP_VARIANT=junior` の場合は `DATA_DIR` を基準に解析済み問題データJSON、アップロード済みExcelコピー、派生CSV保存先、MP3保存先を分けられるようにし、`AUDIO_DIR` や `QUESTION_FILE` が指定されていればそれを優先します。
+
+`GET /api/app-config` は現在の variant、画面タイトル、サブタイトル、利用可能モードを返します。`study-app/script.js` は起動時にこの設定を読み、タイトル表示と localStorage キーを variant 別に切り替えます。これにより、中学生版の学習履歴、学習カウンター、モード別カウンター、設定、共通問題キャッシュは通常版のキーと混ざりません。
+
+通常版の既定値は後方互換性のため変更していません。
+
+- 問題データ: `/var/data/english_words_game/current-questions.json`
+- MP3音声: `/var/data/audio`
+- study-app派生CSV: `/var/data/study-app`
+
+中学生版Renderサービスでは、通常版とは別Web Service・別Persistent Diskを作り、例として `DATA_DIR=/var/data/junior`、`QUESTION_FILE=/var/data/junior/questions.xlsx`、`AUDIO_DIR=/var/data/junior/audio` を設定します。

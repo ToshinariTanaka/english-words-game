@@ -323,3 +323,23 @@ python3 tools/generate_study_audio.py input.xlsx \
 ### study-app 音声再生
 
 `study-app/` は `question_key` がある問題では `{question_key}.mp3` を優先して再生します。MP3 URLをHEADで確認し、未生成・HTTPエラー・fetch失敗・`audio.play()` 失敗時は、無音で終わらせず Web Speech API で現在の `question` だけを読み上げます。`question_key` がない問題も Web Speech API にフォールバックします。
+
+## 中学生専用版を同じ main ブランチでRender運用する設定
+
+中学生専用版はブランチを分けず、同じGitHubリポジトリ・同じ `main` ブランチ・同じコードベースを使い、Render側の環境変数で切り替えます。
+
+Renderで通常版とは別のWeb Serviceを作成し、環境変数に以下を設定してください。
+
+```env
+APP_VARIANT=junior
+APP_TITLE=中学生英単語アプリ
+DATA_DIR=/var/data/junior
+QUESTION_FILE=/var/data/junior/questions.xlsx
+AUDIO_DIR=/var/data/junior/audio
+```
+
+`APP_VARIANT` 未設定、または `APP_VARIANT=default` の場合は通常版として動作し、従来どおり `/var/data/english_words_game/current-questions.json` と `/var/data/audio` を使います。`APP_VARIANT=junior` の場合は、タイトル・ヘッダー表示を中学生専用に切り替え、問題データJSON・アップロード済み問題Excel・MP3音声・学習履歴・日別/月別/年別/累計カウンター・モード別カウンターを通常版と分離します。
+
+> 注意: 通常版と中学生版で同じPersistent Disk保存先を使わないでください。特に `DATA_DIR`、`QUESTION_FILE`、`AUDIO_DIR` は通常版と中学生版で別パスにしてください。上記例では中学生版を `/var/data/junior` 配下へまとめています。
+
+中学生版でも4モード（英単語、チャンク、文節和訳、英文和訳）はすべて利用できます。Excel内で `question` / `correct` / `choice1`〜`choice3` が不足している行は、通常版と同じくエラーではなく出題対象から外します。音声は従来どおり `{question_key}.mp3` があればMP3を優先し、見つからない場合はWeb Speech APIへフォールバックします。

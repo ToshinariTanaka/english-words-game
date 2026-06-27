@@ -43,15 +43,16 @@ const HOSTNAME = typeof window !== 'undefined' ? window.location.hostname : '';
 const IS_GITHUB_PAGES = HOSTNAME.endsWith('github.io');
 const IS_RENDER = HOSTNAME.endsWith('onrender.com') || HOSTNAME === 'localhost' || HOSTNAME === '127.0.0.1';
 const API_BASE = IS_GITHUB_PAGES ? RENDER_API_BASE_URL : (typeof window !== 'undefined' ? window.location.origin : '');
-const SHARED_CACHE_PREFIX = 'englishWordsGame.sharedQuestions.';
-const SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
-const QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
-const LEVEL_RANGE_START_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeStart';
-const LEVEL_RANGE_END_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeEnd';
-const VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
-const AUTO_SPEAK_STORAGE_KEY = 'englishWordsGame.studyApp.autoSpeak';
-const LEARNING_STATS_STORAGE_KEY = 'englishGameLearningStats';
-const STUDY_COUNTS_STORAGE_KEY = 'englishWordsGame.studyApp.studyCounts.v1';
+let storageNamespace = 'default';
+let SHARED_CACHE_PREFIX = 'englishWordsGame.sharedQuestions.';
+let SOUND_ENABLED_STORAGE_KEY = 'englishWordsGame.soundEnabled';
+let QUESTION_COUNT_STORAGE_KEY = 'englishWordsGame.studyApp.questionCount';
+let LEVEL_RANGE_START_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeStart';
+let LEVEL_RANGE_END_STORAGE_KEY = 'englishWordsGame.studyApp.levelRangeEnd';
+let VOICE_STORAGE_KEY = 'englishWordsGame.studyApp.voiceURI';
+let AUTO_SPEAK_STORAGE_KEY = 'englishWordsGame.studyApp.autoSpeak';
+let LEARNING_STATS_STORAGE_KEY = 'englishGameLearningStats';
+let STUDY_COUNTS_STORAGE_KEY = 'englishWordsGame.studyApp.studyCounts.v1';
 const DEFAULT_QUESTION_COUNT = '10';
 const LEVEL_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 const DEFAULT_LEVEL_START = 'A1';
@@ -148,6 +149,47 @@ const COMMON_ALIASES = {
 };
 
 
+
+function buildVariantStorageKey(baseKey, variant) {
+  return variant === 'default' ? baseKey : `${baseKey}.${variant}`;
+}
+
+function applyAppVariantConfig(config = {}) {
+  const variant = String(config.variant || 'default').trim() || 'default';
+  storageNamespace = variant;
+  SHARED_CACHE_PREFIX = buildVariantStorageKey('englishWordsGame.sharedQuestions', variant) + '.';
+  SOUND_ENABLED_STORAGE_KEY = buildVariantStorageKey('englishWordsGame.soundEnabled', variant);
+  QUESTION_COUNT_STORAGE_KEY = buildVariantStorageKey('englishWordsGame.studyApp.questionCount', variant);
+  LEVEL_RANGE_START_STORAGE_KEY = buildVariantStorageKey('englishWordsGame.studyApp.levelRangeStart', variant);
+  LEVEL_RANGE_END_STORAGE_KEY = buildVariantStorageKey('englishWordsGame.studyApp.levelRangeEnd', variant);
+  VOICE_STORAGE_KEY = buildVariantStorageKey('englishWordsGame.studyApp.voiceURI', variant);
+  AUTO_SPEAK_STORAGE_KEY = buildVariantStorageKey('englishWordsGame.studyApp.autoSpeak', variant);
+  LEARNING_STATS_STORAGE_KEY = buildVariantStorageKey('englishGameLearningStats', variant);
+  STUDY_COUNTS_STORAGE_KEY = buildVariantStorageKey('englishWordsGame.studyApp.studyCounts.v1', variant);
+
+  const title = String(config.title || '').trim();
+  const subtitle = String(config.subtitle || '').trim();
+  if (title) {
+    document.title = title;
+    if (els.appTitle) els.appTitle.textContent = title;
+  }
+  if (subtitle && els.appSubtitle) els.appSubtitle.textContent = subtitle;
+  document.body.dataset.appVariant = variant;
+}
+
+async function loadAppVariantConfig() {
+  if (!IS_RENDER) return applyAppVariantConfig({ variant: 'default' });
+  try {
+    const response = await fetch(`${API_BASE}/api/app-config`, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    const config = await response.json();
+    applyAppVariantConfig(config);
+  } catch (error) {
+    console.warn('Failed to load app config; using default variant:', error);
+    applyAppVariantConfig({ variant: 'default' });
+  }
+}
+
 const state = {
   mode: 'word',
   questionPool: [],
@@ -196,6 +238,8 @@ const els = {
   backToSettingsButton: document.getElementById('backToSettingsButton'),
   weakChecked: document.getElementById('weakChecked'),
   clearLearningStatsButton: document.getElementById('clearLearningStatsButton'),
+  appTitle: document.getElementById('appTitle'),
+  appSubtitle: document.getElementById('appSubtitle'),
   studyCountsSummary: document.getElementById('studyCountsSummary'),
   studyCountToday: document.getElementById('studyCountToday'),
   studyCountMonth: document.getElementById('studyCountMonth'),
@@ -1817,12 +1861,17 @@ els.clearLearningStatsButton?.addEventListener('click', () => {
   if (clearLearningStatsWithConfirm()) showQuestion();
 });
 
-setupQuestionCountSetting();
-setupLevelRangeSetting();
-setupAutoSpeakSetting();
-setupSoundSetting();
-setupVoiceSelect();
-setupAudioUnlock();
-updateHostingStatus();
-readLearningStats();
-loadMode(state.mode);
+async function initApp() {
+  await loadAppVariantConfig();
+  setupQuestionCountSetting();
+  setupLevelRangeSetting();
+  setupAutoSpeakSetting();
+  setupSoundSetting();
+  setupVoiceSelect();
+  setupAudioUnlock();
+  updateHostingStatus();
+  readLearningStats();
+  loadMode(state.mode);
+}
+
+initApp();
