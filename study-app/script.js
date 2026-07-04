@@ -199,6 +199,7 @@ const state = {
   correct: 0,
   mistakes: [],
   reviewMode: false,
+  currentQuestion: null,
   selected: false,
   sourceLabel: '',
   loadToken: 0,
@@ -1360,6 +1361,7 @@ function normalizeQuestions(rows) {
 
 function resetSessionStats() {
   state.index = 0;
+  state.currentQuestion = null;
   state.answered = 0;
   state.correct = 0;
   state.mistakes = [];
@@ -1402,6 +1404,7 @@ function setLoadingState(message) {
   cancelSpeech();
   state.questionPool = [];
   state.questions = [];
+  state.currentQuestion = null;
   resetSessionStats();
   els.questionText.textContent = message;
   els.choices.innerHTML = '';
@@ -1446,6 +1449,30 @@ function cloneQuestionForSession(question) {
   };
 }
 
+function getQuestionIdentity(question) {
+  return getLearningHistoryKey(question);
+}
+
+function hasMistake(question) {
+  const identity = getQuestionIdentity(question);
+  return state.mistakes.some((mistake) => getQuestionIdentity(mistake) === identity);
+}
+
+function addMistake(question) {
+  if (!hasMistake(question)) state.mistakes.push(question);
+}
+
+function removeMistake(question) {
+  const identity = getQuestionIdentity(question);
+  state.mistakes = state.mistakes.filter((mistake) => getQuestionIdentity(mistake) !== identity);
+}
+
+function scrollToQuestionArea() {
+  const target = getQuizCardElement();
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function beginConfiguredSession() {
   initializeSpeech();
   hideBackToSettingsButton();
@@ -1478,6 +1505,7 @@ function getNoDataMessage(mode = state.mode) {
 function showEmptyState() {
   cancelSpeech();
   state.questions = [];
+  state.currentQuestion = null;
   state.index = 0;
   els.progressLabel.textContent = '0 / 0';
   els.questionText.textContent = getNoDataMessage();
@@ -1739,6 +1767,7 @@ function showQuestion() {
   hideQuestionMeta();
   els.nextButton.disabled = true;
   const current = state.questions[state.index];
+  state.currentQuestion = current || null;
   els.progressLabel.textContent = state.questions.length === 0 ? '0 / 0' : `${state.index + 1} / ${state.questions.length}`;
 
   if (!current) {
@@ -1787,9 +1816,14 @@ function answer(choice) {
   } else {
     playWrongSound();
     if (!state.reviewMode) {
-      state.mistakes.push(current);
+      addMistake(current);
     }
   }
+
+  if (state.reviewMode && isCorrect) {
+    removeMistake(current);
+  }
+
   updateLearningStat(current, isCorrect);
   incrementStudyCount();
 
@@ -1811,6 +1845,7 @@ function finishSession() {
   els.progressLabel.textContent = `${state.questions.length} / ${state.questions.length}`;
   els.questionText.textContent = state.reviewMode ? '復習が終わりました。' : '学習が終わりました。';
   els.choices.innerHTML = '';
+  state.currentQuestion = null;
   els.feedback.className = 'feedback';
   els.feedback.textContent = `${state.answered}問中${state.correct}問正解、正答率${rate}%です。`;
   renderStudyCountsSummary();
@@ -1836,12 +1871,14 @@ function nextQuestion() {
 function startReview() {
   if (state.mistakes.length === 0) return;
   state.questions = shuffle(state.mistakes).map(cloneQuestionForSession);
-  state.mistakes = [];
   state.index = 0;
+  state.currentQuestion = state.questions[0] || null;
   state.reviewMode = true;
   state.selected = false;
+  if (typeof hideStudyCountsSummary === 'function') hideStudyCountsSummary();
   showQuestion();
   updateStats();
+  scrollToQuestionArea();
 }
 
 els.modeButtons.forEach((button) => button.addEventListener('click', () => loadMode(button.dataset.mode)));

@@ -79,3 +79,5 @@
 - `APP_VARIANT=junior` で中学生専用版として表示・保存先・localStorageキーを分離する実装を追加しました。
 - `APP_VARIANT` 未設定または `default` では、通常版の既存保存先と画面表示を維持します。
 - Renderでは通常版とは別Web Serviceを作成し、同じGitHubリポジトリ・同じmainブランチに対して中学生版専用の環境変数とPersistent Diskを設定する運用です。
+
+- 2026-07-04: study-appの「間違えた問題の復習」を修正。復習開始時に `reviewMode` と `currentQuestion` をセットし、通常の問題表示処理 `showQuestion()` で問題文・選択肢・問題情報・音声ボタン状態を表示する。復習開始時に誤答リストを全消去せず、復習中に正解した問題だけ誤答リストから削除する。
