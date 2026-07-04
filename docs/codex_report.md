@@ -1,39 +1,35 @@
 ## 今回やったこと
-- 同じ main ブランチ・同じコードベースで通常版と中学生版を切り替えられるよう、`APP_VARIANT` / `APP_TITLE` / `DATA_DIR` / `QUESTION_FILE` / `AUDIO_DIR` に対応しました。
-- `APP_VARIANT=junior` の場合だけ、サーバー側の問題データ保存先、MP3保存先、派生データ保存先を `DATA_DIR` 配下へ分離できるようにしました。
-- study-app 起動時に `/api/app-config` を読み込み、中学生版では画面タイトルとヘッダーを中学生専用表示へ切り替えるようにしました。
-- study-app の localStorage キーを variant ごとに分け、中学生版の学習履歴・今日/今月/今年/累計カウンター・モード別カウンター・設定・共通問題キャッシュが通常版と混ざらないようにしました。
-- README に、通常版とは別のRender Web Serviceとして中学生版を作る環境変数例とPersistent Disk分離の注意を追記しました。
-- `docs/architecture.md` と `docs/project_status.md` に、環境変数ベースの中学生版運用方針を追記しました。
+- `study-app` の「間違えた問題の復習」開始処理を修正し、復習開始時に `reviewMode` へ切り替え、最初の復習問題を `currentQuestion` にセットして通常の `showQuestion()` 描画で問題文・選択肢・問題情報・音声ボタン状態を表示するようにしました。
+- 復習開始時に間違えた問題リストを即時全消去しないようにし、復習中に正解した問題だけをリストから削除する仕様にしました。不正解の復習問題はリストに残ります。
+- 通常学習中の誤答追加は重複しないようにし、復習ボタンの有効/無効と件数表示が現在の間違いリストに追従するようにしました。
+- 復習開始後、必要に応じて問題表示エリアへスクロールするようにしました。
+- ブラウザキャッシュ回避のため、`study-app/index.html` のCSS/JSクエリを更新しました。
+- 復習開始ロジックを固定するNodeテストを追加し、`npm test` に組み込みました。
 
 ## 変更ファイル
-- `server.js`
-- `study-app/index.html`
 - `study-app/script.js`
-- `README.md`
+- `study-app/index.html`
+- `tests_study_app_mistake_review.js`
+- `package.json`
 - `docs/codex_report.md`
-- `docs/architecture.md`
 - `docs/project_status.md`
+- `docs/next_tasks.md`
 
 ## テスト結果
-- `node -c server.js` 成功。
 - `node -c study-app/script.js` 成功。
-- `APP_VARIANT=junior APP_TITLE=中学生英単語アプリ DATA_DIR=/tmp/ewg-junior QUESTION_FILE=/tmp/ewg-junior/questions.xlsx AUDIO_DIR=/tmp/ewg-junior/audio PORT=3131 node server.js` を起動し、`GET /api/app-config` が `variant: junior` と中学生版タイトルを返すことを確認しました。
-- 同じ中学生版サーバーで `GET /api/questions/status` を確認し、未保存時でも専用データファイル側で通常応答することを確認しました。
+- `node tests_study_app_mistake_review.js` 成功。
 - `npm test` 成功。npm の `Unknown env config "http-proxy"` 警告は表示されましたが、テスト自体はすべて通過しました。
 - `git diff --check` 成功。
 
 ## 注意点
-- `QUESTION_FILE=/var/data/junior/questions.xlsx` はアップロード済みExcelのコピー保存先です。アプリが配信に使う解析済みJSONは `DATA_DIR/current-questions.json`（または `QUESTIONS_FILE` 指定時はそのパス）へ保存します。
-- `APP_VARIANT` 未設定または `default` の通常版は、既存保存先 `/var/data/english_words_game/current-questions.json` と `/var/data/audio` を維持します。
-- 中学生版Renderサービスでは、通常版と同じPersistent Diskパスを指定しないでください。
-- 画面表示のテキスト差し替えのみで、大きなレイアウト変更はしていないためスクリーンショットは取得していません。
+- UIの構造変更や大きな見た目変更はありません。復習開始時に既存の問題表示カードへスクロールする挙動のみ追加しています。
+- 実ブラウザでの手動確認はこの環境では未実施です。Renderへデプロイ後、指定URLで「わざと1問間違える → 復習を始める → 問題文と選択肢が出る → 回答できる」を確認してください。
+- 復習中に正解した問題は間違えた問題リストから削除し、不正解のままなら残す仕様にしています。
 
 ## 次にやるべきこと
-- Render上で通常版とは別のWeb Serviceを作り、`APP_VARIANT=junior` などの環境変数と専用Persistent Diskを設定してください。
-- 中学生版専用Excelをアップロードし、4モードそれぞれで出題できることを本番URLで確認してください。
-- 中学生版専用MP3をアップロードまたは生成し、通常版MP3ディレクトリにファイルが増えないことをRender Shell等で確認してください。
+- Render本番URL `https://english-words-game-1ph3.onrender.com/study-app/` で復習開始から回答、次の復習問題、復習対象0件時のボタン無効を手動確認してください。
+- 可能であればPlaywright等のブラウザE2Eを導入し、復習UIの実DOM表示まで自動確認してください。
 
 ## チャッピーに相談すべき点
-- `QUESTION_FILE` の例を `.xlsx` のまま運用するか、実体に合わせて `/var/data/junior/current-questions.json` のような名前に変更するか。
-- 中学生版のサブタイトル文言を「中学生専用・英単語／チャンク／文節／英文トレーニング」のままでよいか。
+- 復習中に不正解だった問題をリストに残す現在仕様でよいか、復習セッション終了時に再挑戦しやすい導線を追加するか。
+- 復習モード中の成績カウンターを通常学習と合算する現状でよいか、復習専用カウンターに分ける必要があるか。

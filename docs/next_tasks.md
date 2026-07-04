@@ -54,3 +54,9 @@
 - Render Persistent Diskの `/var/data/audio` に `{question_key}.mp3` 形式のMP3を配置する。
 - `https://english-words-game-1ph3.onrender.com/audio/w000001.mp3` などが `content-type: audio/mpeg` と `access-control-allow-origin: *` を返すことを確認する。
 - GitHub Pages版とRender版の `/study-app/` で「もう一度聞く」を押し、MP3がある問題はMP3、ない問題はWeb Speech APIで読み上げられることを実機確認する。
+
+## 2026-07-04 復習機能の本番確認
+
+- Render本番URL `/study-app/` で、1問誤答後に「間違えた問題の復習」から問題文・選択肢・問題情報が即時表示されることを確認する。
+- 復習中に正解した問題が復習対象から外れ、不正解の問題は復習対象に残る運用で問題ないか確認する。
+- Playwright等を導入できる場合は、復習開始ボタン押下後の実DOM表示をE2Eテストに追加する。
