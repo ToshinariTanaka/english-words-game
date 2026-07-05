@@ -35,6 +35,8 @@ SHEET_CONFIGS = {
 MODE_CHOICES = ["all", *SHEET_CONFIGS.keys()]
 DEFAULT_OUTPUT_DIR = "audio_output"
 LOG_FILENAME = "generation_log.csv"
+MANIFEST_JSON_FILENAME = "audio_manifest.json"
+MANIFEST_CSV_FILENAME = "audio_manifest.csv"
 OPENAI_TTS_ENDPOINT = "https://api.openai.com/v1/audio/speech"
 DEFAULT_OPENAI_TTS_MODEL = "gpt-4o-mini-tts"
 DEFAULT_OPENAI_TTS_VOICE = "alloy"
@@ -155,8 +157,42 @@ def synthesize_text_to_mp3(text: str, output_path: Path, timeout: int = 60) -> N
         raise RuntimeError(f"TTS API error HTTP {exc.code}: {body}") from exc
 
 
+def write_manifest(output_dir: Path, rows: list[dict[str, str]]) -> None:
+    manifest_rows = [row for row in rows if row.get("question_key") and row.get("output_file")]
+    items = {
+        row["question_key"]: {
+            "mode": row["mode"],
+            "sheetName": row.get("sheet_name", ""),
+            "excelRow": int(row.get("excel_row") or 0),
+            "question_key": row["question_key"],
+            "questionId": row["question_key"],
+            "text": row["question"],
+            "filename": Path(row["output_file"]).name,
+        }
+        for row in manifest_rows
+    }
+    (output_dir / MANIFEST_JSON_FILENAME).write_text(
+        json.dumps({"schema_version": 1, "source": "official_workbook_question_key", "items": items}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    fieldnames = ["mode", "sheet_name", "excel_row", "question_key", "question_id", "text", "filename"]
+    with (output_dir / MANIFEST_CSV_FILENAME).open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in manifest_rows:
+            writer.writerow({
+                "mode": row["mode"],
+                "sheet_name": row.get("sheet_name", ""),
+                "excel_row": row.get("excel_row", ""),
+                "question_key": row["question_key"],
+                "question_id": row["question_key"],
+                "text": row["question"],
+                "filename": Path(row["output_file"]).name,
+            })
+
+
 def write_log(log_path: Path, rows: list[dict[str, str]]) -> None:
-    fieldnames = ["question_key", "mode", "question", "output_file", "status", "message"]
+    fieldnames = ["question_key", "mode", "sheet_name", "excel_row", "question", "output_file", "status", "message"]
     with log_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
@@ -194,6 +230,8 @@ def main() -> int:
             "question_key": item.question_key,
             "mode": item.mode,
             "question": item.question,
+            "sheet_name": item.sheet_name,
+            "excel_row": str(item.excel_row),
             "output_file": str(output_file),
             "status": "",
             "message": "",
@@ -220,6 +258,7 @@ def main() -> int:
 
     log_path = args.output / LOG_FILENAME
     write_log(log_path, log_rows)
+    write_manifest(args.output, log_rows)
     print(
         f"対象 {len(filtered)} 件 / generated={generated} skipped={skipped} dry-run={dry_run} failed={failed} / log={log_path}"
     )

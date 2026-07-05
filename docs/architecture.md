@@ -34,7 +34,7 @@
 
 `study-app/script.js` は現在表示中の問題の `questionKey` を使い、`{API_BASE}/audio/{question_key}.mp3` を `HTMLAudioElement` で実際に再生試行します。HEAD確認だけではMP3なしと判定しません。対象テキストはC列相当の `question` の英語だけで、正解や選択肢の日本語は読み上げません。MP3の未生成・読み込み失敗・`audio.play()` reject・`error`イベント・タイムアウト・`question_key` なしの場合だけ Web Speech API へフォールバックします。自動読上げは `englishWordsGame.studyApp.autoSpeak` に保存するON/OFF選択制で初期値はONです。問題表示時は自動読上げONの場合だけ読み上げ、スピーカーアイコンのみの手動再生ボタンは自動読上げOFFでも同じ音声再生関数で利用できます。問題遷移、読み込み状態、セッション終了時はMP3とWeb Speech APIの両方を停止します。
 
-Renderサーバーの `server.js` は `GET /audio/{filename}.mp3` を Persistent Disk の `/var/data/audio` から配信します。レスポンスは `content-type: audio/mpeg` と `access-control-allow-origin: *` を付与し、GitHub Pages版の学習アプリからも取得できるようにします。MP3ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` のように `{question_key}.mp3` とします。TTS生成処理やAPIキーはブラウザには置かず、生成済みMP3だけを配置する方針です。
+Renderサーバーの `server.js` は `GET /audio/{filename}.mp3` を Persistent Disk の `/var/data/audio` から配信します。ただし、実ファイルが存在しても `audio_manifest.json` に登録されていないMP3は404として扱い、旧対応表やファイル名だけを信用した誤再生を防ぎます。レスポンスは `content-type: audio/mpeg` と `access-control-allow-origin: *` を付与します。MP3ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` のように `{question_key}.mp3` とします。TTS生成処理やAPIキーはブラウザには置かず、生成済みMP3とmanifestだけを配置する方針です。
 
 ### study-app のCSV形式
 
@@ -139,11 +139,11 @@ RPG本体のアップロード欄は第4段階で一時確認用に整理しま�
 
 ### study-app のMP3アップロード管理
 
-`server.js` は `POST /api/audio/upload` で `multipart/form-data` のMP3ファイルを受け取り、Render Persistent Disk の `/var/data/audio` へ保存します。加えて `POST /api/audio/upload-zip` でZIP一括アップロードを受け取り、ZIP内の `.mp3` だけを対象にします。さらに `POST /api/audio/generate-from-workbook` は4シートExcelのC列 `question` とM列 `question_key` を使い、サーバー側環境変数 `OPENAI_API_KEY` でOpenAI TTSへ接続して最大10件の `{question_key}.mp3` を生成します。既存MP3は標準でスキップし、上書き指定時だけ再生成します。これらのAPIは `AUDIO_UPLOAD_TOKEN` が設定され、リクエストヘッダー `X-Audio-Upload-Token` と一致した場合だけ許可します。未設定時はAPIを無効化します。ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式だけを許可し、ZIP内のサブフォルダは保存時に無視してbasenameだけを使います。単一アップロードの空ファイルは拒否し、ZIP内の空ファイル・不正ファイル名・mp3以外はスキップして結果JSONへ記録します。同名ファイルは上書きします。`admin/audio-upload/` は単一MP3とZIP一括アップロードの管理画面です。
+`server.js` は `POST /api/audio/upload` で `multipart/form-data` のMP3ファイルを受け取り、Render Persistent Disk の `/var/data/audio` へ保存します。加えて `POST /api/audio/upload-zip` でZIP一括アップロードを受け取り、ZIP内の `.mp3` だけを対象にします。さらに `POST /api/audio/generate-from-workbook` は4シートExcelのC列 `question` とM列 `question_key` を使い、サーバー側環境変数 `OPENAI_API_KEY` でOpenAI TTSへ接続して最大10件の `{question_key}.mp3` を生成します。生成成功時は `audio_manifest.json` に `question_key`、モード、Excel行、読み上げテキスト、MP3ファイル名を保存します。manifest外の同名旧MP3は削除せず `mp3_backup_before_relink` へ退避してから再生成します。既存MP3はmanifestに登録済みの場合だけ標準でスキップし、上書き指定時は退避後に再生成します。これらのAPIは `AUDIO_UPLOAD_TOKEN` が設定され、リクエストヘッダー `X-Audio-Upload-Token` と一致した場合だけ許可します。未設定時はAPIを無効化します。ファイル名は `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式だけを許可し、ZIP内のサブフォルダは保存時に無視してbasenameだけを使います。単一アップロードの空ファイルは拒否し、ZIP内の空ファイル・不正ファイル名・mp3以外はスキップして結果JSONへ記録します。同名ファイルは上書きしますが、再生対象になるにはmanifest登録が必要です。`admin/audio-upload/` は単一MP3とZIP一括アップロードの管理画面ですが、正規の再リンク運用はExcelからの再生成を優先します。
 
 ## ローカルTTS生成ツール
 
-`tools/generate_study_audio.py` は、study-app正式4シートExcelを入力にして、ブラウザへAPIキーを渡さずローカル環境でMP3を生成する管理者向けCLIです。Excel読み取りは `openpyxl`、TTS provider境界は `synthesize_text_to_mp3(text, output_path)` に分離しています。現在は `OPENAI_API_KEY` を環境変数から読むOpenAI TTS実装ですが、将来別providerへ差し替える場合もCLIのExcel抽出・ログ出力・skip/overwrite制御を維持できます。
+`tools/generate_study_audio.py` は、study-app正式4シートExcelを入力にして、ブラウザへAPIキーを渡さずローカル環境でMP3を生成する管理者向けCLIです。Excel読み取りは `openpyxl`、TTS provider境界は `synthesize_text_to_mp3(text, output_path)` に分離しています。現在は `OPENAI_API_KEY` を環境変数から読むOpenAI TTS実装ですが、将来別providerへ差し替える場合もCLIのExcel抽出・ログ出力・skip/overwrite制御を維持できます。CLIは `audio_manifest.json` と `audio_manifest.csv` も出力し、`question_key` とMP3ファイル名の対応表を成果物として残します。
 
 ## 環境変数による中学生専用版（2026-06-27）
 

@@ -11,7 +11,7 @@
     <section class="upload-card">
       <p class="eyebrow">Study App Admin</p>
       <h1>MP3音声アップロード</h1>
-      <p class="hint">ファイル名は w000001.mp3 / c000001.mp3 / p000001.mp3 / s000001.mp3 形式のみ対応します。保存先は Render Persistent Disk の /var/data/audio です。</p>
+      <p class="hint">ファイル名は w000001.mp3 / c000001.mp3 / p000001.mp3 / s000001.mp3 形式のみ対応します。保存先は Render Persistent Disk の /var/data/audio です。再生対象は audio_manifest.json 登録済みMP3だけです。</p>
       <label class="field" for="audioFile">
         <span>MP3ファイル</span>
         <input id="audioFile" type="file" accept=".mp3,audio/mpeg">
@@ -31,7 +31,7 @@
       <button id="zipUploadButton" type="button">ZIPを一括アップロード</button>
       <hr>
       <h2>ExcelからMP3生成</h2>
-      <p class="hint">4シートExcel（.xlsx）のC列 question を読み上げ、M列 question_key をファイル名にして /var/data/audio に保存します。安全のため一度に最大10件までです。APIキーはサーバー側の OPENAI_API_KEY を使います。</p>
+      <p class="hint">4シートExcel（.xlsx）のC列 question を読み上げ、M列 question_key をファイル名にして /var/data/audio に保存し、audio_manifest.json を更新します。安全のため一度に最大10件までです。APIキーはサーバー側の OPENAI_API_KEY を使います。</p>
       <label class="field" for="workbookFile">
         <span>Excelファイル</span>
         <input id="workbookFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">

@@ -309,7 +309,8 @@ python3 tools/generate_study_audio.py input.xlsx \
 - 既に同名MP3がある場合、既定では `skipped` として上書きしません。
 - 上書きしたい場合だけ `--overwrite` を付けます。
 - API未設定時や事前確認だけしたい場合は `--dry-run` を付けると、MP3を作らず対象一覧だけを `audio_output/generation_log.csv` に出力します。
-- ログCSVの列は `question_key,mode,question,output_file,status,message` です。
+- ログCSVの列は `question_key,mode,sheet_name,excel_row,question,output_file,status,message` です。
+- 生成対象から `audio_manifest.json` と `audio_manifest.csv` も出力します。manifestには `question_key`、モード、問題ID、読み上げテキスト、MP3ファイル名が入り、行番号だけを対応根拠にしません。
 - TTS生成部分は `synthesize_text_to_mp3(text, output_path)` 関数に分離しているため、将来別TTS APIへ差し替えやすい構成です。
 
 ### study-app 勉強数カウンター
@@ -322,7 +323,7 @@ python3 tools/generate_study_audio.py input.xlsx \
 
 ### study-app 音声再生
 
-`study-app/` は `question_key` がある問題では `{question_key}.mp3` を優先して再生します。MP3 URLをHEADで確認し、未生成・HTTPエラー・fetch失敗・`audio.play()` 失敗時は、無音で終わらせず Web Speech API で現在の `question` だけを読み上げます。`question_key` がない問題も Web Speech API にフォールバックします。
+`study-app/` は `question_key` がある問題では `{question_key}.mp3` を優先して再生します。サーバー側は `/var/data/audio/audio_manifest.json` に登録されたMP3だけを配信し、manifest外の旧MP3は実ファイルが残っていても404にします。MP3未生成・HTTPエラー・`audio.play()` 失敗時は、無音で終わらせず Web Speech API で現在の `question` だけを読み上げます。`question_key` がない問題も Web Speech API にフォールバックします。
 
 ## 中学生専用版を同じ main ブランチでRender運用する設定
 

@@ -1,3 +1,4 @@
+- 2026-07-05: study-app用MP3音声の対応を `audio_manifest.json` 基準へ変更。Excel由来の `question_key` からmanifestを作成し、manifest外の旧MP3は配信せず、同名旧MP3は `mp3_backup_before_relink` へ退避してから再生成する。ローカル生成ツールも `audio_manifest.json` / `audio_manifest.csv` を出力する。
 - 2026-06-23: study-appの音声UIを調整。手動再生ボタンは上部のモード名右側へ移動し、画面表示はスピーカーアイコンのみ（aria-label/titleで音声再生の説明を維持）に変更。音声ステータスは問題ID・レベル・学習履歴の下へ移動。
 - 2026-06-23: study-app の学習画面で、問題ID・レベル・学習履歴の情報ブロックを「次の問題へ」ボタン直下へ移動。判定メッセージとは別の `questionMeta` として表示し、表示内容・計算ロジック・文言は変更しない。
 - 2026-06-22: study-appの勉強数カウンターの累計合計を、既存`total`ではなく表示中のモード別内訳（`word + chunk + phrase + definition`）の合算に統一。version 1の`total` / `byDate`はlocalStorage上保持するが、今日・今月・今年・累計の表示合計はいずれもモード別合計と一致する。

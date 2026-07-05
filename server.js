@@ -16,6 +16,8 @@ const DATA_FILE = process.env.QUESTIONS_FILE || path.join(DATA_DIR, 'current-que
 const QUESTION_FILE = process.env.QUESTION_FILE || path.join(DATA_DIR, 'questions.xlsx');
 const STUDY_APP_DATA_DIR = process.env.STUDY_APP_DATA_DIR || (IS_JUNIOR_VARIANT ? path.join(DATA_DIR, 'study-app') : '/var/data/study-app');
 const AUDIO_DIR = process.env.AUDIO_DIR || (IS_JUNIOR_VARIANT ? path.join(DATA_DIR, 'audio') : '/var/data/audio');
+const AUDIO_MANIFEST_FILE = process.env.AUDIO_MANIFEST_FILE || path.join(AUDIO_DIR, 'audio_manifest.json');
+const AUDIO_BACKUP_DIR = process.env.AUDIO_BACKUP_DIR || path.join(path.dirname(AUDIO_DIR), 'mp3_backup_before_relink');
 const STUDY_APP_FILES = { word: 'word_mode.csv', chunk: 'chunk_mode.csv', phrase: 'phrase_mode.csv', definition: 'definition_mode.csv' };
 const MODES = ['word', 'chunk', 'phrase', 'definition'];
 const MODE_ALIASES = { vocabulary: 'word', sentence: 'definition', translation: 'definition' };
@@ -283,6 +285,76 @@ function writeStore(store) {
 }
 function sendJson(res, status, data) { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); }
 function ensureAudioDir() { fs.mkdirSync(AUDIO_DIR, { recursive: true }); }
+function readAudioManifest() {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(AUDIO_MANIFEST_FILE, 'utf8'));
+    return manifest?.schema_version === 1 && manifest.items && typeof manifest.items === 'object' ? manifest : { schema_version: 1, items: {} };
+  } catch (error) {
+    if (error.code === 'ENOENT') return { schema_version: 1, items: {} };
+    throw error;
+  }
+}
+function writeAudioManifestFromItems(items, filename = null) {
+  ensureAudioDir();
+  const now = new Date().toISOString();
+  const existing = readAudioManifest().items || {};
+  const nextItems = { ...existing };
+  for (const item of items) {
+    nextItems[item.questionKey] = {
+      mode: item.mode,
+      sheetName: item.sheetName,
+      excelRow: item.excelRow,
+      question_key: item.questionKey,
+      questionId: item.questionKey,
+      text: item.question,
+      filename: item.filename,
+      updatedAt: now,
+    };
+  }
+  const manifest = { schema_version: 1, source: 'official_workbook_question_key', filename, updatedAt: now, items: nextItems };
+  const tmp = `${AUDIO_MANIFEST_FILE}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(manifest, null, 2));
+  fs.renameSync(tmp, AUDIO_MANIFEST_FILE);
+  return manifest;
+}
+function getManifestEntryForFilename(filename) {
+  const manifest = readAudioManifest();
+  return Object.values(manifest.items || {}).find((entry) => entry?.filename === filename) || null;
+}
+function isManifestedAudioFile(filename) {
+  const entry = getManifestEntryForFilename(filename);
+  return Boolean(entry && entry.filename === filename);
+}
+function quarantineAudioFile(filename) {
+  ensureAudioDir();
+  fs.mkdirSync(AUDIO_BACKUP_DIR, { recursive: true });
+  const src = path.resolve(AUDIO_DIR, filename);
+  if (!src.startsWith(path.resolve(AUDIO_DIR) + path.sep) || !fs.existsSync(src) || !fs.statSync(src).isFile()) return null;
+  let finalDest = path.join(AUDIO_BACKUP_DIR, filename);
+  for (let i = 1; fs.existsSync(finalDest); i += 1) {
+    finalDest = path.join(AUDIO_BACKUP_DIR, `${path.basename(filename, '.mp3')}.${i}.mp3`);
+  }
+  fs.renameSync(src, finalDest);
+  return { filename, backup: finalDest };
+}
+function quarantineExistingAudioFiles() {
+  ensureAudioDir();
+  fs.mkdirSync(AUDIO_BACKUP_DIR, { recursive: true });
+  const moved = [];
+  for (const name of fs.readdirSync(AUDIO_DIR)) {
+    if (!/\.mp3$/i.test(name)) continue;
+    const src = path.join(AUDIO_DIR, name);
+    if (!fs.statSync(src).isFile()) continue;
+    const dest = path.join(AUDIO_BACKUP_DIR, name);
+    let finalDest = dest;
+    for (let i = 1; fs.existsSync(finalDest); i += 1) {
+      finalDest = path.join(AUDIO_BACKUP_DIR, `${path.basename(name, '.mp3')}.${i}.mp3`);
+    }
+    fs.renameSync(src, finalDest);
+    moved.push({ filename: name, backup: finalDest });
+  }
+  return moved;
+}
 function isAllowedAudioFilename(filename) { return /^[wcps]\d{6}\.mp3$/.test(String(filename || '')); }
 function isAllowedAudioKey(key) { return /^[wcps]\d{6}$/.test(String(key || '')); }
 function validateAudioKeyRange(startKey, endKey) {
@@ -291,6 +363,7 @@ function validateAudioKeyRange(startKey, endKey) {
   if (startKey && endKey && startKey > endKey) throw new Error('開始キーは終了キー以下にしてください。');
 }
 function isGeneratedAudioFile(filename) {
+  if (!isManifestedAudioFile(filename)) return false;
   const target = path.resolve(AUDIO_DIR, filename);
   if (!target.startsWith(path.resolve(AUDIO_DIR) + path.sep)) return false;
   try { return fs.statSync(target).isFile() && fs.statSync(target).size > 0; }
@@ -377,7 +450,7 @@ function handleAudio(req, res, pathname) {
     sendAudioHeaders(res, 403);
     return res.end('Forbidden');
   }
-  if (!fs.existsSync(target) || fs.statSync(target).isDirectory()) {
+  if (!isManifestedAudioFile(filename) || !fs.existsSync(target) || fs.statSync(target).isDirectory()) {
     sendAudioHeaders(res, 404);
     return res.end('Not found');
   }
@@ -611,8 +684,11 @@ function handleAudioGenerateFromWorkbook(req, res) {
       const overwrite = String(fields.overwrite || '') === 'true';
       const voice = parseAudioVoice(fields.voice);
       const modeRows = parseOfficialWorkbookRows(file.buffer);
-      const items = collectAudioGenerationItems(modeRows, modes, startKey, endKey, limit);
+      const validation = validateOfficialModeRows(modeRows);
+      if (validation.errors.length) return sendJson(res, 400, makeValidationResponse(validation.errors));
+      const items = collectAudioGenerationItems(validation.playableRows, modes, startKey, endKey, limit);
       ensureAudioDir();
+      const quarantined = overwrite ? quarantineExistingAudioFiles() : [];
       const results = [];
       let generated = 0;
       let skipped = 0;
@@ -622,17 +698,22 @@ function handleAudioGenerateFromWorkbook(req, res) {
         if (!target.startsWith(path.resolve(AUDIO_DIR) + path.sep)) { failed += 1; results.push({ ...item, status: 'failed', message: '保存先が不正です。' }); continue; }
         if (isGeneratedAudioFile(item.filename) && !overwrite) { skipped += 1; results.push({ ...item, status: 'skipped', message: '既存MP3があるためスキップしました。', url: `/audio/${item.filename}` }); continue; }
         try {
+          if (!overwrite && !isManifestedAudioFile(item.filename)) {
+            const moved = quarantineAudioFile(item.filename);
+            if (moved) quarantined.push(moved);
+          }
           const mp3 = await synthesizeTextToMp3(item.question, voice);
           if (!mp3.length) throw new Error('TTS APIから空の音声が返されました。');
           fs.writeFileSync(target, mp3);
           generated += 1;
+          writeAudioManifestFromItems([item], file.filename);
           results.push({ ...item, status: 'generated', message: '生成しました。', url: `/audio/${item.filename}` });
         } catch (error) {
           failed += 1;
           results.push({ ...item, status: 'failed', message: error.message });
         }
       }
-      return sendJson(res, failed ? 207 : 200, { ok: failed === 0, requestedMode: fields.mode || 'word', limit, overwrite, voice, outputDir: AUDIO_DIR, total: items.length, generated, skipped, failed, results });
+      return sendJson(res, failed ? 207 : 200, { ok: failed === 0, requestedMode: fields.mode || 'word', limit, overwrite, voice, outputDir: AUDIO_DIR, manifestFile: AUDIO_MANIFEST_FILE, backupDir: AUDIO_BACKUP_DIR, quarantined, total: items.length, generated, skipped, failed, results });
     } catch (error) {
       return sendJson(res, 400, { ok: false, error: error.message });
     }
@@ -656,8 +737,10 @@ function handleAudioGenerationStatus(req, res) {
       const endKey = String(fields.endKey || '').trim();
       validateAudioKeyRange(startKey, endKey);
       const modeRows = parseOfficialWorkbookRows(file.buffer);
+      const validation = validateOfficialModeRows(modeRows);
+      if (validation.errors.length) return sendJson(res, 400, makeValidationResponse(validation.errors));
       ensureAudioDir();
-      return sendJson(res, 200, { ok: true, requestedMode: fields.mode || 'word', outputDir: AUDIO_DIR, ...buildAudioGenerationStatus(modeRows, modes, startKey, endKey) });
+      return sendJson(res, 200, { ok: true, requestedMode: fields.mode || 'word', outputDir: AUDIO_DIR, manifestFile: AUDIO_MANIFEST_FILE, ...buildAudioGenerationStatus(validation.playableRows, modes, startKey, endKey) });
     } catch (error) {
       return sendJson(res, 400, { ok: false, error: error.message });
     }
