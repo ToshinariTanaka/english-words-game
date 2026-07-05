@@ -1,35 +1,35 @@
 ## 今回やったこと
-- `study-app` の「間違えた問題の復習」開始処理を修正し、復習開始時に `reviewMode` へ切り替え、最初の復習問題を `currentQuestion` にセットして通常の `showQuestion()` 描画で問題文・選択肢・問題情報・音声ボタン状態を表示するようにしました。
-- 復習開始時に間違えた問題リストを即時全消去しないようにし、復習中に正解した問題だけをリストから削除する仕様にしました。不正解の復習問題はリストに残ります。
-- 通常学習中の誤答追加は重複しないようにし、復習ボタンの有効/無効と件数表示が現在の間違いリストに追従するようにしました。
-- 復習開始後、必要に応じて問題表示エリアへスクロールするようにしました。
-- ブラウザキャッシュ回避のため、`study-app/index.html` のCSS/JSクエリを更新しました。
-- 復習開始ロジックを固定するNodeテストを追加し、`npm test` に組み込みました。
+- 現在のMP3ファイル名だけを信用して再生する方式をやめ、`audio_manifest.json` に存在する `question_key` / MP3対応だけをサーバーが配信する方式に変更しました。
+- Excel由来の4シート問題データを検証してからMP3生成対象を作り、生成成功時に `question_key`、モード、問題ID、読み上げ英語テキスト、MP3ファイル名を manifest に保存するようにしました。
+- manifestにない既存MP3は `/audio/...` から404扱いになり、旧MP3を誤再生しないようにしました。
+- 新生成時に同名の旧MP3がmanifest管理外の場合は削除せず `mp3_backup_before_relink` へ退避してから再生成するようにしました。上書き再生成時は音声フォルダ内の既存MP3をまとめて退避できます。
+- ローカル生成ツール `tools/generate_study_audio.py` でも `audio_manifest.json` と `audio_manifest.csv` を出力するようにしました。
+- 音声生成状況APIは、実ファイルの存在だけでなく manifest に載っているMP3だけを生成済みとして数えるようにしました。
 
 ## 変更ファイル
-- `study-app/script.js`
-- `study-app/index.html`
-- `tests_study_app_mistake_review.js`
-- `package.json`
+- `server.js`
+- `tools/generate_study_audio.py`
+- `tests_server_audio_upload.js`
 - `docs/codex_report.md`
+- `docs/architecture.md`
 - `docs/project_status.md`
-- `docs/next_tasks.md`
+- `README.md`
 
 ## テスト結果
-- `node -c study-app/script.js` 成功。
-- `node tests_study_app_mistake_review.js` 成功。
-- `npm test` 成功。npm の `Unknown env config "http-proxy"` 警告は表示されましたが、テスト自体はすべて通過しました。
-- `git diff --check` 成功。
+- `node --check server.js` 成功。
+- `python3 -m py_compile tools/generate_study_audio.py` 成功。
+- `npm test -- --runInBand` 成功。npm の `Unknown env config "http-proxy"` 警告は表示されましたが、テスト自体はすべて通過しました。
 
 ## 注意点
-- UIの構造変更や大きな見た目変更はありません。復習開始時に既存の問題表示カードへスクロールする挙動のみ追加しています。
-- 実ブラウザでの手動確認はこの環境では未実施です。Renderへデプロイ後、指定URLで「わざと1問間違える → 復習を始める → 問題文と選択肢が出る → 回答できる」を確認してください。
-- 復習中に正解した問題は間違えた問題リストから削除し、不正解のままなら残す仕様にしています。
+- この作業環境には添付Excelファイルが存在しなかったため、実データからのMP3一括生成・実MP3退避は未実行です。コード側は、ExcelアップロードまたはローカルCLI実行時に新しいmanifestを作る状態まで整えています。
+- 既存MP3ファイルはmanifestに載っていなければ配信されません。生成済みのはずの音声が404になる場合は、正しいExcelから再生成して `audio_manifest.json` を作成してください。
+- 単体MP3/ZIPアップロード機能は保存自体は可能ですが、再生可否はmanifestに登録済みかどうかで決まります。今後の正規運用はExcelからの再生成を優先してください。
 
 ## 次にやるべきこと
-- Render本番URL `https://english-words-game-1ph3.onrender.com/study-app/` で復習開始から回答、次の復習問題、復習対象0件時のボタン無効を手動確認してください。
-- 可能であればPlaywright等のブラウザE2Eを導入し、復習UIの実DOM表示まで自動確認してください。
+- 本番/検証環境で、正しい4シートExcelを `/admin/audio-upload/` からアップロードしてMP3を再生成してください。
+- 再生成後、`/var/data/audio/audio_manifest.json` の `items` が `question_key` と1対1になっていることを確認してください。
+- 英単語、チャンク、文節和訳、英文和訳の各モードで、MP3あり問題は新MP3だけ、MP3なし問題はWeb Speech APIで読まれることを実ブラウザで確認してください。
 
 ## チャッピーに相談すべき点
-- 復習中に不正解だった問題をリストに残す現在仕様でよいか、復習セッション終了時に再挑戦しやすい導線を追加するか。
-- 復習モード中の成績カウンターを通常学習と合算する現状でよいか、復習専用カウンターに分ける必要があるか。
+- 単体MP3/ZIPアップロードを今後も残すか、manifestとExcelの整合性を守るため管理画面上で非推奨または無効にするか。
+- `question_key` 以外に別の問題ID列をmanifestへ保持する必要があるか。現状は安定IDとして `question_key` を `questionId` にも入れています。
