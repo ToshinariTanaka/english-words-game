@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>パスワード変更</title>
+  <link rel="stylesheet" href="/auth-ui.css">
+</head>
+<body>
+  <main class="narrow card">
+    <h1>パスワード変更</h1>
+    <p class="muted">変更すると、ほかの端末のログインはすべて解除されます。この端末では新しいセッションを続けて利用できます。</p>
+    <div id="message" class="message" role="alert"></div>
+    <form id="password-form">
+      <label>現在のパスワード<input name="currentPassword" type="password" required maxlength="128" autocomplete="current-password"></label>
+      <label>新しいパスワード<input name="newPassword" type="password" required minlength="4" maxlength="128" autocomplete="new-password"></label>
+      <label>新しいパスワード確認<input name="newPasswordConfirmation" type="password" required minlength="4" maxlength="128" autocomplete="new-password"></label>
+      <button type="submit">変更する</button>
+    </form>
+    <p><a href="/member/">会員ホームへ戻る</a></p>
+  </main>
+  <script src="/auth-ui.js"></script>
+  <script src="/member/change-password/script.js"></script>
+</body>
+</html>
