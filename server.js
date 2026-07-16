@@ -4,6 +4,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const authApp = require('./src/auth/app');
+const authDb = require('./src/db');
 
 const PORT = Number(process.env.PORT || 3000);
 const APP_VARIANT = String(process.env.APP_VARIANT || 'default').trim() || 'default';
@@ -34,6 +36,11 @@ const OPENAI_TTS_MODEL = process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts';
 const OPENAI_TTS_VOICE = process.env.OPENAI_TTS_VOICE || 'marin';
 const OPENAI_TTS_VOICES = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse', 'marin', 'cedar']);
 const PYTHON_PACKAGE_DIR = process.env.PYTHON_PACKAGE_DIR || path.join(__dirname, '.python_packages');
+const PYTHON_COMMAND = process.env.PYTHON_COMMAND || process.env.PYTHON || 'python3';
+
+if (!authDb.isConfigured()) {
+  authDb.warnOnce('DATABASE_URL が未設定です。既存の英語学習機能だけを起動します。');
+}
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -53,6 +60,8 @@ function getPythonEnv() {
   return {
     ...process.env,
     PYTHONPATH: [PYTHON_PACKAGE_DIR, process.env.PYTHONPATH].filter(Boolean).join(path.delimiter),
+    PYTHONIOENCODING: process.env.PYTHONIOENCODING || 'utf-8',
+    PYTHONUTF8: process.env.PYTHONUTF8 || '1',
   };
 }
 
@@ -93,19 +102,19 @@ function logWorkbookParserFailure(parsed, command) {
 }
 
 function buildPythonDiagnostics() {
-  const pythonCommand = 'python3';
+  const pythonCommand = PYTHON_COMMAND;
   const python = { available: false };
   const openpyxl = { available: false };
   const pythonEnv = getPythonEnv();
   const pythonVersion = spawnSync(pythonCommand, ['--version'], { encoding: 'utf8', env: pythonEnv });
   if (pythonVersion.error) {
     python.error = pythonVersion.error.message;
-    openpyxl.error = 'python3 is not available, so openpyxl could not be checked.';
+    openpyxl.error = `${pythonCommand} is not available, so openpyxl could not be checked.`;
     return { ok: false, python, openpyxl, pythonPackageDir: PYTHON_PACKAGE_DIR, pythonPath: pythonEnv.PYTHONPATH || '' };
   }
   if (pythonVersion.status !== 0) {
-    python.error = (pythonVersion.stderr || pythonVersion.stdout || `python3 --version exited with status ${pythonVersion.status}`).trim();
-    openpyxl.error = 'python3 version check failed, so openpyxl could not be checked.';
+    python.error = (pythonVersion.stderr || pythonVersion.stdout || `${pythonCommand} --version exited with status ${pythonVersion.status}`).trim();
+    openpyxl.error = `${pythonCommand} version check failed, so openpyxl could not be checked.`;
     return { ok: false, python, openpyxl, pythonPackageDir: PYTHON_PACKAGE_DIR, pythonPath: pythonEnv.PYTHONPATH || '' };
   }
   python.available = true;
@@ -143,14 +152,14 @@ for sheet_name in workbook.sheetnames:
 print(json.dumps(result, ensure_ascii=False))
 `, 'utf8');
   try {
-    const parsed = spawnSync('python3', [scriptPath, workbookPath], { encoding: 'utf8', env: getPythonEnv(), maxBuffer: 20 * 1024 * 1024 });
+    const parsed = spawnSync(PYTHON_COMMAND, [scriptPath, workbookPath], { encoding: 'utf8', env: getPythonEnv(), maxBuffer: 20 * 1024 * 1024 });
     if (parsed.error) {
-      logWorkbookParserFailure(parsed, `python3 ${scriptPath} ${workbookPath}`);
-      throw new Error('Excelファイルの読み込みに失敗しました。Render環境で python3 / openpyxl が利用できるか確認してください。');
+      logWorkbookParserFailure(parsed, `${PYTHON_COMMAND} ${scriptPath} ${workbookPath}`);
+      throw new Error('Excelファイルの読み込みに失敗しました。Render環境で Python / openpyxl が利用できるか確認してください。');
     }
     if (parsed.status !== 0) {
-      logWorkbookParserFailure(parsed, `python3 ${scriptPath} ${workbookPath}`);
-      throw new Error('Excelファイルの読み込みに失敗しました。Render環境で python3 / openpyxl が利用できるか確認してください。');
+      logWorkbookParserFailure(parsed, `${PYTHON_COMMAND} ${scriptPath} ${workbookPath}`);
+      throw new Error('Excelファイルの読み込みに失敗しました。Render環境で Python / openpyxl が利用できるか確認してください。');
     }
     return JSON.parse(parsed.stdout || '{}');
   } finally {
@@ -775,6 +784,7 @@ function serveStatic(req, res, pathname) {
 }
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  if (authApp.canHandle(url.pathname)) return authApp.handle(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/app-config') return handleAppConfig(req, res);
   if (req.method === 'GET' && url.pathname === '/api/questions/current') return handleCurrent(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/questions/status') return handleStatus(req, res, url);
