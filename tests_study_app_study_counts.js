@@ -2,7 +2,7 @@ const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
 
-const source = fs.readFileSync('study-app/script.js', 'utf8');
+const source = fs.readFileSync('study-app/script.js', 'utf8').replace(/\r\n/g, '\n');
 const start = source.indexOf('const MODES =');
 const end = source.indexOf('function setLoadingState');
 const snippet = source.slice(start, end);

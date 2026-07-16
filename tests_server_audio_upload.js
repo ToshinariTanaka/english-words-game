@@ -1,5 +1,6 @@
 const assert = require('assert');
 const childProcess = require('child_process');
+const PYTHON_COMMAND = process.env.PYTHON_COMMAND || process.env.PYTHON || 'python3';
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
@@ -159,8 +160,10 @@ function makeMultipart(content, filename, contentType = 'audio/mpeg', fields = {
   });
   await new Promise((resolve) => ttsServer.listen(ttsPort, '127.0.0.1', resolve));
   const workbookPath = path.join(tmpDir, 'audio.xlsx');
-  childProcess.execFileSync('python3', ['-c', `
+  const workbookScriptPath = path.join(tmpDir, 'create_audio_workbook.py');
+  fs.writeFileSync(workbookScriptPath, `
 from openpyxl import Workbook
+import sys
 wb = Workbook()
 sheets = [('★英単語', 'w', 'Hello'), ('★チャンク', 'c', 'Good morning'), ('★文節和訳', 'p', 'Nice to meet you'), ('★英文和訳', 's', 'This is a pen')]
 for i, (name, prefix, text) in enumerate(sheets):
@@ -170,8 +173,9 @@ for i, (name, prefix, text) in enumerate(sheets):
     max_n = 20 if prefix == 'w' else 3
     for n in range(1, max_n + 1):
         ws.append([n, 'A1', f'{text} {n}', 'a', 'b', 'c', 'd', '', '', '', '', '', f'{prefix}{n:06d}'])
-wb.save(r'''${workbookPath}''')
-`]);
+wb.save(sys.argv[1])
+`, 'utf8');
+  childProcess.execFileSync(PYTHON_COMMAND, [workbookScriptPath, workbookPath]);
   let generationServer = null;
   let uploadServer = null;
   const server = childProcess.spawn(process.execPath, ['server.js'], {
