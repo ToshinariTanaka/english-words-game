@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>管理者ログイン</title>
+  <link rel="stylesheet" href="/auth-ui.css">
+</head>
+<body>
+  <main class="narrow card">
+    <h1>管理者ログイン</h1>
+    <p class="muted">管理者ごとのログインIDとパスワードを入力してください。</p>
+    <div id="message" class="message" role="alert"></div>
+    <form id="login-form">
+      <label>ログインID<input name="loginId" required maxlength="64" autocomplete="username"></label>
+      <label>パスワード<input name="password" type="password" required maxlength="128" autocomplete="current-password"></label>
+      <button type="submit">ログイン</button>
+    </form>
+    <p><a href="/">英語学習RPGへ戻る</a></p>
+  </main>
+  <script src="/auth-ui.js"></script>
+  <script src="/admin/login/script.js"></script>
+</body>
+</html>

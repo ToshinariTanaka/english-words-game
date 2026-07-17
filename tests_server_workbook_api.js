@@ -1,5 +1,6 @@
 const assert = require('assert');
 const childProcess = require('child_process');
+const PYTHON_COMMAND = process.env.PYTHON_COMMAND || process.env.PYTHON || 'python3';
 const fs = require('fs');
 const http = require('http');
 const os = require('os');
@@ -37,6 +38,12 @@ function makeMultipart(filePath, filename) {
   return { body: Buffer.concat([head, file, tail]), headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } };
 }
 
+function runPythonScript(filename, script, args = []) {
+  const scriptPath = path.join(tmpDir, filename);
+  fs.writeFileSync(scriptPath, script, 'utf8');
+  return childProcess.spawnSync(PYTHON_COMMAND, [scriptPath, ...args], { encoding: 'utf8' });
+}
+
 function createWorkbook(target, emptyMode = null) {
   const script = `
 from openpyxl import Workbook
@@ -55,15 +62,15 @@ for mode, sheet_name, key in sheets:
         ws.append(['3', '', f'incomplete {mode}', '', '', '', '', '', '', '', '', '', ''])
 wb.save(sys.argv[1])
 `;
-  const args = ['-c', script, target];
+  const args = [target];
   if (emptyMode) args.push(emptyMode);
-  const result = childProcess.spawnSync('python3', args, { encoding: 'utf8' });
+  const result = runPythonScript('create_workbook.py', script, args);
   assert.strictEqual(result.status, 0, result.stderr);
 }
 
 (async () => {
   const server = childProcess.spawn(process.execPath, ['server.js'], {
-    env: { ...process.env, PORT: String(port), QUESTIONS_FILE: dataFile },
+    env: { ...process.env, PORT: String(port), QUESTIONS_FILE: dataFile, QUESTION_FILE: path.join(tmpDir, 'questions.xlsx') },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   try {
@@ -126,7 +133,7 @@ wb.save(sys.argv[1])
 
     const invalidWorkbook = path.join(tmpDir, 'invalid.xlsx');
     createWorkbook(invalidWorkbook);
-    childProcess.spawnSync('python3', ['-c', `
+    runPythonScript('modify_invalid_workbook.py', `
 from openpyxl import load_workbook
 import sys
 wb = load_workbook(sys.argv[1])
@@ -135,7 +142,7 @@ ws['B2'] = 'Z9'
 ws['E2'] = 'word correct'
 wb['★英文和訳']['M2'] = 'd000001'
 wb.save(sys.argv[1])
-`, invalidWorkbook], { encoding: 'utf8' });
+`, [invalidWorkbook]);
     const invalidUpload = makeMultipart(invalidWorkbook, 'invalid.xlsx');
     const invalid = await request('POST', '/api/questions/upload-workbook', invalidUpload);
     assert.strictEqual(invalid.status, 400, invalid.text);

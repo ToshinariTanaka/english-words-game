@@ -2,6 +2,24 @@
 
 英単語を倒してgoldを稼ぐ英語学習RPGです。既存のRPG本体は `index.html` / `style.css` / `script.js` で維持しています。
 
+## PostgreSQL・管理者／会員認証基盤（第1弾）
+
+既存のRPGと `study-app` を維持したまま、PostgreSQLを使う会員認証基盤を追加しました。
+
+- 管理者ログイン: `/admin/login/`
+- 管理者ダッシュボード: `/admin/dashboard/`
+- 会員ログイン: `/member/login/`
+- 会員ホーム: `/member/`
+- マイグレーション: `npm run db:migrate` / `npm run db:status`
+- 初回代表管理者作成: `npm run admin:create -- --login-id tanaka --display-name "田中" --role owner`
+- 代表管理者のロック復旧: `npm run admin:unlock -- --login-id tanaka`
+- 認証単体テスト: `npm run test:auth`
+- PostgreSQL統合テスト: `TEST_DATABASE_URL=... npm run test:db-integration`
+
+必要な環境変数は `DATABASE_URL`、`SESSION_SECRET`、`TEMP_PASSWORD_ENCRYPTION_KEY`、`APP_TIMEZONE`、`NODE_ENV` です。認証用パスワードはbcrypt、初期・仮パスワードの一時表示データはAES-256-GCM、セッションCookieのトークンはHMAC-SHA-256でハッシュ化して保存します。DB未設定・接続不能時は認証APIだけが503となり、既存のRPG・`study-app`・問題API・音声機能は起動を継続します。
+
+導入、秘密値の生成、Render PostgreSQL設定、バックアップ、ロック復旧の詳細は [`docs/member_auth_operations.md`](docs/member_auth_operations.md) を参照してください。
+
 ## RPG本体の音声・効果音設定（2026-06-17）
 
 ルートのRPG本体（`index.html` / `script.js` / `style.css`）に、読み上げ音声と効果音の設定を追加しました。

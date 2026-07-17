@@ -12,3 +12,13 @@ services:
     envVars:
       - key: DATA_DIR
         value: /var/data/english_words_game
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: TEMP_PASSWORD_ENCRYPTION_KEY
+        sync: false
+      - key: APP_TIMEZONE
+        value: Asia/Tokyo
+      - key: NODE_ENV
+        value: production

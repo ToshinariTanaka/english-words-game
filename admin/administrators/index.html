@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>管理者管理</title>
+  <link rel="stylesheet" href="/auth-ui.css">
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar"><div><h1>管理者管理</h1><a href="/admin/dashboard/">ダッシュボードへ戻る</a></div></div>
+    <div id="message" class="message" role="alert"></div>
+    <section class="card">
+      <h2>管理者を作成</h2>
+      <form id="create-form">
+        <div class="grid">
+          <label>表示名<input name="displayName" required maxlength="100"></label>
+          <label>ログインID<input name="loginId" required minlength="3" maxlength="64" pattern="[A-Za-z0-9._@-]+"></label>
+          <label>権限<select name="role"><option value="admin">一般管理者</option><option value="viewer">閲覧者</option><option value="owner">代表管理者</option></select></label>
+          <label>初期パスワード<input name="password" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></label>
+        </div>
+        <button type="submit">管理者を作成</button>
+      </form>
+      <h2>管理者一覧</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>表示名</th><th>ログインID</th><th>権限</th><th>利用状態</th><th>ログイン停止</th><th>最終ログイン</th><th>操作</th></tr></thead>
+          <tbody id="administrator-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <dialog id="reset-dialog">
+    <h2>管理者パスワードを再設定</h2>
+    <p>現在のパスワードは表示されません。再設定すると既存セッションは失効します。</p>
+    <form id="reset-form">
+      <input id="reset-target" type="hidden">
+      <label>新しいパスワード<input id="reset-password" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></label>
+      <div class="actions"><button type="submit">再設定</button><button type="button" class="secondary" id="reset-cancel">キャンセル</button></div>
+    </form>
+  </dialog>
+  <script src="/auth-ui.js"></script>
+  <script src="/admin/administrators/script.js"></script>
+</body>
+</html>

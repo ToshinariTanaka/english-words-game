@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>会員管理</title>
+  <link rel="stylesheet" href="/auth-ui.css">
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar"><div><h1>会員管理</h1><a href="/admin/dashboard/">ダッシュボードへ戻る</a></div></div>
+    <div id="message" class="message" role="alert"></div>
+    <section class="card">
+      <h2>会員を作成</h2>
+      <form id="create-form">
+        <div class="grid">
+          <label>氏名<input name="name" required maxlength="100" autocomplete="off"></label>
+          <label>初期パスワード<input name="password" type="password" required minlength="4" maxlength="128" autocomplete="new-password"></label>
+        </div>
+        <button type="submit">会員IDを発行して作成</button>
+      </form>
+      <h2>会員一覧</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>会員ID</th><th>氏名</th><th>利用状態</th><th>ログイン停止</th><th>最終ログイン</th><th>初期・仮パスワード</th><th>操作</th></tr></thead>
+          <tbody id="member-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+  <dialog id="secret-dialog">
+    <h2>初期・仮パスワード</h2>
+    <p>画面を閉じると表示を消去します。安全な方法で本人へ伝えてください。</p>
+    <p id="secret-value" class="secret"></p>
+    <form method="dialog"><button>閉じる</button></form>
+  </dialog>
+  <dialog id="reset-dialog">
+    <h2>仮パスワードを再設定</h2>
+    <form id="reset-form">
+      <input id="reset-target" type="hidden">
+      <label>新しい仮パスワード<input id="reset-password" type="password" required minlength="4" maxlength="128" autocomplete="new-password"></label>
+      <div class="actions"><button type="submit">再設定</button><button type="button" class="secondary" id="reset-cancel">キャンセル</button></div>
+    </form>
+  </dialog>
+  <script src="/auth-ui.js"></script>
+  <script src="/admin/members/script.js"></script>
+</body>
+</html>

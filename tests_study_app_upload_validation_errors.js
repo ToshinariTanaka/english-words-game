@@ -2,7 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 
-const source = fs.readFileSync('study-app/script.js', 'utf8');
+const source = fs.readFileSync('study-app/script.js', 'utf8').replace(/\r\n/g, '\n');
 assert.ok(source.includes("definition: 's'"), 'definition mode question_key prefix remains s');
 assert.ok(source.includes('function showUploadValidationErrors'), '専用エラー表示関数を持つ');
 assert.ok(source.includes('textContent = String(error)'), 'HTML特殊文字はtextContentで表示する');

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>会員ホーム</title>
+  <link rel="stylesheet" href="/auth-ui.css">
+</head>
+<body>
+  <main class="narrow card">
+    <div class="topbar"><h1>会員ホーム</h1><button id="logout" class="secondary">ログアウト</button></div>
+    <div id="message" class="message" role="alert"></div>
+    <dl class="grid">
+      <div class="stat"><dt>氏名</dt><dd id="name">—</dd></div>
+      <div class="stat"><dt>会員ID</dt><dd id="member-id">—</dd></div>
+      <div class="stat"><dt>最終ログイン日時</dt><dd id="last-login">—</dd></div>
+    </dl>
+    <p class="actions"><a class="button" href="/member/change-password/">パスワードを変更</a></p>
+    <p class="muted">テスト機能は準備中です。既存の英語学習機能は引き続きご利用いただけます。</p>
+  </main>
+  <script src="/auth-ui.js"></script>
+  <script src="/member/script.js"></script>
+</body>
+</html>

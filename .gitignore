@@ -1,1 +1,9 @@
-.python_packages/
+node_modules/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+*.local
+.qa-bin/
+__pycache__/
+*.py[cod]

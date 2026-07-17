@@ -1,5 +1,44 @@
 # Architecture Notes
 
+## 管理者・会員認証基盤（2026-07-17）
+
+認証機能は既存のRPG／study-app用APIから分離し、`server.js` は `/api/auth/`、`/api/admin/`、`/api/member/` だけを `src/auth/app.js` へ渡します。`DATABASE_URL` がなくても認証モジュールは遅延接続となるため、既存静的画面、問題API、音声APIの起動を妨げません。
+
+### モジュール
+
+- `src/db/`: PostgreSQL Pool、トランザクション、接続不能判定、チェックサム付き前方マイグレーション。
+- `src/auth/security.js`: bcrypt、AES-256-GCM、ランダムセッショントークン、HMAC-SHA-256、CSRF派生トークン。
+- `src/auth/service.js`: ログイン、ロック、会員／管理者管理、セッション失効、監査ログ。
+- `src/auth/app.js`: JSONサイズ制限、Cookie、CSRF／Origin検証、権限確認、APIルーティング。
+- `admin/`・`member/`: サーバーセッションだけを使う最小画面。認証情報はlocalStorageへ保存しない。
+
+### データモデル
+
+- `administrators`: 個別ログインID、`owner` / `admin` / `viewer`、bcryptハッシュ、ロック状態、`session_version`。
+- `members`: `member_number_seq` から発行する `UP000001` 形式の不変ID、bcryptハッシュ、暗号化した初期・仮パスワード、ロック状態、`session_version`。
+- `sessions`: 管理者／会員共通のサーバー側セッション。Cookieの平文トークンは保存せず、HMAC-SHA-256だけを保存する。
+- `audit_logs`: 認証・管理操作をJSONメタデータ付きで記録する。秘密値は `cleanMetadata` で除外する。
+- `schema_migrations`: ファイル名、SHA-256チェックサム、適用日時を記録し、二重適用と適用済みファイル改変を防ぐ。
+
+会員IDはPostgreSQL sequenceを使うため、トランザクションのロールバックや同時作成があっても一度発行した番号を再利用しません。欠番は許容します。
+
+### 認証・失効
+
+パスワードはSHA-256で長さを固定してからbcrypt（標準cost 12）へ渡し、bcryptの入力長制約と極端に長い入力への負荷を抑えます。入力自体は管理者8〜128文字、会員4〜128文字です。初期・仮パスワードは認証用ハッシュとは別にAES-256-GCMで暗号化し、会員本人が変更すると暗号文を削除します。
+
+セッションは30日有効で、CookieはHttpOnly（CSRF Cookieを除く）、SameSite=Lax、本番Secure、Path=/です。パスワード変更、再設定、利用停止、権限変更、全端末ログアウトでは `session_version` を増やして既存セッションを失効します。本人のパスワード変更後は現在端末へだけ新しいセッションを再発行します。
+
+状態変更APIは、セッションからHMACで導出したCSRF値をCookieと `X-CSRF-Token` の両方で照合し、Origin／Sec-Fetch-Siteも検証します。SQLは固定SQLとパラメータ化クエリだけを使用します。
+
+### 権限境界
+
+- 代表管理者: 管理者・会員・監査ログの全機能。
+- 一般管理者: 会員作成、停止、仮パスワード、ロック解除、セッション失効。
+- 閲覧者: 自分の管理者情報、ダッシュボード、ログアウトのみ。
+- 会員: 自分の情報、パスワード変更、ログアウトのみ。
+
+画面上の非表示だけに依存せず、各APIでアカウント種別と権限を再検証します。
+
 ## 既存RPG本体
 
 - `script.js`: ゲームロジック本体（出題、判定、Gold計算、復習モード、自動遷移）。
