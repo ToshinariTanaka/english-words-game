@@ -55,6 +55,12 @@ function validatePositiveId(value) {
   return id;
 }
 
+function validatePositiveIds(value, label = '対象ID') {
+  if (!Array.isArray(value)) throw new ValidationError(`${label}の一覧が正しくありません。`);
+  if (value.length > 5000) throw new ValidationError(`${label}は5000件以内で指定してください。`);
+  return [...new Set(value.map((item) => validatePositiveId(item)))];
+}
+
 module.exports = {
   ADMIN_ROLES,
   requiredString,
@@ -65,5 +71,6 @@ module.exports = {
   validateName,
   validatePassword,
   validatePositiveId,
+  validatePositiveIds,
   validateRole,
 };

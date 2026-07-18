@@ -13,6 +13,7 @@ async function loadSession() {
     document.querySelector('#role').textContent = account.roleLabel;
     document.querySelector('#last-login').textContent = AuthUi.formatDate(account.lastLoginAt);
     const links = [];
+    if (account.capabilities.manageGroups) links.push('<a class="button" href="/admin/groups/">グループ管理</a>');
     if (account.capabilities.manageMembers) links.push('<a class="button" href="/admin/members/">会員管理</a>');
     if (account.capabilities.manageAdministrators) links.push('<a class="button" href="/admin/administrators/">管理者管理</a>');
     if (account.capabilities.viewAuditLogs) links.push('<a class="button" href="/admin/audit-logs/">監査ログ</a>');

@@ -1,0 +1,9 @@
+textarea { width: 100%; border: 1px solid #b9c5d8; border-radius: 8px; padding: 10px 12px; background: #fff; font: inherit; resize: vertical; }
+.members-dialog { width: min(620px, calc(100% - 32px)); }
+.member-picker { max-height: min(52vh, 480px); overflow-y: auto; border: 1px solid #dbe3ef; border-radius: 10px; }
+.member-option { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; padding: 10px 12px; font-weight: 500; border-bottom: 1px solid #e6ebf3; }
+.member-option:last-child { border-bottom: 0; }
+.member-option input { width: auto; }
+.member-option[hidden] { display: none; }
+.member-option .inactive-note { color: #8f1d1d; font-size: .84rem; }
+.empty-members { margin: 0; padding: 16px; color: #5b6475; }

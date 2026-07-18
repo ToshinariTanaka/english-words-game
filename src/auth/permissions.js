@@ -12,6 +12,7 @@ function requireRole(account, allowedRoles) {
 }
 
 function canManageMembers(role) { return role === 'owner' || role === 'admin'; }
+function canManageGroups(role) { return role === 'owner' || role === 'admin'; }
 function canManageAdministrators(role) { return role === 'owner'; }
 function canViewTemporaryPasswords(role) { return role === 'owner' || role === 'admin'; }
 function canViewAuditLogs(role) { return role === 'owner'; }
@@ -19,6 +20,7 @@ function canViewAuditLogs(role) { return role === 'owner'; }
 module.exports = {
   ROLE_LABELS,
   canManageAdministrators,
+  canManageGroups,
   canManageMembers,
   canViewAuditLogs,
   canViewTemporaryPasswords,

@@ -20,6 +20,20 @@
 
 導入、秘密値の生成、Render PostgreSQL設定、バックアップ、ロック復旧の詳細は [`docs/member_auth_operations.md`](docs/member_auth_operations.md) を参照してください。
 
+## グループ管理（第2弾・第1段階）
+
+テスト配信の対象単位になるグループと会員所属を追加しました。
+
+- グループ管理画面: `/admin/groups/`
+- 利用権限: 代表管理者／一般管理者
+- グループ名・説明の作成／編集
+- 会員検索と複数会員の所属差し替え
+- グループのアーカイブ（所属履歴は保持）
+- 作成／編集／所属変更／アーカイブの監査ログ
+- マイグレーション: `002_groups.sql`
+
+データモデルとAPI、検証項目は [`docs/phase2_groups.md`](docs/phase2_groups.md) を参照してください。
+
 ## RPG本体の音声・効果音設定（2026-06-17）
 
 ルートのRPG本体（`index.html` / `script.js` / `style.css`）に、読み上げ音声と効果音の設定を追加しました。
