@@ -11,6 +11,7 @@ const {
 } = require('./errors');
 const {
   canManageAdministrators,
+  canManageGroups,
   canManageMembers,
   canViewAuditLogs,
   canViewTemporaryPasswords,
@@ -102,6 +103,7 @@ function withAccountCapabilities(account) {
     ...account,
     roleLabel: ROLE_LABELS[account.role],
     capabilities: {
+      manageGroups: canManageGroups(account.role),
       manageMembers: canManageMembers(account.role),
       manageAdministrators: canManageAdministrators(account.role),
       viewTemporaryPasswords: canViewTemporaryPasswords(account.role),
@@ -194,6 +196,37 @@ async function handleMembers(req, res, url) {
   throw new AppError('APIが見つかりません。', { statusCode: 404, code: 'NOT_FOUND' });
 }
 
+async function handleGroups(req, res, url) {
+  const session = await requireSession(req, 'administrator');
+  const actor = requireAdminPermission(session, canManageGroups);
+  if (req.method === 'GET' && url.pathname === '/api/admin/groups') {
+    return sendJson(res, 200, { ok: true, groups: await service.listGroups() });
+  }
+  const membersMatch = url.pathname.match(/^\/api\/admin\/groups\/(\d+)\/members$/);
+  if (req.method === 'GET' && membersMatch) {
+    return sendJson(res, 200, { ok: true, memberIds: await service.getGroupMemberIds(membersMatch[1]) });
+  }
+
+  requireCsrf(req, 'administrator', session.token);
+  if (req.method === 'POST' && url.pathname === '/api/admin/groups') {
+    const body = await readJson(req, getConfig().authJsonLimitBytes);
+    return sendJson(res, 201, { ok: true, group: await service.createGroup(actor, body) });
+  }
+  if (req.method === 'PUT' && membersMatch) {
+    const body = await readJson(req, getConfig().authJsonLimitBytes);
+    return sendJson(res, 200, { ok: true, membership: await service.replaceGroupMembers(actor, membersMatch[1], body.memberIds) });
+  }
+  const itemMatch = url.pathname.match(/^\/api\/admin\/groups\/(\d+)$/);
+  if (req.method === 'PATCH' && itemMatch) {
+    const body = await readJson(req, getConfig().authJsonLimitBytes);
+    return sendJson(res, 200, { ok: true, group: await service.updateGroup(actor, itemMatch[1], body) });
+  }
+  if (req.method === 'DELETE' && itemMatch) {
+    return sendJson(res, 200, { ok: true, group: await service.archiveGroup(actor, itemMatch[1]) });
+  }
+  throw new AppError('APIが見つかりません。', { statusCode: 404, code: 'NOT_FOUND' });
+}
+
 async function handleAdministrators(req, res, url) {
   const session = await requireSession(req, 'administrator');
   const actor = requireAdminPermission(session, canManageAdministrators);
@@ -247,6 +280,7 @@ async function route(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/auth/logout') return handleLogout(req, res);
   if (req.method === 'POST' && url.pathname === '/api/member/change-password') return handleOwnPasswordChange(req, res, 'member');
   if (req.method === 'POST' && url.pathname === '/api/admin/change-password') return handleOwnPasswordChange(req, res, 'administrator');
+  if (url.pathname === '/api/admin/groups' || url.pathname.startsWith('/api/admin/groups/')) return handleGroups(req, res, url);
   if (url.pathname === '/api/admin/members' || url.pathname.startsWith('/api/admin/members/')) return handleMembers(req, res, url);
   if (url.pathname === '/api/admin/administrators' || url.pathname.startsWith('/api/admin/administrators/')) return handleAdministrators(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/admin/audit-logs') return handleAuditLogs(req, res, url);

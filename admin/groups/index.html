@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>グループ管理</title>
+  <link rel="stylesheet" href="/auth-ui.css">
+  <link rel="stylesheet" href="/admin/groups/style.css">
+</head>
+<body>
+  <main class="shell">
+    <div class="topbar"><div><h1>グループ管理</h1><a href="/admin/dashboard/">ダッシュボードへ戻る</a></div></div>
+    <div id="message" class="message" role="alert"></div>
+    <section class="card">
+      <h2>グループを作成</h2>
+      <form id="create-form">
+        <div class="grid">
+          <label>グループ名<input name="name" required maxlength="100" autocomplete="off"></label>
+          <label>説明<textarea name="description" maxlength="500" rows="3"></textarea></label>
+        </div>
+        <button type="submit">グループを作成</button>
+      </form>
+
+      <h2>グループ一覧</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>グループ名</th><th>説明</th><th>所属会員</th><th>更新日時</th><th>操作</th></tr></thead>
+          <tbody id="group-rows"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="edit-dialog">
+    <h2>グループを編集</h2>
+    <form id="edit-form">
+      <input id="edit-target" type="hidden">
+      <label>グループ名<input id="edit-name" required maxlength="100" autocomplete="off"></label>
+      <label>説明<textarea id="edit-description" maxlength="500" rows="4"></textarea></label>
+      <div class="actions"><button type="submit">保存</button><button type="button" class="secondary" id="edit-cancel">キャンセル</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="members-dialog" class="members-dialog">
+    <h2 id="members-heading">所属会員を編集</h2>
+    <p class="muted">このグループに所属させる会員を選択してください。</p>
+    <form id="members-form">
+      <input id="members-target" type="hidden">
+      <label>会員を検索<input id="member-search" type="search" placeholder="会員IDまたは氏名"></label>
+      <div id="member-picker" class="member-picker"></div>
+      <div class="actions"><button type="submit">所属を保存</button><button type="button" class="secondary" id="members-cancel">キャンセル</button></div>
+    </form>
+  </dialog>
+
+  <script src="/auth-ui.js"></script>
+  <script src="/admin/groups/script.js"></script>
+</body>
+</html>

@@ -22,6 +22,7 @@ const {
 } = require('./security');
 const { nextFailureState } = require('./lockout');
 const {
+  requiredString,
   validateBoolean,
   validateLoginId,
   validateLoginPassword,
@@ -29,6 +30,7 @@ const {
   validateName,
   validatePassword,
   validatePositiveId,
+  validatePositiveIds,
   validateRole,
 } = require('./validation');
 
@@ -360,6 +362,179 @@ async function resetMemberPassword(actor, memberIdValue, passwordValue) {
   });
 }
 
+function publicGroup(row) {
+  return {
+    id: Number(row.id),
+    name: row.name,
+    description: row.description,
+    memberCount: Number(row.member_count || 0),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function listGroups() {
+  const result = await db.query(`
+    SELECT g.id, g.name, g.description, g.created_at, g.updated_at,
+           COUNT(m.id)::int AS member_count
+      FROM groups g
+      LEFT JOIN group_members gm ON gm.group_id = g.id
+      LEFT JOIN members m ON m.id = gm.member_id AND m.archived_at IS NULL
+     WHERE g.archived_at IS NULL
+     GROUP BY g.id
+     ORDER BY LOWER(g.name), g.id
+  `);
+  return result.rows.map(publicGroup);
+}
+
+async function createGroup(actor, input) {
+  const name = validateName(input.name, 'グループ名');
+  const description = requiredString(input.description ?? '', '説明', { min: 0, max: 500 });
+  try {
+    return await db.transaction(async (client) => {
+      const inserted = await client.query(
+        `INSERT INTO groups (name, description, created_by)
+         VALUES ($1, $2, $3) RETURNING *`,
+        [name, description, actor.id],
+      );
+      await writeAudit(client, {
+        actorType: 'administrator', actorId: actor.id, action: 'group.created',
+        targetType: 'group', targetId: inserted.rows[0].id, metadata: { name },
+      });
+      return publicGroup(inserted.rows[0]);
+    });
+  } catch (error) {
+    if (error.code === '23505') throw new ConflictError('同じ名前のグループが既に存在します。');
+    throw error;
+  }
+}
+
+async function updateGroup(actor, groupIdValue, input) {
+  const groupId = validatePositiveId(groupIdValue);
+  try {
+    return await db.transaction(async (client) => {
+      const selected = await client.query(
+        'SELECT * FROM groups WHERE id = $1 AND archived_at IS NULL FOR UPDATE',
+        [groupId],
+      );
+      const current = selected.rows[0];
+      if (!current) throw new NotFoundError('グループが見つかりません。');
+      const name = input.name === undefined ? current.name : validateName(input.name, 'グループ名');
+      const description = input.description === undefined
+        ? current.description
+        : requiredString(input.description, '説明', { min: 0, max: 500 });
+      const updated = await client.query(
+        `UPDATE groups SET name = $2, description = $3, updated_at = NOW()
+          WHERE id = $1 RETURNING *`,
+        [groupId, name, description],
+      );
+      await writeAudit(client, {
+        actorType: 'administrator', actorId: actor.id, action: 'group.updated',
+        targetType: 'group', targetId: groupId,
+        metadata: { nameChanged: current.name !== name, descriptionChanged: current.description !== description },
+      });
+      const count = await client.query(
+        `SELECT COUNT(m.id)::int AS member_count
+           FROM group_members gm
+           JOIN members m ON m.id = gm.member_id AND m.archived_at IS NULL
+          WHERE gm.group_id = $1`,
+        [groupId],
+      );
+      return publicGroup({ ...updated.rows[0], member_count: count.rows[0].member_count });
+    });
+  } catch (error) {
+    if (error.code === '23505') throw new ConflictError('同じ名前のグループが既に存在します。');
+    throw error;
+  }
+}
+
+async function archiveGroup(actor, groupIdValue) {
+  const groupId = validatePositiveId(groupIdValue);
+  return db.transaction(async (client) => {
+    const archived = await client.query(
+      `UPDATE groups SET archived_at = NOW(), updated_at = NOW()
+        WHERE id = $1 AND archived_at IS NULL RETURNING id, name`,
+      [groupId],
+    );
+    if (!archived.rows[0]) throw new NotFoundError('グループが見つかりません。');
+    await writeAudit(client, {
+      actorType: 'administrator', actorId: actor.id, action: 'group.archived',
+      targetType: 'group', targetId: groupId, metadata: { name: archived.rows[0].name },
+    });
+    return { id: groupId };
+  });
+}
+
+async function getGroupMemberIds(groupIdValue) {
+  const groupId = validatePositiveId(groupIdValue);
+  const group = await db.query(
+    'SELECT id FROM groups WHERE id = $1 AND archived_at IS NULL',
+    [groupId],
+  );
+  if (!group.rows[0]) throw new NotFoundError('グループが見つかりません。');
+  const result = await db.query(
+    `SELECT gm.member_id
+       FROM group_members gm
+       JOIN members m ON m.id = gm.member_id
+      WHERE gm.group_id = $1 AND m.archived_at IS NULL
+      ORDER BY gm.member_id`,
+    [groupId],
+  );
+  return result.rows.map((row) => Number(row.member_id));
+}
+
+async function replaceGroupMembers(actor, groupIdValue, memberIdsValue) {
+  const groupId = validatePositiveId(groupIdValue);
+  const memberIds = validatePositiveIds(memberIdsValue, '会員ID');
+  return db.transaction(async (client) => {
+    const group = await client.query(
+      'SELECT id FROM groups WHERE id = $1 AND archived_at IS NULL FOR UPDATE',
+      [groupId],
+    );
+    if (!group.rows[0]) throw new NotFoundError('グループが見つかりません。');
+
+    const members = await client.query(
+      `SELECT id FROM members
+        WHERE id = ANY($1::bigint[]) AND archived_at IS NULL`,
+      [memberIds],
+    );
+    if (members.rows.length !== memberIds.length) throw new NotFoundError('指定された会員の一部が見つかりません。');
+
+    const existingResult = await client.query(
+      'SELECT member_id FROM group_members WHERE group_id = $1 FOR UPDATE',
+      [groupId],
+    );
+    const existing = new Set(existingResult.rows.map((row) => Number(row.member_id)));
+    const requested = new Set(memberIds);
+    const added = memberIds.filter((memberId) => !existing.has(memberId));
+    const removed = [...existing].filter((memberId) => !requested.has(memberId));
+
+    if (removed.length > 0) {
+      await client.query(
+        'DELETE FROM group_members WHERE group_id = $1 AND member_id = ANY($2::bigint[])',
+        [groupId, removed],
+      );
+    }
+    if (added.length > 0) {
+      await client.query(
+        `INSERT INTO group_members (group_id, member_id, added_by)
+         SELECT $1, new_members.member_id, $3
+           FROM UNNEST($2::bigint[]) AS new_members(member_id)`,
+        [groupId, added, actor.id],
+      );
+    }
+    if (added.length > 0 || removed.length > 0) {
+      await client.query('UPDATE groups SET updated_at = NOW() WHERE id = $1', [groupId]);
+    }
+    await writeAudit(client, {
+      actorType: 'administrator', actorId: actor.id, action: 'group.members.replaced',
+      targetType: 'group', targetId: groupId,
+      metadata: { addedMemberIds: added, removedMemberIds: removed, memberCount: memberIds.length },
+    });
+    return { groupId, memberIds: [...memberIds].sort((a, b) => a - b) };
+  });
+}
+
 async function listAdministrators() {
   const result = await db.query(`
     SELECT id, login_id, display_name, role, is_active, locked_until, last_login_at,
@@ -550,24 +725,30 @@ async function status() {
 }
 
 module.exports = {
+  archiveGroup,
   authenticate,
   changeOwnPassword,
   cleanMetadata,
   createAdministrator,
+  createGroup,
   createMember,
+  getGroupMemberIds,
   getSession,
   getTemporaryPassword,
   listAdministrators,
   listAuditLogs,
+  listGroups,
   listMembers,
   publicAccount,
   resetAdministratorPassword,
   resetMemberPassword,
+  replaceGroupMembers,
   revokeAllSessions,
   revokeCurrentSession,
   setMemberStatus,
   status,
   unlockAccount,
   updateAdministrator,
+  updateGroup,
   writeAudit,
 };

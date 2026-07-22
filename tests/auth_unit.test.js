@@ -11,6 +11,7 @@ const { requestOriginAllowed, sessionCookies } = require('../src/auth/app');
 const { nextFailureState } = require('../src/auth/lockout');
 const {
   canManageAdministrators,
+  canManageGroups,
   canManageMembers,
   canViewAuditLogs,
   canViewTemporaryPasswords,
@@ -24,7 +25,7 @@ const {
   verifyPassword,
 } = require('../src/auth/security');
 const { cleanMetadata } = require('../src/auth/service');
-const { validateLoginId, validatePassword } = require('../src/auth/validation');
+const { validateLoginId, validatePassword, validatePositiveIds } = require('../src/auth/validation');
 
 test('パスワードはbcryptでハッシュ化し、平文を保持しない', async () => {
   const password = '会員Pass!123';
@@ -106,10 +107,19 @@ test('10回目の失敗で15分ロックし、期限切れ後は失敗回数を1
 test('権限は代表管理者・一般管理者・閲覧者で分離する', () => {
   assert.equal(canManageAdministrators('owner'), true);
   assert.equal(canManageAdministrators('admin'), false);
+  assert.equal(canManageGroups('owner'), true);
+  assert.equal(canManageGroups('admin'), true);
+  assert.equal(canManageGroups('viewer'), false);
   assert.equal(canManageMembers('admin'), true);
   assert.equal(canManageMembers('viewer'), false);
   assert.equal(canViewTemporaryPasswords('viewer'), false);
   assert.equal(canViewAuditLogs('admin'), false);
+});
+
+test('グループ所属の会員ID一覧は正の整数へ正規化して重複を除く', () => {
+  assert.deepEqual(validatePositiveIds([3, '2', 3]), [3, 2]);
+  assert.throws(() => validatePositiveIds('1,2'), /一覧が正しくありません/);
+  assert.throws(() => validatePositiveIds([0]), /対象IDが正しくありません/);
 });
 
 test('監査ログ用メタデータから秘密情報を除去する', () => {
