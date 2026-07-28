@@ -3,10 +3,13 @@
 const message = document.querySelector('#message');
 const rows = document.querySelector('#member-rows');
 const createForm = document.querySelector('#create-form');
+const nameDialog = document.querySelector('#name-dialog');
+const nameForm = document.querySelector('#name-form');
 const secretDialog = document.querySelector('#secret-dialog');
 const resetDialog = document.querySelector('#reset-dialog');
 let csrfToken = '';
 let canViewTemporaryPasswords = false;
+let members = [];
 
 function statusBadge(active) {
   return `<span class="badge ${active ? 'active' : 'inactive'}">${active ? '利用中' : '停止中'}</span>`;
@@ -14,7 +17,8 @@ function statusBadge(active) {
 
 async function loadMembers() {
   const data = await AuthUi.request('/api/admin/members');
-  rows.innerHTML = data.members.map((member) => `
+  members = data.members;
+  rows.innerHTML = members.map((member) => `
     <tr>
       <td>${AuthUi.escapeHtml(member.memberId)}</td>
       <td>${AuthUi.escapeHtml(member.name)}</td>
@@ -23,6 +27,7 @@ async function loadMembers() {
       <td>${AuthUi.escapeHtml(AuthUi.formatDate(member.lastLoginAt))}</td>
       <td>${member.hasTemporaryPassword ? (canViewTemporaryPasswords ? `<button data-action="view" data-id="${member.id}">確認</button>` : '確認権限なし') : '変更済み'}</td>
       <td><div class="compact">
+        <button class="secondary" data-action="edit-name" data-id="${member.id}">氏名編集</button>
         <button class="secondary" data-action="toggle" data-id="${member.id}" data-active="${member.isActive}">${member.isActive ? '利用停止' : '利用再開'}</button>
         <button class="secondary" data-action="reset" data-id="${member.id}">仮パスワード</button>
         <button class="secondary" data-action="unlock" data-id="${member.id}">停止解除</button>
@@ -66,6 +71,15 @@ rows.addEventListener('click', async (event) => {
   button.disabled = true;
   AuthUi.clearMessage(message);
   try {
+    if (action === 'edit-name') {
+      const member = members.find((item) => String(item.id) === id);
+      if (!member) throw new Error('会員情報を再読み込みしてください。');
+      document.querySelector('#name-target').value = id;
+      document.querySelector('#edit-name').value = member.name;
+      nameDialog.showModal();
+      document.querySelector('#edit-name').focus();
+      return;
+    }
     if (action === 'view') {
       const data = await AuthUi.request(`/api/admin/members/${id}/temporary-password`, { csrfToken });
       document.querySelector('#secret-value').textContent = data.temporaryPassword;
@@ -97,6 +111,25 @@ rows.addEventListener('click', async (event) => {
   }
 });
 
+nameForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  AuthUi.clearMessage(message);
+  const submitButton = nameForm.querySelector('button[type="submit"]');
+  const id = document.querySelector('#name-target').value;
+  const name = document.querySelector('#edit-name').value;
+  submitButton.disabled = true;
+  try {
+    await AuthUi.request(`/api/admin/members/${id}`, { method: 'PATCH', body: { name }, csrfToken });
+    nameDialog.close();
+    AuthUi.showMessage(message, '生徒氏名を更新しました。', 'success');
+    await loadMembers();
+  } catch (error) {
+    AuthUi.showMessage(message, error.message);
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+
 document.querySelector('#reset-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   const id = document.querySelector('#reset-target').value;
@@ -112,8 +145,13 @@ document.querySelector('#reset-form').addEventListener('submit', async (event) =
   }
 });
 
+document.querySelector('#name-cancel').addEventListener('click', () => nameDialog.close());
 document.querySelector('#reset-cancel').addEventListener('click', () => resetDialog.close());
 secretDialog.addEventListener('close', () => { document.querySelector('#secret-value').textContent = ''; });
+nameDialog.addEventListener('close', () => {
+  document.querySelector('#name-target').value = '';
+  document.querySelector('#edit-name').value = '';
+});
 resetDialog.addEventListener('close', () => { document.querySelector('#reset-password').value = ''; });
 
 initialize();
