@@ -8,6 +8,8 @@ process.env.TEMP_PASSWORD_ENCRYPTION_KEY = `base64:${Buffer.alloc(32, 7).toStrin
 process.env.BCRYPT_ROUNDS = '10';
 
 const { requestOriginAllowed, sessionCookies } = require('../src/auth/app');
+const db = require('../src/db');
+const { updateMemberName } = require('../src/auth/member-name');
 const { nextFailureState } = require('../src/auth/lockout');
 const {
   canManageAdministrators,
@@ -125,4 +127,42 @@ test('グループ所属の会員ID一覧は正の整数へ正規化して重複
 test('監査ログ用メタデータから秘密情報を除去する', () => {
   const cleaned = cleanMetadata({ reason: 'test', password: 'secret', nested: { sessionToken: 'secret', safe: 'ok' } });
   assert.deepEqual(cleaned, { reason: 'test', nested: { safe: 'ok' } });
+});
+
+test('会員氏名更新は入力を整形し、更新と監査ログを同一トランザクションで行う', async (t) => {
+  const originalTransaction = db.transaction;
+  const queries = [];
+  t.after(() => { db.transaction = originalTransaction; });
+
+  db.transaction = async (callback) => callback({
+    async query(sql, params) {
+      queries.push({ sql, params });
+      if (sql.includes('SELECT name FROM members')) return { rows: [{ name: '旧氏名' }] };
+      if (sql.includes('UPDATE members')) {
+        return {
+          rows: [{
+            id: 7,
+            member_id: 'UP000007',
+            name: params[1],
+            is_active: true,
+            locked_until: null,
+            last_login_at: null,
+            password_changed_at: null,
+            created_at: new Date('2026-01-01T00:00:00Z'),
+          }],
+        };
+      }
+      if (sql.includes('INSERT INTO audit_logs')) return { rows: [] };
+      throw new Error(`想定外のSQL: ${sql}`);
+    },
+  });
+
+  const member = await updateMemberName({ id: 1 }, '7', { name: ' 新氏名 ' });
+  assert.equal(member.id, 7);
+  assert.equal(member.memberId, 'UP000007');
+  assert.equal(member.name, '新氏名');
+  assert.deepEqual(queries[1].params, [7, '新氏名']);
+  assert.match(queries[2].sql, /member\.name\.updated/);
+  assert.deepEqual(JSON.parse(queries[2].params[2]), { nameChanged: true });
+  await assert.rejects(updateMemberName({ id: 1 }, 7, { name: '   ' }), /氏名は1文字以上/);
 });
