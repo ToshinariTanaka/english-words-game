@@ -28,6 +28,14 @@
       </div>
     </section>
   </main>
+  <dialog id="name-dialog">
+    <h2>生徒氏名を編集</h2>
+    <form id="name-form">
+      <input id="name-target" type="hidden">
+      <label>氏名<input id="edit-name" required maxlength="100" autocomplete="off"></label>
+      <div class="actions"><button type="submit">保存</button><button type="button" class="secondary" id="name-cancel">キャンセル</button></div>
+    </form>
+  </dialog>
   <dialog id="secret-dialog">
     <h2>初期・仮パスワード</h2>
     <p>画面を閉じると表示を消去します。安全な方法で本人へ伝えてください。</p>
