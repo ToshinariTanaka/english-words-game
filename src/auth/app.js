@@ -18,6 +18,7 @@ const {
   ROLE_LABELS,
 } = require('./permissions');
 const { csrfTokenForSession, safeEqual } = require('./security');
+const { updateMemberName } = require('./member-name');
 const service = require('./service');
 
 const COOKIE_NAMES = Object.freeze({
@@ -168,6 +169,11 @@ async function handleMembers(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/admin/members') {
     const body = await readJson(req, getConfig().authJsonLimitBytes);
     return sendJson(res, 201, { ok: true, member: await service.createMember(actor, body) });
+  }
+  const itemMatch = url.pathname.match(/^\/api\/admin\/members\/(\d+)$/);
+  if (req.method === 'PATCH' && itemMatch) {
+    const body = await readJson(req, getConfig().authJsonLimitBytes);
+    return sendJson(res, 200, { ok: true, member: await updateMemberName(actor, itemMatch[1], body) });
   }
   const temporaryMatch = url.pathname.match(/^\/api\/admin\/members\/(\d+)\/temporary-password$/);
   if (req.method === 'GET' && temporaryMatch) {
