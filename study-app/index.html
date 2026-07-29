@@ -78,7 +78,8 @@
               <option value="random">ランダム</option>
             </select>
             <small id="voiceCandidateCount" class="voice-candidate-count">音声候補：0件</small>
-            <small class="voice-select-help">音声候補は指定した10種類のうち、このブラウザで利用できるものだけを表示します。</small>
+            <small class="voice-select-help">このブラウザで利用できる英語音声から選べます。歌声・特殊効果系は除外します。</small>
+            <small class="voice-select-help">固定音声・ランダム選択時は選択したブラウザ音声を使い、自動選択時はMP3を優先します。</small>
             <small class="voice-select-help">自動読上げON時は問題表示時にも再生します。</small>
           </label>
           <label class="random-toggle" for="soundEffects">
@@ -160,5 +161,6 @@
   </main>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="./script.js?v=20260704-mistake-review"></script>
+  <script src="./voice-options.js?v=20260711-selectable-voices"></script>
 </body>
 </html>
