@@ -60,3 +60,8 @@
 - Render本番URL `/study-app/` で、1問誤答後に「間違えた問題の復習」から問題文・選択肢・問題情報が即時表示されることを確認する。
 - 復習中に正解した問題が復習対象から外れ、不正解の問題は復習対象に残る運用で問題ないか確認する。
 - Playwright等を導入できる場合は、復習開始ボタン押下後の実DOM表示をE2Eテストに追加する。
+
+## iPhone Safari音声の実機確認
+- `/study-app/speech-synthesis-safari-test.html` で直接発話が開始・終了することを確認する。
+- 通常画面でMP3欠損問題を再生し、Web Inspectorの `[WebSpeech]` ログ（voices件数、before/after speak、start/end/error、speaking/pending/paused）を保存する。
+- 最小ページだけ成功する場合、MP3失敗後の非同期フォールバックがiOSのユーザー操作制限を受けていないか追加検証する。

@@ -106,6 +106,7 @@ async function reset(question) {
   await Promise.resolve();
   assert.deepStrictEqual(audioPlayCalls, ['http://localhost/audio/w000002.mp3'], 'MP3 URLが存在する場合は再生を試す');
   assert.deepStrictEqual(spokenTexts, ['play reject'], 'audio.play()が失敗した場合もWeb Speech APIへフォールバックする');
+  assert.strictEqual(cancelled, 1, 'Safari対策としてMP3開始時だけcancelし、フォールバック直前には重ねてcancelしない');
 
   await reset({ question: 'error event', questionKey: 'w000003' });
   audioPlayPending = true;

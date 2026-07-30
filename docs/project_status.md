@@ -86,3 +86,4 @@
 - Renderでは通常版とは別Web Serviceを作成し、同じGitHubリポジトリ・同じmainブランチに対して中学生版専用の環境変数とPersistent Diskを設定する運用です。
 
 - 2026-07-04: study-appの「間違えた問題の復習」を修正。復習開始時に `reviewMode` と `currentQuestion` をセットし、通常の問題表示処理 `showQuestion()` で問題文・選択肢・問題情報・音声ボタン状態を表示する。復習開始時に誤答リストを全消去せず、復習中に正解した問題だけ誤答リストから削除する。
+- 2026-07-30: iPhone SafariのWeb Speechフォールバックを修正。`getVoices()` 空配列時は `voiceschanged` を最大800ms待機し、発話直前の二重 `cancel()` を廃止、utterance参照保持と `speaking` / `pending` / `paused` を含む詳細ログ、Safari実機向け最小診断ページを追加。
