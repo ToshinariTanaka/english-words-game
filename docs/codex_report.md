@@ -1,3 +1,40 @@
+# Codex Report: iPhone Safari Web Speech修正（2026-07-30）
+
+## 今回やったこと
+- Web Speechフォールバックの `speak()` 前後、発話イベント、`speaking` / `pending` / `paused`、音声一覧を詳細ログへ出すようにしました。
+- iOS Safariで発話が止まる可能性がある、フォールバック直前の `cancel()` を廃止しました。MP3試行開始時の停止は維持しています。
+- `getVoices()` が空の場合は `voiceschanged` を最大800ms待ち、空のままでも `lang=en-US` のブラウザ標準音声で発話を試みます。
+- 発話オブジェクトを完了まで参照保持し、Safariで途中破棄される可能性を避けました。
+- iOS Safariで直接確認できる最小サンプルを追加しました。
+
+## 変更ファイル
+- `study-app/script.js`: Web Speechの待機、発話、状態ログ、Safari向けcancel順序を修正。
+- `study-app/speech-synthesis-safari-test.html`: Web Speech API単独の実機確認ページを追加。
+- `study-app/index.html`: JavaScriptキャッシュバスターを更新。
+- `tests_study_app_audio_fallback.js`: MP3失敗時にcancelが重複しない回帰テストを追加。
+- `README.md`、`docs/architecture.md`、`docs/project_status.md`、`docs/next_tasks.md`: 仕様と実機確認手順を更新。
+
+## テスト結果
+- `node tests_study_app_audio_fallback.js`: 成功。
+- `git diff --check`: 成功。
+- `npm test`: legacyテストと認証テスト12件は成功しましたが、既存のCookie期限テスト1件が実行時刻境界による1秒差（期待 `2592xxx`、実値 `2591999`）で失敗しました。今回の音声変更とは無関係です。
+- `node tests_study_app_audio_fallback.js`: MP3失敗後に `speak()` が呼ばれ、直前に二重 `cancel()` されないことを確認。
+- 実iPhone Safariはこのコンテナから利用できないため、実機の音声出力確認は未実施です。
+
+## 注意点
+- `voiceschanged` はSafariの実装や端末状態によって発火しないことがあるため、800msで待機を終了し、音声未指定のまま発話します。
+- MP3の失敗判定後にWeb Speechへ移る構成自体は維持しています。iOSの設定、消音状態、音声データ未ダウンロードなど端末固有要因は実機確認が必要です。
+- UIの見た目は変更していないため、スクリーンショットは不要と判断しました。
+
+## 次にやるべきこと
+- iPhone Safariで通常画面と `/study-app/speech-synthesis-safari-test.html` を開き、Web Inspectorログの `before speak()`、`after speak()`、`utterance start/end/error` を確認してください。
+- 最小サンプルだけ成功し通常画面が失敗する場合は、MP3失敗までの非同期経路によるユーザー操作制限を追加調査してください。
+
+## チャッピーに相談すべき点
+- 実機ログに `not-allowed` / `audio-busy` 等のエラーが出た場合、その全文とiOS/Safariバージョンを共有し、端末固有対策を追加するか相談してください。
+
+---
+
 # Codex Report: MP3音声配信の復旧（2026-07-30）
 
 ## 今回やったこと

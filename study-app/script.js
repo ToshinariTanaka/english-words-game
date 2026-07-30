@@ -253,6 +253,7 @@ let soundEnabled = loadStoredBoolean(SOUND_ENABLED_STORAGE_KEY, true);
 let autoSpeakEnabled = loadStoredBoolean(AUTO_SPEAK_STORAGE_KEY, true);
 let lastRandomVoiceURI = '';
 let currentQuestionAudio = null;
+let currentSpeechUtterance = null;
 let questionPlaybackToken = 0;
 
 function getLocalDateKey(date = new Date()) {
@@ -466,7 +467,9 @@ function setupQuestionCountSetting() {
 
 function getAvailableVoices() {
   const synthesis = getSpeechSynthesis();
-  return synthesis?.getVoices?.() || [];
+  const voices = synthesis?.getVoices?.() || [];
+  console.debug('[WebSpeech] getVoices()', { count: voices.length, voices: voices.map((voice) => ({ name: voice.name, lang: voice.lang, voiceURI: voice.voiceURI })) });
+  return voices;
 }
 
 function getVoiceSearchableText(voice) {
@@ -574,7 +577,14 @@ function setupVoiceSelect() {
   });
   const synthesis = getSpeechSynthesis();
   if (synthesis) {
-    synthesis.onvoiceschanged = populateVoiceSelect;
+    if (typeof synthesis.addEventListener === 'function') {
+      synthesis.addEventListener('voiceschanged', () => {
+        console.debug('[WebSpeech] voiceschanged');
+        populateVoiceSelect();
+      });
+    } else {
+      synthesis.onvoiceschanged = populateVoiceSelect;
+    }
   }
 }
 
@@ -757,6 +767,41 @@ function getSpeechSynthesis() {
   return typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
 }
 
+function logSpeechSynthesisState(stage, extra = {}) {
+  const synthesis = getSpeechSynthesis();
+  console.debug('[WebSpeech]', stage, {
+    available: Boolean(synthesis),
+    speaking: Boolean(synthesis?.speaking),
+    pending: Boolean(synthesis?.pending),
+    paused: Boolean(synthesis?.paused),
+    ...extra,
+  });
+}
+
+function waitForSpeechVoices(timeoutMs = 800) {
+  const synthesis = getSpeechSynthesis();
+  const initialVoices = getAvailableVoices();
+  if (!synthesis || initialVoices.length > 0 || typeof synthesis.addEventListener !== 'function') {
+    return Promise.resolve(initialVoices);
+  }
+  console.debug('[WebSpeech] voice list is empty; waiting for voiceschanged', { timeoutMs });
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (reason) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeoutId);
+      synthesis.removeEventListener('voiceschanged', handleVoicesChanged);
+      const voices = getAvailableVoices();
+      console.debug('[WebSpeech] voice wait finished', { reason, count: voices.length });
+      resolve(voices);
+    };
+    const handleVoicesChanged = () => finish('voiceschanged');
+    const timeoutId = setTimeout(() => finish('timeout'), timeoutMs);
+    synthesis.addEventListener('voiceschanged', handleVoicesChanged, { once: true });
+  });
+}
+
 function getCurrentQuestionText() {
   const current = state.questions[state.index];
   return current?.question ? String(current.question).trim() : '';
@@ -774,7 +819,12 @@ function stopQuestionPlayback() {
   questionPlaybackToken += 1;
   stopQuestionAudio();
   const synthesis = getSpeechSynthesis();
-  if (synthesis) synthesis.cancel();
+  if (synthesis) {
+    logSpeechSynthesisState('before cancel()');
+    synthesis.cancel();
+    currentSpeechUtterance = null;
+    logSpeechSynthesisState('after cancel()');
+  }
 }
 
 function cancelSpeech() {
@@ -788,15 +838,18 @@ function getCurrentQuestionAudioUrl() {
   return `${API_BASE}/audio/${encodeURIComponent(questionKey)}.mp3`;
 }
 
-function speakCurrentQuestionWithWebSpeech(statusLabel = '現在の音声') {
+async function speakCurrentQuestionWithWebSpeech(statusLabel = '現在の音声') {
   const synthesis = getSpeechSynthesis();
   const text = getCurrentQuestionText();
   if (!synthesis || !text || typeof SpeechSynthesisUtterance === 'undefined') {
     if (els.voiceStatus) els.voiceStatus.textContent = 'ブラウザ音声が利用できません';
-    return;
+    console.warn('[WebSpeech] unavailable or text is empty', { hasSynthesis: Boolean(synthesis), hasText: Boolean(text), hasUtterance: typeof SpeechSynthesisUtterance !== 'undefined' });
+    return false;
   }
 
-  synthesis.cancel();
+  // iOS Safariでは cancel() の直後に speak() すると、追加した発話まで停止することがある。
+  // MP3試行開始時に既存音声は停止済みなので、フォールバック直前には cancel() しない。
+  await waitForSpeechVoices();
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-US';
@@ -810,8 +863,23 @@ function speakCurrentQuestionWithWebSpeech(statusLabel = '現在の音声') {
   updateVoiceStatus(selectedVoice, statusLabel || (isRandomVoice ? '今回の音声' : '現在の音声'));
   utterance.rate = 0.9;
   utterance.pitch = 1.0;
-
+  utterance.onstart = () => logSpeechSynthesisState('utterance start', { text });
+  utterance.onend = () => {
+    logSpeechSynthesisState('utterance end', { text });
+    if (currentSpeechUtterance === utterance) currentSpeechUtterance = null;
+  };
+  utterance.onerror = (event) => {
+    console.error('[WebSpeech] utterance error', { error: event.error, charIndex: event.charIndex, text });
+    logSpeechSynthesisState('utterance error');
+    if (currentSpeechUtterance === utterance) currentSpeechUtterance = null;
+  };
+  utterance.onpause = () => logSpeechSynthesisState('utterance pause');
+  utterance.onresume = () => logSpeechSynthesisState('utterance resume');
+  currentSpeechUtterance = utterance;
+  logSpeechSynthesisState('before speak()', { text, voice: selectedVoice?.name || 'browser default', voiceCount: getAvailableVoices().length });
   synthesis.speak(utterance);
+  logSpeechSynthesisState('after speak()');
+  return true;
 }
 
 function setVoiceStatusMessage(message) {
@@ -826,7 +894,12 @@ function playAudioElement(src, statusPrefix = '') {
     }
     stopQuestionAudio();
     const synthesis = getSpeechSynthesis();
-    if (synthesis) synthesis.cancel();
+    if (synthesis) {
+      logSpeechSynthesisState('MP3 start: before cancel()');
+      synthesis.cancel();
+      currentSpeechUtterance = null;
+      logSpeechSynthesisState('MP3 start: after cancel()');
+    }
     setVoiceStatusMessage(`${statusPrefix}MP3を再生しています`);
     const audio = new Audio(src);
     currentQuestionAudio = audio;
@@ -872,18 +945,18 @@ async function speakCurrentQuestion(options = {}) {
   const statusPrefix = options.statusPrefix || '';
   const audioUrl = getCurrentQuestionAudioUrl();
   const fallbackToWebSpeech = () => {
-    if (playbackToken !== questionPlaybackToken) return;
+    if (playbackToken !== questionPlaybackToken) return Promise.resolve(false);
     stopQuestionAudio();
-    speakCurrentQuestionWithWebSpeech(`${statusPrefix}MP3が再生できないため、ブラウザ音声で読み上げます`);
+    return speakCurrentQuestionWithWebSpeech(`${statusPrefix}MP3が再生できないため、ブラウザ音声で読み上げます`);
   };
 
   if (!audioUrl) {
-    fallbackToWebSpeech();
-    return;
+    return fallbackToWebSpeech();
   }
 
-  playAudioElement(audioUrl, statusPrefix).catch(() => {
-    fallbackToWebSpeech();
+  return playAudioElement(audioUrl, statusPrefix).catch((error) => {
+    console.warn('[Audio] MP3 playback failed; falling back to Web Speech', { audioUrl, error });
+    return fallbackToWebSpeech();
   });
 }
 
@@ -898,8 +971,10 @@ function initializeSpeech() {
   const synthesis = getSpeechSynthesis();
   if (!synthesis) return;
   // iPhone Safariでは、ユーザー操作の中でspeechSynthesisへ触れておくと
-  // 以後の手動再生が安定しやすい。音声は出さず、既存キューだけを止める。
-  synthesis.cancel();
+  // 以後の手動再生が安定しやすい。ここでは音声一覧を初期化するだけにし、
+  // 直後の発話を巻き込む可能性があるcancel()は呼ばない。
+  logSpeechSynthesisState('initializeSpeech: user interaction');
+  getAvailableVoices();
 }
 
 function updateSpeakButton() {

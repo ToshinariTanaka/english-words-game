@@ -376,3 +376,7 @@ AUDIO_DIR=/var/data/junior/audio
 > 注意: 通常版と中学生版で同じPersistent Disk保存先を使わないでください。特に `DATA_DIR`、`QUESTION_FILE`、`AUDIO_DIR` は通常版と中学生版で別パスにしてください。上記例では中学生版を `/var/data/junior` 配下へまとめています。
 
 中学生版でも4モード（英単語、チャンク、文節和訳、英文和訳）はすべて利用できます。Excel内で `question` / `correct` / `choice1`〜`choice3` が不足している行は、通常版と同じくエラーではなく出題対象から外します。音声は従来どおり `{question_key}.mp3` があればMP3を優先し、見つからない場合はWeb Speech APIへフォールバックします。
+
+### iPhone Safari Web Speech診断
+
+MP3失敗時のWeb Speechフォールバックは、`getVoices()` が空なら `voiceschanged` を最大800ms待機し、候補が得られなくても `en-US` のブラウザ標準音声で `speechSynthesis.speak()` を実行します。コンソールの `[WebSpeech]` ログには `getVoices()` の件数、`speak()` 前後、発話の開始・終了・エラー、および `speaking` / `pending` / `paused` が出力されます。Safariでの確認用最小ページは `/study-app/speech-synthesis-safari-test.html` です。このページはユーザー操作内で `speak()` を直接呼び、発話直前には `cancel()` を呼びません。

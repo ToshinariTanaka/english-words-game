@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iOS Safari Web Speech 最小確認</title>
+  <style>body{font-family:system-ui,sans-serif;max-width:42rem;margin:2rem auto;padding:0 1rem}button,input{font:inherit;padding:.7rem}input{width:100%;box-sizing:border-box}pre{white-space:pre-wrap;background:#111;color:#d7ffd7;padding:1rem;min-height:12rem}</style>
+</head>
+<body>
+  <h1>iOS Safari Web Speech 最小確認</h1>
+  <p>iPhone Safariでボタンを押し、画面内ログとSafariのWeb Inspectorを確認してください。</p>
+  <label>読み上げる英語 <input id="text" value="Safari speech synthesis test"></label>
+  <p><button id="speak" type="button">🔊 読み上げる</button> <button id="cancel" type="button">停止</button></p>
+  <pre id="log" aria-live="polite"></pre>
+  <script>
+    const logElement = document.getElementById('log');
+    const synth = window.speechSynthesis;
+    let retainedUtterance = null;
+    function log(stage, extra = {}) {
+      const entry = { stage, time: new Date().toISOString(), speaking: synth?.speaking, pending: synth?.pending, paused: synth?.paused, ...extra };
+      console.log('[SafariSpeechTest]', entry);
+      logElement.textContent += `${JSON.stringify(entry)}\n`;
+    }
+    function voices() {
+      const list = synth?.getVoices?.() || [];
+      log('getVoices', { count: list.length, voices: list.map(({ name, lang }) => ({ name, lang })) });
+      return list;
+    }
+    synth?.addEventListener?.('voiceschanged', () => voices());
+    document.getElementById('speak').addEventListener('click', () => {
+      const text = document.getElementById('text').value.trim();
+      const list = voices();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      utterance.voice = list.find((voice) => /^en([-_]|$)/i.test(voice.lang)) || null;
+      utterance.onstart = () => log('start');
+      utterance.onend = () => { log('end'); retainedUtterance = null; };
+      utterance.onerror = (event) => { log('error', { error: event.error }); retainedUtterance = null; };
+      retainedUtterance = utterance;
+      // Safari対策: この直前ではcancel()を呼ばず、ユーザー操作内で直接speak()する。
+      log('before speak', { text, voice: utterance.voice?.name || 'browser default' });
+      synth.speak(utterance);
+      log('after speak');
+    });
+    document.getElementById('cancel').addEventListener('click', () => { log('before cancel'); synth.cancel(); retainedUtterance = null; log('after cancel'); });
+    voices();
+  </script>
+</body>
+</html>

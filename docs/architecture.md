@@ -197,3 +197,7 @@ RPG本体のアップロード欄は第4段階で一時確認用に整理しま�
 - study-app派生CSV: `/var/data/study-app`
 
 中学生版Renderサービスでは、通常版とは別Web Service・別Persistent Diskを作り、例として `DATA_DIR=/var/data/junior`、`QUESTION_FILE=/var/data/junior/questions.xlsx`、`AUDIO_DIR=/var/data/junior/audio` を設定します。
+
+### iOS Safari Web Speech診断
+
+MP3からWeb Speechへフォールバックするときは、MP3試行開始時に既存発話を `cancel()` しますが、Safariが新しい発話まで停止する競合を避けるため `speak()` 直前には再度 `cancel()` しません。音声一覧が空なら `voiceschanged` を最大800ms待ち、タイムアウト後も `utterance.lang = "en-US"` としてブラウザ既定音声へ発話を委ねます。発話中は `SpeechSynthesisUtterance` の参照を保持し、開始・終了・エラー・一時停止・再開とsynthesis状態を `[WebSpeech]` ログへ記録します。独立診断ページは `study-app/speech-synthesis-safari-test.html` です。
