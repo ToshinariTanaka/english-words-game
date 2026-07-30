@@ -61,7 +61,7 @@
 
 ### 音声読み上げ（2026-06-19）
 
-`study-app/` は問題カード上部の「🔊」ボタンを押したときだけ音声を再生します。問題表示時の自動読み上げチェックボックスは混乱防止のため非表示にしました。音声は `question_key` に対応する `/audio/{question_key}.mp3` を優先し、MP3が未配置・読み込み失敗・再生失敗の場合はブラウザ標準の Web Speech APIへフォールバックします。
+`study-app/` の音声は通常、`question_key` に対応する `/audio/{question_key}.mp3` を優先し、MP3が未配置・読み込み失敗・再生失敗の場合はブラウザ標準の Web Speech APIへフォールバックします。ただしiPhone／iPadのSafariでは、手動ボタンのクリックと同じ同期実行経路で `speechSynthesis.speak()` を呼べるよう、手動・自動ともMP3を試さずWeb Speech APIを直接使います。
 
 Render Persistent Disk のMP3保存先は `/var/data/audio` です。管理者は `/admin/audio-upload/` から `w000001.mp3` / `c000001.mp3` / `p000001.mp3` / `s000001.mp3` 形式のMP3を単一アップロード、またはZIPで一括アップロードできます。単一アップロードAPI `POST /api/audio/upload` とZIP一括アップロードAPI `POST /api/audio/upload-zip` は `AUDIO_UPLOAD_TOKEN` が設定され、ヘッダー `X-Audio-Upload-Token` と一致した場合だけ有効です。未設定時は安全のため無効化されます。 ExcelからのMP3生成ではOpenAI TTSの `voice` を13種類から選択でき、初期値は `marin` です。`POST /api/audio/generation-status` はExcel上の対象キーと `/var/data/audio` の実ファイルを照合し、0バイトMP3を未作成扱いにして `nextStartKey` / `nextEndKey` / `nextMissingKeys` など次に作るべき10件の情報を返します。
 
@@ -355,7 +355,7 @@ python3 tools/generate_study_audio.py input.xlsx \
 
 ### study-app 音声再生
 
-`study-app/` は `question_key` がある問題では `{question_key}.mp3` を優先して再生します。サーバー側は、正規の `w/c/p/s + 6桁 + .mp3` 形式で `/var/data/audio` 内に存在する、0バイトより大きい通常ファイルを配信します。`audio_manifest.json` は問題との対応管理や生成状況確認に使いますが、配信の必須条件ではありません。MP3未生成・HTTPエラー・`audio.play()` 失敗時は、無音で終わらせず Web Speech API で現在の `question` だけを読み上げます。`question_key` がない問題も Web Speech API にフォールバックします。
+`study-app/` は `question_key` がある問題では `{question_key}.mp3` を優先して再生します。サーバー側は、正規の `w/c/p/s + 6桁 + .mp3` 形式で `/var/data/audio` 内に存在する、0バイトより大きい通常ファイルを配信します。`audio_manifest.json` は問題との対応管理や生成状況確認に使いますが、配信の必須条件ではありません。MP3未生成・HTTPエラー・`audio.play()` 失敗時は、無音で終わらせず Web Speech API で現在の `question` だけを読み上げます。`question_key` がない問題も Web Speech API にフォールバックします。例外としてiOS／iPadOS SafariはMP3失敗待ちを挟まず、Web Speechを直接実行します。判定にはUser-Agentに加えplatformとタッチ点数を使い、デスクトップ表示のiPadOSも対象にします。
 
 ## 中学生専用版を同じ main ブランチでRender運用する設定
 
@@ -379,4 +379,4 @@ AUDIO_DIR=/var/data/junior/audio
 
 ### iPhone Safari Web Speech診断
 
-MP3失敗時のWeb Speechフォールバックは、`getVoices()` が空なら `voiceschanged` を最大800ms待機し、候補が得られなくても `en-US` のブラウザ標準音声で `speechSynthesis.speak()` を実行します。コンソールの `[WebSpeech]` ログには `getVoices()` の件数、`speak()` 前後、発話の開始・終了・エラー、および `speaking` / `pending` / `paused` が出力されます。Safariでの確認用最小ページは `/study-app/speech-synthesis-safari-test.html` です。このページはユーザー操作内で `speak()` を直接呼び、発話直前には `cancel()` を呼びません。
+iOS／iPadOS Safariでは、通常画面もMP3を生成・再生せずWeb Speechを直接使います。特に手動ボタンでは音声一覧待機などの `await` を挟む前に、クリックイベントの同期実行経路で `speechSynthesis.speak()` を呼びます。その他のブラウザのMP3失敗時フォールバックは、`getVoices()` が空なら `voiceschanged` を最大800ms待機します。コンソールの `[WebSpeech]` ログには発話前後と状態が出力されます。Safariでの確認用最小ページは `/study-app/speech-synthesis-safari-test.html` です。

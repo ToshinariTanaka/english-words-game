@@ -63,5 +63,5 @@
 
 ## iPhone Safari音声の実機確認
 - `/study-app/speech-synthesis-safari-test.html` で直接発話が開始・終了することを確認する。
-- 通常画面でMP3欠損問題を再生し、Web Inspectorの `[WebSpeech]` ログ（voices件数、before/after speak、start/end/error、speaking/pending/paused）を保存する。
-- 最小ページだけ成功する場合、MP3失敗後の非同期フォールバックがiOSのユーザー操作制限を受けていないか追加検証する。
+- 通常画面の手動ボタンで、MP3リクエストを行わず「手動再生：iPhone Safariのためブラウザ音声で読み上げます」と表示され、直ちに発話することを確認する。
+- 自動読上げでもMP3失敗待ちが発生せず、Web Speechで発話することを確認する。

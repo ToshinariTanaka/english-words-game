@@ -70,6 +70,7 @@ vm.runInContext(`${snippet};
 this.state = state;
 this.speakCurrentQuestion = speakCurrentQuestion;
 this.getCurrentQuestionAudioUrl = getCurrentQuestionAudioUrl;
+this.isIosSafari = isIosSafari;
 `, sandbox);
 
 async function reset(question) {
@@ -117,6 +118,39 @@ async function reset(question) {
   await Promise.resolve();
   assert.deepStrictEqual(audioPlayCalls, ['http://localhost/audio/w000003.mp3'], 'HEAD確認なしでMP3再生を実際に試す');
   assert.deepStrictEqual(spokenTexts, ['error event'], 'errorイベント時もWeb Speech APIへフォールバックする');
+
+  await reset({ question: 'iPhone direct', questionKey: 'w000004' });
+  sandbox.navigator = {
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',
+    platform: 'iPhone',
+    maxTouchPoints: 5,
+  };
+  const iphonePlayback = sandbox.speakCurrentQuestion({ statusPrefix: '手動再生：' });
+  assert.deepStrictEqual(audioPlayCalls, [], 'iPhone SafariではMP3用Audio.play()を呼ばない');
+  assert.deepStrictEqual(spokenTexts, ['iPhone direct'], 'iPhone Safariではクリックと同じ同期経路でspeechSynthesis.speak()を直接呼ぶ');
+  assert.strictEqual(voiceStatus.textContent, '手動再生：iPhone Safariのためブラウザ音声で読み上げます');
+  await iphonePlayback;
+
+  await reset({ question: 'iPadOS direct', questionKey: 'w000005' });
+  sandbox.navigator = {
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1',
+    platform: 'MacIntel',
+    maxTouchPoints: 5,
+  };
+  const ipadPlayback = sandbox.speakCurrentQuestion({ statusPrefix: '自動読上げ：' });
+  assert.deepStrictEqual(audioPlayCalls, [], 'デスクトップ風User-AgentのiPadOS SafariでもMP3を試さない');
+  assert.deepStrictEqual(spokenTexts, ['iPadOS direct'], 'iPadOS Safariの自動読上げもWeb Speechを直接使う');
+  await ipadPlayback;
+
+  await reset({ question: 'iOS Chrome', questionKey: 'w000006' });
+  sandbox.navigator = {
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 CriOS/140.0 Mobile/15E148 Safari/604.1',
+    platform: 'iPhone',
+    maxTouchPoints: 5,
+  };
+  await sandbox.speakCurrentQuestion();
+  assert.deepStrictEqual(audioPlayCalls, ['http://localhost/audio/w000006.mp3'], 'iOS Safari以外は従来どおりMP3を優先する');
+  assert.deepStrictEqual(spokenTexts, [], 'MP3成功時はWeb Speechを呼ばない');
 
   console.log('tests_study_app_audio_fallback: OK');
 })().catch((error) => {

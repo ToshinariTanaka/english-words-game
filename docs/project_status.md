@@ -87,3 +87,4 @@
 
 - 2026-07-04: study-appの「間違えた問題の復習」を修正。復習開始時に `reviewMode` と `currentQuestion` をセットし、通常の問題表示処理 `showQuestion()` で問題文・選択肢・問題情報・音声ボタン状態を表示する。復習開始時に誤答リストを全消去せず、復習中に正解した問題だけ誤答リストから削除する。
 - 2026-07-30: iPhone SafariのWeb Speechフォールバックを修正。`getVoices()` 空配列時は `voiceschanged` を最大800ms待機し、発話直前の二重 `cancel()` を廃止、utterance参照保持と `speaking` / `pending` / `paused` を含む詳細ログ、Safari実機向け最小診断ページを追加。
+- 2026-07-30: iPhone／iPad Safariでは手動・自動読上げともMP3を試さずWeb Speechを直接使う方式へ変更。手動時の `speechSynthesis.speak()` はクリックの同期実行経路内で呼び、デスクトップ表示iPadOSはplatformとタッチ対応を併用して検出する。PC・Android・iOS版Chrome等は従来のMP3優先経路を維持。

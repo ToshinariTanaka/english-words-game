@@ -1,3 +1,37 @@
+# Codex Report: iOS Safari同期Web Speech再生（2026-07-30）
+
+## 今回やったこと
+- iPhone／iPad SafariではMP3を試さず、手動・自動読上げともWeb Speech APIを直接使うようにしました。
+- 手動スピーカーボタンでは、音声一覧待機などの非同期境界より前に `speechSynthesis.speak()` を呼び、クリックイベントの同期実行経路を維持しました。
+- User-Agent、platform、タッチ点数を組み合わせてデスクトップ表示のiPadOSも検出し、iOS版Chrome等はSafari扱いしないようにしました。
+- iOS Safari、iPadOS Safari、iOS Chrome、従来のPC相当MP3成功／失敗経路の回帰テストを追加しました。
+
+## 変更ファイル
+- `study-app/script.js`: iOS Safari判定とWeb Speech直接再生経路を追加。
+- `study-app/index.html`: `script.js` のキャッシュバスターを更新。
+- `tests_study_app_audio_fallback.js`: iPhone／iPadOS直接発話と非Safari回帰テストを追加。
+- `README.md`、`docs/architecture.md`、`docs/project_status.md`、`docs/next_tasks.md`: 新しいブラウザ別音声仕様と実機確認項目を更新。
+- `docs/codex_report.md`: 今回の実装・検証結果を記録。
+
+## テスト結果
+- `node tests_study_app_audio_fallback.js`: 成功。iPhone／iPadOS SafariでAudioを生成せず、`speak()` が同期的に呼ばれることを確認。
+- `node tests_study_app_auto_speak.js`: 成功。従来の自動読上げON/OFFと手動MP3再生を確認。
+- `npm test`: 成功。legacy一式と認証テスト13件がすべて成功。
+- `git diff --check`: 成功。空白エラーなし。
+
+## 注意点
+- 実iPhone／iPad Safariはこのコンテナから利用できないため、端末からの実音声出力は未確認です。
+- UIのレイアウトやスタイルは変更しておらず、音声状態文言のみの変更なのでスクリーンショットは取得していません。
+
+## 次にやるべきこと
+- iPhone／iPad Safariの通常学習画面で手動・自動読上げを実行し、MP3リクエストなしで直ちに発話することを確認してください。
+- PC・AndroidでMP3成功経路とMP3失敗後のWeb Speechフォールバックを実ブラウザ確認してください。
+
+## チャッピーに相談すべき点
+- 実機でも発話が拒否される場合は、iOS／Safariバージョンと `[WebSpeech]` の `utterance error` を共有し、追加の端末別対策が必要か相談してください。
+
+---
+
 # Codex Report: iPhone Safari Web Speech修正（2026-07-30）
 
 ## 今回やったこと
