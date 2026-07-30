@@ -200,4 +200,4 @@ RPG本体のアップロード欄は第4段階で一時確認用に整理しま�
 
 ### iOS Safari Web Speech診断
 
-MP3からWeb Speechへフォールバックするときは、MP3試行開始時に既存発話を `cancel()` しますが、Safariが新しい発話まで停止する競合を避けるため `speak()` 直前には再度 `cancel()` しません。音声一覧が空なら `voiceschanged` を最大800ms待ち、タイムアウト後も `utterance.lang = "en-US"` としてブラウザ既定音声へ発話を委ねます。発話中は `SpeechSynthesisUtterance` の参照を保持し、開始・終了・エラー・一時停止・再開とsynthesis状態を `[WebSpeech]` ログへ記録します。独立診断ページは `study-app/speech-synthesis-safari-test.html` です。
+iPhone／iPad Safariは `userAgent` の端末名だけでなく、`platform` と `maxTouchPoints` によるデスクトップ表示iPadOS判定も併用します（iOS版Chrome等は除外）。この判定時は手動・自動ともMP3を試さずWeb Speechを直接使います。手動操作では音声一覧待機の `await` を通らず、クリックイベントの同期実行経路内で `speechSynthesis.speak()` を呼びます。その他のブラウザは従来どおりMP3優先で、失敗時に音声一覧を最大800ms待ってWeb Speechへフォールバックします。発話中は `SpeechSynthesisUtterance` の参照を保持し、状態を `[WebSpeech]` ログへ記録します。独立診断ページは `study-app/speech-synthesis-safari-test.html` です。

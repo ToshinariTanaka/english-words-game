@@ -767,6 +767,19 @@ function getSpeechSynthesis() {
   return typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
 }
 
+function isIosSafari() {
+  if (typeof navigator === 'undefined') return false;
+  const userAgent = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const maxTouchPoints = Number(navigator.maxTouchPoints) || 0;
+  const isIosDevice = /iPhone|iPad|iPod/i.test(userAgent)
+    || /iPhone|iPad|iPod/i.test(platform)
+    || (platform === 'MacIntel' && maxTouchPoints > 1);
+  const isSafariEngine = /Version\/[\d.]+.*Safari/i.test(userAgent)
+    && !/(CriOS|FxiOS|EdgiOS|OPiOS)/i.test(userAgent);
+  return isIosDevice && isSafariEngine;
+}
+
 function logSpeechSynthesisState(stage, extra = {}) {
   const synthesis = getSpeechSynthesis();
   console.debug('[WebSpeech]', stage, {
@@ -838,7 +851,7 @@ function getCurrentQuestionAudioUrl() {
   return `${API_BASE}/audio/${encodeURIComponent(questionKey)}.mp3`;
 }
 
-async function speakCurrentQuestionWithWebSpeech(statusLabel = '現在の音声') {
+async function speakCurrentQuestionWithWebSpeech(statusLabel = '現在の音声', options = {}) {
   const synthesis = getSpeechSynthesis();
   const text = getCurrentQuestionText();
   if (!synthesis || !text || typeof SpeechSynthesisUtterance === 'undefined') {
@@ -847,39 +860,45 @@ async function speakCurrentQuestionWithWebSpeech(statusLabel = '現在の音声'
     return false;
   }
 
-  // iOS Safariでは cancel() の直後に speak() すると、追加した発話まで停止することがある。
-  // MP3試行開始時に既存音声は停止済みなので、フォールバック直前には cancel() しない。
-  await waitForSpeechVoices();
+  const speakNow = () => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    const selectedVoiceValue = getSelectedVoiceValue();
+    const isRandomVoice = selectedVoiceValue === 'random';
+    const selectedVoice = isRandomVoice ? pickRandomVoice() : (getSelectedVoice() || getAutoVoiceCandidate());
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice.lang || utterance.lang;
+    }
+    updateVoiceStatus(selectedVoice, statusLabel || (isRandomVoice ? '今回の音声' : '現在の音声'));
+    if (options.exactStatus) setVoiceStatusMessage(statusLabel);
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+    utterance.onstart = () => logSpeechSynthesisState('utterance start', { text });
+    utterance.onend = () => {
+      logSpeechSynthesisState('utterance end', { text });
+      if (currentSpeechUtterance === utterance) currentSpeechUtterance = null;
+    };
+    utterance.onerror = (event) => {
+      console.error('[WebSpeech] utterance error', { error: event.error, charIndex: event.charIndex, text });
+      logSpeechSynthesisState('utterance error');
+      if (currentSpeechUtterance === utterance) currentSpeechUtterance = null;
+    };
+    utterance.onpause = () => logSpeechSynthesisState('utterance pause');
+    utterance.onresume = () => logSpeechSynthesisState('utterance resume');
+    currentSpeechUtterance = utterance;
+    logSpeechSynthesisState('before speak()', { text, voice: selectedVoice?.name || 'browser default', voiceCount: getAvailableVoices().length });
+    synthesis.speak(utterance);
+    logSpeechSynthesisState('after speak()');
+    return true;
+  };
 
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'en-US';
-  const selectedVoiceValue = getSelectedVoiceValue();
-  const isRandomVoice = selectedVoiceValue === 'random';
-  const selectedVoice = isRandomVoice ? pickRandomVoice() : (getSelectedVoice() || getAutoVoiceCandidate());
-  if (selectedVoice) {
-    utterance.voice = selectedVoice;
-    utterance.lang = selectedVoice.lang || utterance.lang;
-  }
-  updateVoiceStatus(selectedVoice, statusLabel || (isRandomVoice ? '今回の音声' : '現在の音声'));
-  utterance.rate = 0.9;
-  utterance.pitch = 1.0;
-  utterance.onstart = () => logSpeechSynthesisState('utterance start', { text });
-  utterance.onend = () => {
-    logSpeechSynthesisState('utterance end', { text });
-    if (currentSpeechUtterance === utterance) currentSpeechUtterance = null;
-  };
-  utterance.onerror = (event) => {
-    console.error('[WebSpeech] utterance error', { error: event.error, charIndex: event.charIndex, text });
-    logSpeechSynthesisState('utterance error');
-    if (currentSpeechUtterance === utterance) currentSpeechUtterance = null;
-  };
-  utterance.onpause = () => logSpeechSynthesisState('utterance pause');
-  utterance.onresume = () => logSpeechSynthesisState('utterance resume');
-  currentSpeechUtterance = utterance;
-  logSpeechSynthesisState('before speak()', { text, voice: selectedVoice?.name || 'browser default', voiceCount: getAvailableVoices().length });
-  synthesis.speak(utterance);
-  logSpeechSynthesisState('after speak()');
-  return true;
+  // iOS Safariの手動操作では、クリックの同期実行経路を維持するため一度もawaitしない。
+  if (options.synchronous) return speakNow();
+
+  // 通常ブラウザのフォールバックでは、従来どおり音声一覧の初期化を待つ。
+  await waitForSpeechVoices();
+  return speakNow();
 }
 
 function setVoiceStatusMessage(message) {
@@ -943,6 +962,13 @@ async function speakCurrentQuestion(options = {}) {
   const playbackToken = questionPlaybackToken + 1;
   questionPlaybackToken = playbackToken;
   const statusPrefix = options.statusPrefix || '';
+  if (isIosSafari()) {
+    stopQuestionAudio();
+    return speakCurrentQuestionWithWebSpeech(
+      `${statusPrefix}iPhone Safariのためブラウザ音声で読み上げます`,
+      { synchronous: true, exactStatus: true },
+    );
+  }
   const audioUrl = getCurrentQuestionAudioUrl();
   const fallbackToWebSpeech = () => {
     if (playbackToken !== questionPlaybackToken) return Promise.resolve(false);
