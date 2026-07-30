@@ -449,8 +449,14 @@ function sendAudioHeaders(res, status, extraHeaders = {}) {
 }
 
 function handleAudio(req, res, pathname) {
-  const filename = decodeURIComponent(pathname.replace(/^\/audio\//, ''));
-  if (!/^[A-Za-z0-9_-]+\.mp3$/.test(filename)) {
+  let filename;
+  try {
+    filename = decodeURIComponent(pathname.replace(/^\/audio\//, ''));
+  } catch (error) {
+    sendAudioHeaders(res, 400);
+    return res.end('Bad request');
+  }
+  if (!isAllowedAudioFilename(filename)) {
     sendAudioHeaders(res, 400);
     return res.end('Bad request');
   }
@@ -459,7 +465,14 @@ function handleAudio(req, res, pathname) {
     sendAudioHeaders(res, 403);
     return res.end('Forbidden');
   }
-  if (!isManifestedAudioFile(filename) || !fs.existsSync(target) || fs.statSync(target).isDirectory()) {
+  let stat;
+  try {
+    stat = fs.statSync(target);
+  } catch (error) {
+    sendAudioHeaders(res, 404);
+    return res.end('Not found');
+  }
+  if (!stat.isFile() || stat.size <= 0) {
     sendAudioHeaders(res, 404);
     return res.end('Not found');
   }

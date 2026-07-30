@@ -13,6 +13,8 @@
 - 2026-06-19: study-app用MP3管理機能を追加。`POST /api/audio/upload` は `AUDIO_UPLOAD_TOKEN` と `X-Audio-Upload-Token` の一致時のみ有効で、`w/c/p/s` + 6桁の `.mp3` を `/var/data/audio` へ上書き保存する。`/admin/audio-upload/` から最小構成の管理アップロードが可能。study-appの自動読み上げチェックボックスは非表示にし、音声は「もう一度聞く」ボタンで再生する方針に統一。
 # Project Status
 
+- 2026-07-30: MP3配信をPersistent Disk上の実ファイル基準へ戻した。`audio_manifest.json` 未登録でも、正規の `{question_key}.mp3` 名で音声ディレクトリ内に存在する0バイトより大きい通常ファイルは配信する。manifestは生成・対応管理用として維持し、不正名、パストラバーサル、欠損、空ファイル、ディレクトリは拒否する。
+
 - 2026-06-21: OpenAI TTSの既定モデルを `tts-1` から `gpt-4o-mini-tts` に変更。管理画面の初期voice `marin` と、`marin` / `cedar` を含む13種類voice対応仕様に合わせ、サーバーAPIとローカル一括生成ツールの既定値、READMEの説明を更新。
 - 2026-06-19: study-appの音声再生をMP3優先に更新。`question_key` から `https://english-words-game-1ph3.onrender.com/audio/{question_key}.mp3` を取得し、失敗時はWeb Speech APIへフォールバックする。スマホ前提のため問題表示時の自動再生は行わず、手動の「もう一度聞く」操作時のみ再生する。Render側は `/audio/{filename}.mp3` を `/var/data/audio` から `audio/mpeg` と CORS `*` 付きで配信する。
 - 2026-06-19: Render正式URLを `https://english-words-game-1ph3.onrender.com` として確定し、study-appの `RENDER_STUDY_APP_URL` を `https://english-words-game-1ph3.onrender.com/study-app/` に設定。GitHub Pages上では `API_BASE` をRender APIベースURLへ切り替え、共通問題データAPIをRenderから取得する構成へ更新。
