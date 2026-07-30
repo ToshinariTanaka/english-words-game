@@ -1,3 +1,35 @@
+# Codex Report: MP3音声配信の復旧（2026-07-30）
+
+## 今回やったこと
+- `GET /audio/{question_key}.mp3` の配信条件からmanifest登録必須判定を外し、Persistent Disk上の有効な既存MP3を配信できるようにしました。
+- 正規ファイル名、音声ディレクトリ内のパス、通常ファイル、1バイト以上という条件を明示して、不正・欠損・空・ディレクトリを拒否します。
+- manifest登録済み／未登録、欠損、0バイト、ディレクトリ、不正名、パストラバーサル、音声レスポンスヘッダーの回帰テストを追加しました。
+
+## 変更ファイル
+- `server.js`
+- `tests_server_audio_upload.js`
+- `README.md`
+- `docs/architecture.md`
+- `docs/project_status.md`
+- `docs/codex_report.md`
+
+## テスト結果
+- `node --check server.js`: 成功。
+- `node tests_server_audio_upload.js`: 成功。
+- `npm test`: 成功。
+
+## 注意点
+- 実Render Persistent Diskと実ブラウザには接続していないため、学習画面の自動再生、スピーカーボタン、MP3欠損時のWeb Speech APIフォールバックは既存の自動テストでの確認です。
+- manifestは配信判定には使いませんが、音声生成状況と問題・音声の対応管理には引き続き使います。
+
+## 次にやるべきこと
+- Renderへ反映後、manifestにない既存 `w000001.mp3` の取得と、各ブラウザで自動・手動再生およびWeb Speech APIフォールバックを実機確認してください。
+
+## チャッピーに相談すべき点
+- manifestと既存MP3の対応がずれている場合の運用監視を、管理画面の警告として追加するか判断してください。
+
+---
+
 # Codex Report: 第2弾 グループ管理（2026-07-19）
 
 ## 今回実装したこと

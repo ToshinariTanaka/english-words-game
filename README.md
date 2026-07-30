@@ -355,7 +355,7 @@ python3 tools/generate_study_audio.py input.xlsx \
 
 ### study-app 音声再生
 
-`study-app/` は `question_key` がある問題では `{question_key}.mp3` を優先して再生します。サーバー側は `/var/data/audio/audio_manifest.json` に登録されたMP3だけを配信し、manifest外の旧MP3は実ファイルが残っていても404にします。MP3未生成・HTTPエラー・`audio.play()` 失敗時は、無音で終わらせず Web Speech API で現在の `question` だけを読み上げます。`question_key` がない問題も Web Speech API にフォールバックします。
+`study-app/` は `question_key` がある問題では `{question_key}.mp3` を優先して再生します。サーバー側は、正規の `w/c/p/s + 6桁 + .mp3` 形式で `/var/data/audio` 内に存在する、0バイトより大きい通常ファイルを配信します。`audio_manifest.json` は問題との対応管理や生成状況確認に使いますが、配信の必須条件ではありません。MP3未生成・HTTPエラー・`audio.play()` 失敗時は、無音で終わらせず Web Speech API で現在の `question` だけを読み上げます。`question_key` がない問題も Web Speech API にフォールバックします。
 
 ## 中学生専用版を同じ main ブランチでRender運用する設定
 

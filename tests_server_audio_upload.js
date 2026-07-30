@@ -272,7 +272,35 @@ wb.save(sys.argv[1])
     const audio = await request('GET', '/audio/w000001.mp3');
     assert.strictEqual(audio.status, 200, audio.text);
     assert.strictEqual(audio.headers['content-type'], 'audio/mpeg');
+    assert.strictEqual(audio.headers['access-control-allow-origin'], '*');
     assert.strictEqual(audio.text, 'mp3-data');
+
+    // 配信可否はmanifestではなく、安全なファイル名と実ファイルの状態で決める。
+    const unmanifestedFilename = 'w000004.mp3';
+    assert.strictEqual(
+      Object.values(JSON.parse(fs.readFileSync(path.join(audioDir, 'audio_manifest.json'), 'utf8')).items)
+        .some((entry) => entry.filename === unmanifestedFilename),
+      false,
+    );
+    const unmanifestedAudio = await request('GET', `/audio/${unmanifestedFilename}`);
+    assert.strictEqual(unmanifestedAudio.status, 200, unmanifestedAudio.text);
+    assert.strictEqual(unmanifestedAudio.text, 'existing-mp3');
+
+    const missingAudio = await request('GET', '/audio/s999999.mp3');
+    assert.strictEqual(missingAudio.status, 404, missingAudio.text);
+
+    const emptyAudio = await request('GET', '/audio/w000011.mp3');
+    assert.strictEqual(emptyAudio.status, 404, emptyAudio.text);
+
+    fs.mkdirSync(path.join(audioDir, 'p999999.mp3'));
+    const directoryAudio = await request('GET', '/audio/p999999.mp3');
+    assert.strictEqual(directoryAudio.status, 404, directoryAudio.text);
+
+    const invalidFilenameAudio = await request('GET', '/audio/x000001.mp3');
+    assert.strictEqual(invalidFilenameAudio.status, 400, invalidFilenameAudio.text);
+
+    const traversalAudio = await request('GET', '/audio/%2e%2e%2fserver.js');
+    assert.strictEqual(traversalAudio.status, 400, traversalAudio.text);
 
     const overwriteUpload = makeMultipart('new-mp3-data', 'w000001.mp3');
     const overwrite = await request('POST', '/api/audio/upload', { body: overwriteUpload.body, headers: { ...overwriteUpload.headers, 'X-Audio-Upload-Token': 'secret' } });
