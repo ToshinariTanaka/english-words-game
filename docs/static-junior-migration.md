@@ -53,3 +53,9 @@ Cloudflareを接続する前でも、同じ feature ブランチから無料 Sta
 ## 判断基準
 
 Renderの有料ジュニアWebサービスは、上記を満たす別配信先が安定稼働し、正本のデータを安全に退避・移行できて初めて停止候補となる。テスト段階で削除しない。
+
+## Cloudflare Pages 初回デプロイの再実行（2026-10-09）
+
+Cloudflare Pages プロジェクト名: up-junior-words-preview。
+Production branch を feature/static-junior-preview-20261008 に変更した。初回の main ブランチからの公開履歴は変更直後に残るため、この試験用ブランチへのドキュメント更新コミットで新規自動ビルドを促す。
+本番の Render サービス・データ・main ブランチには変更を加えない。
