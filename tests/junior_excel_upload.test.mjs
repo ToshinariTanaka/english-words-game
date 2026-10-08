@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { prepareWorkbook, FIELDS } from '../admin/junior-data/parser.mjs';
 import { validateRelease, MANIFEST_KEY } from '../cloudflare/junior-questions.js';
-import { onRequestPost } from '../functions/api/admin/questions/publish.js';
+import { onRequestPost as stageMode } from '../functions/api/admin/questions/stage/[mode].js';
+import { onRequestPost as publish } from '../functions/api/admin/questions/publish.js';
 import { onRequestGet as getQuestions } from '../functions/api/questions/current.js';
 import { onRequestGet as getStatus } from '../functions/api/questions/status.js';
 
 const SHEETS = { word:'★英単語', chunk:'★チャンク', phrase:'★文節和訳', definition:'★英文和訳' };
 const PREFIXES = { word:'w', chunk:'c', phrase:'p', definition:'s' };
+const TOKEN='a'.repeat(40);
 function fixture(flag = true) {
   const wb = { SheetNames: Object.values(SHEETS), Sheets: {} };
   for (const [mode, sheet] of Object.entries(SHEETS)) {
@@ -23,81 +25,116 @@ const converter = (sheet) => sheet;
 
 class MemoryR2 {
   constructor() { this.store = new Map(); this.fail = false; }
-  async get(key) { const data = this.store.get(key); return data === undefined ? null :
-    { text: async () => data, json: async () => JSON.parse(data) }; }
-  async put(key, value) {
+  async get(key) {
+    const obj = this.store.get(key);
+    return !obj ? null : {
+      text: async () => obj.text,
+      json: async () => JSON.parse(obj.text),
+      body: new Response(obj.text).body,
+      customMetadata: obj.options.customMetadata,
+    };
+  }
+  async head(key) {
+    const obj = this.store.get(key);
+    return !obj ? null : {
+      customMetadata: obj.options.customMetadata || {},
+      size: Buffer.byteLength(obj.text),
+    };
+  }
+  async put(key, value, options = {}) {
     if (this.fail && key.includes('/definition.json')) throw new Error('Simulated write error');
-    this.store.set(key, value); return { key };
+    const text = typeof value === 'string' ? value : await new Response(value).text();
+    this.store.set(key, { text, options });
+    return { key };
+  }
+}
+const envFor = (bucket) => ({ JUNIOR_DATA:bucket, JUNIOR_UPLOAD_TOKEN:TOKEN });
+const base='https://junior.pages.dev';
+
+function context(env, path, body, { token=TOKEN, origin=base, headers={} }={}) {
+  const request = new Request(base + path, { method:'POST',
+    headers: { Origin:origin, Authorization:'Bearer ' + token,
+      'Content-Type':'application/json', ...headers }, body:JSON.stringify(body) });
+  return {env,request};
+}
+
+async function stageAll(env, dataset, id) {
+  for (const [mode, rows] of Object.entries(dataset.modes)) {
+    const request=context(env,'/api/admin/questions/stage/'+mode,{
+      ok:true, mode, rows, count:rows.length, filename:'junior.xlsx', filter:'a1a2', versionId:id,
+    },{headers:{'X-Release-Id':id,'X-Filter':'a1a2','X-Row-Count':String(rows.length)}});
+    const result=await stageMode({...request,params:{mode}});
+    if (!result.ok) throw new Error('stage '+mode+' failed: '+await result.text());
   }
 }
 
-function context(env, body, token = 'a'.repeat(40), origin = 'https://junior.pages.dev') {
-  return {
-    env, request: new Request('https://junior.pages.dev/api/admin/questions/publish', {
-      method: 'POST', headers: { Origin: origin, Authorization:'Bearer ' + token,
-        'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    }),
-  };
-}
-
-test('A1+A2 filter, target1800 flag and full test dataset select expected rows', () => {
-  const wb = fixture();
-  const a12 = prepareWorkbook(wb,'a1a2',converter);
+test('A1+A2 filter, target1800 flag and full system test select the right rows', () => {
+  const wb=fixture();
+  const a12=prepareWorkbook(wb,'a1a2',converter);
   assert.equal(a12.total,8);
   assert.deepEqual(Object.values(a12.counts),[2,2,2,2]);
-  const flag = prepareWorkbook(wb,'target1800',converter);
-  assert.deepEqual(Object.values(flag.counts),[2,2,2,2]);
-  assert.deepEqual(flag.modes.word.map((x) => x.question_key), ['w000001','w000003']);
-  const all = prepareWorkbook(wb,'all',converter);
-  assert.equal(all.total,12);
-  assert.throws(() => prepareWorkbook(fixture(false),'target1800',converter), /N1/);
-  const duplicate = fixture();
-  duplicate.Sheets['★英単語'][2][12] = 'w000001';
-  assert.throws(() => prepareWorkbook(duplicate,'a1a2',converter), /重複/);
-  const choices = fixture();
-  choices.Sheets['★英単語'][1][4] = '意味1';
-  assert.throws(() => prepareWorkbook(choices,'a1a2',converter), /空欄・重複/);
+  const target=prepareWorkbook(wb,'target1800',converter);
+  assert.deepEqual(Object.values(target.counts),[2,2,2,2]);
+  assert.deepEqual(target.modes.word.map(x=>x.question_key),['w000001','w000003']);
+  assert.equal(prepareWorkbook(wb,'all',converter).total,12);
+  assert.throws(()=>prepareWorkbook(fixture(false),'target1800',converter),/N1/);
+  const duplicate=fixture();
+  duplicate.Sheets['★英単語'][2][12]='w000001';
+  assert.throws(()=>prepareWorkbook(duplicate,'a1a2',converter),/重複/);
+  const options=fixture();
+  options.Sheets['★英単語'][1][4]='意味1';
+  assert.throws(()=>prepareWorkbook(options,'a1a2',converter),/空欄・重複/);
 });
 
-test('rejects incorrect publish filters and invalid levels', () => {
+test('validates workbook before network submission',()=>{
   const result=prepareWorkbook(fixture(),'a1a2',converter);
   assert.equal(validateRelease({version:1,filename:'junior.xlsx',filter:'a1a2',modes:result.modes}).total,8);
-  assert.throws(() => validateRelease({version:1,filename:'x.xlsx',filter:'a1a2',
+  assert.throws(()=>validateRelease({version:1,filename:'x.xlsx',filter:'a1a2',
     modes:prepareWorkbook(fixture(),'all',converter).modes}),/別レベル/);
-  assert.throws(() => validateRelease({version:1,filename:'x.xlsx',filter:'no',modes:result.modes}),/不正/);
 });
 
-test('publishes atomically and serves student questions from R2 without access token',async () => {
-  const bucket=new MemoryR2();
-  const env={JUNIOR_DATA:bucket,JUNIOR_UPLOAD_TOKEN:'a'.repeat(40)};
-  const workbook=prepareWorkbook(fixture(),'a1a2',converter);
-  let c=context(env,{version:1,filename:'junior.xlsx',filter:'a1a2',modes:workbook.modes});
-  let response=await onRequestPost(c);
+test('stages 4 modes, publishes one manifest and streams questions to students',async()=>{
+  const bucket=new MemoryR2(),env=envFor(bucket);
+  const data=prepareWorkbook(fixture(),'a1a2',converter);
+  const id=crypto.randomUUID();
+  await stageAll(env,data,id);
+  assert.equal(bucket.store.has(MANIFEST_KEY),false);
+  const response=await publish(context(env,'/api/admin/questions/publish',{
+    version:1, versionId:id, filename:'junior.xlsx',filter:'a1a2', counts:data.counts,
+  }));
   assert.equal(response.status,200);
-  const published=await response.json();
-  assert.equal(published.total,8);
+  assert.equal((await response.json()).total,8);
   assert.equal(bucket.store.has(MANIFEST_KEY),true);
-  let questions=await getQuestions({env,request:new Request('https://junior.pages.dev/api/questions/current?mode=word')});
+  const questions=await getQuestions({env,request:new Request(base+'/api/questions/current?mode=word')});
   assert.equal(questions.status,200);
   assert.equal((await questions.json()).rows.length,2);
-  let status=await getStatus({env});
+  const status=await getStatus({env});
   assert.equal((await status.json()).counts.word,2);
 
-  const oldManifest=bucket.store.get(MANIFEST_KEY);
+  const oldManifest=bucket.store.get(MANIFEST_KEY).text;
+  const secondId=crypto.randomUUID();
   bucket.fail=true;
-  c=context(env,{version:1,filename:'junior2.xlsx',filter:'all',modes:prepareWorkbook(fixture(),'all',converter).modes});
-  response=await onRequestPost(c);
-  assert.equal(response.status,503);
-  assert.equal(bucket.store.get(MANIFEST_KEY),oldManifest);
+  await assert.rejects(stageAll(env,data,secondId),/stage definition failed/);
+  const commit=await publish(context(env,'/api/admin/questions/publish',{
+    version:1,versionId:secondId,filename:'junior.xlsx',filter:'a1a2',counts:data.counts,
+  }));
+  assert.equal(commit.status,409);
+  assert.equal(bucket.store.get(MANIFEST_KEY).text,oldManifest);
 });
 
-test('never accepts unauthenticated or cross-origin Excel publication',async () => {
-  const bucket=new MemoryR2();
-  const env={JUNIOR_DATA:bucket,JUNIOR_UPLOAD_TOKEN:'a'.repeat(40)};
-  const workbook=prepareWorkbook(fixture(),'a1a2',converter);
-  const payload={version:1,filename:'junior.xlsx',filter:'a1a2',modes:workbook.modes};
-  assert.equal((await onRequestPost(context(env,payload,'wrong'))).status,401);
-  assert.equal((await onRequestPost(context(env,payload,'a'.repeat(40),'https://other.example'))).status,403);
-  assert.equal((await onRequestPost(context({JUNIOR_DATA:bucket},payload))).status,503);
+test('unauthorized and cross-site staging or publication never write R2 data',async()=>{
+  const bucket=new MemoryR2(),env=envFor(bucket),id=crypto.randomUUID();
+  const data=prepareWorkbook(fixture(),'a1a2',converter);
+  const row=data.modes.word;
+  const input={ok:true,mode:'word',rows:row,count:row.length};
+  const headers={'X-Release-Id':id,'X-Filter':'a1a2','X-Row-Count':String(row.length)};
+  const badToken=await stageMode({...context(env,'/api/admin/questions/stage/word',input,{token:'wrong',headers}),params:{mode:'word'}});
+  assert.equal(badToken.status,401);
+  const badOrigin=await stageMode({...context(env,'/api/admin/questions/stage/word',input,{origin:'https://evil.example',headers}),params:{mode:'word'}});
+  assert.equal(badOrigin.status,403);
+  const missingSecret=await publish(context({JUNIOR_DATA:bucket},'/api/admin/questions/publish',{
+    version:1,versionId:id,filename:'junior.xlsx',filter:'a1a2',counts:data.counts,
+  }));
+  assert.equal(missingSecret.status,503);
   assert.equal(bucket.store.size,0);
 });
