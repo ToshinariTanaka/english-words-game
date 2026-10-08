@@ -138,3 +138,39 @@ test('unauthorized and cross-site staging or publication never write R2 data',as
   assert.equal(missingSecret.status,503);
   assert.equal(bucket.store.size,0);
 });
+
+
+test('handles 9,185 staged questions without parsing large JSON in the Worker', async () => {
+  const targetCounts={word:7489,chunk:856,phrase:441,definition:399};
+  const workbook={SheetNames:Object.values(SHEETS),Sheets:{}};
+  for(const [mode,sheet] of Object.entries(SHEETS)) {
+    const count=targetCounts[mode];
+    const pref=PREFIXES[mode];
+    const rows=[FIELDS];
+    for(let i=1;i<=count;i++) {
+      rows.push([i,i%3===0?'B1':i%2===0?'A2':'A1',
+        'question '+mode+' '+i,'正解'+i,'誤答A'+i,'誤答B'+i,'誤答C'+i,
+        '0','0','0%','0','note',pref+String(i).padStart(6,'0')]);
+    }
+    workbook.Sheets[sheet]=rows;
+  }
+  const dataset=prepareWorkbook(workbook,'all',converter);
+  assert.equal(dataset.total,9185);
+  const bucket=new MemoryR2();
+  const env=envFor(bucket);
+  const versionId=crypto.randomUUID();
+  for(const [mode,rows] of Object.entries(dataset.modes)) {
+    const c=context(env,'/api/admin/questions/stage/'+mode,
+      {ok:true,mode,rows,count:rows.length,versionId,filename:'full.xlsx',filter:'all'},
+      {headers:{'X-Release-Id':versionId,'X-Filter':'all','X-Row-Count':String(rows.length)}});
+    const response=await stageMode({...c,params:{mode}});
+    assert.equal(response.status,200,mode);
+  }
+  const publishResponse=await publish(context(env,'/api/admin/questions/publish',{
+    version:1, versionId, filename:'full.xlsx', filter:'all',counts:dataset.counts,
+  }));
+  assert.equal(publishResponse.status,200);
+  const response=await getQuestions({env,request:new Request(base+'/api/questions/current?mode=word')});
+  const data=await response.json();
+  assert.equal(data.rows.length,7489);
+});
