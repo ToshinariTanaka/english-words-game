@@ -48,8 +48,8 @@ function rewriteJavaScript(js) {
   js = replaceExactlyOnce(
     js,
     'async function fetchSharedQuestions(mode) {',
-    "async function fetchSharedQuestions(mode) {\n  if (STATIC_JUNIOR_PREVIEW) throw new Error('静的試験版ではローカルのサンプル教材を使います。');",
-    'disable Render question API',
+    "async function fetchSharedQuestions(mode) {\n  if (STATIC_JUNIOR_PREVIEW) {\n    const response = await fetch('/api/questions/current?mode=' + encodeURIComponent(mode), {cache:'no-store'});\n    if (!response.ok) throw new Error('共有教材の読み込みに失敗しました：HTTP ' + response.status);\n    const data = await response.json();\n    if (!data.ok || !Array.isArray(data.rows)) throw new Error('共有教材の形式が不正です。');\n    return data;\n  }",
+    'Cloudflare R2 question API',
   );
   js = replaceExactlyOnce(
     js,
@@ -60,7 +60,7 @@ function rewriteJavaScript(js) {
   js = replaceExactlyOnce(
     js,
     'function updateHostingStatus() {',
-    "function updateHostingStatus() {\n  if (STATIC_JUNIOR_PREVIEW) {\n    els.hostingStatus.textContent = '静的試験版：Renderとの通信なし／学習履歴はこの端末に保存';\n    els.hostingStatus.className = 'hosting-status hosting-status-ok';\n    return;\n  }",
+    "function updateHostingStatus() {\n  if (STATIC_JUNIOR_PREVIEW) {\n    els.hostingStatus.textContent = 'Cloudflare共有教材：公開済み教材を優先／未公開時はデモ教材／履歴はこの端末に保存';\n    els.hostingStatus.className = 'hosting-status hosting-status-ok';\n    return;\n  }",
     'static hosting status',
   );
   js = replaceExactlyOnce(
@@ -90,7 +90,7 @@ function rewriteJavaScript(js) {
   js = replaceExactlyOnce(
     js,
     'const hostingMessage = IS_GITHUB_PAGES ?',
-    "const hostingMessage = STATIC_JUNIOR_PREVIEW ? '試験版です。サーバー保存を行いません。4モードのデモ教材を利用できます。' : IS_GITHUB_PAGES ?",
+    "const hostingMessage = STATIC_JUNIOR_PREVIEW ? 'Cloudflareの共有教材を優先します。未公開なら各3問のデモを表示します。' : IS_GITHUB_PAGES ?",
     'mode-level hosting notice',
   );
   return js;
@@ -102,10 +102,10 @@ function rewriteHtml(html) {
   html = replaceExactlyOnce(html, '<h1 id="appTitle">英語学習アプリ</h1>',
     '<h1 id="appTitle">中学生英単語アプリ（試験版）</h1>', 'visible title');
   html = replaceExactlyOnce(html, '<header class="hero">',
-    '<header class="hero">\n      <p class="static-preview-notice">試験公開｜内蔵デモは各モード3問です。実際の塾生データは含みません。</p>',
+    '<header class="hero">\n      <p class="static-preview-notice">試験公開｜共有教材が未公開の場合、各モード3問の内蔵デモを表示します。実際の塾生データは含みません。</p>',
     'preview banner');
   html = replacePatternOnce(html, /<p id="uploadStatus" class="upload-status">.*<\/p>/m,
-    '<p id="uploadStatus" class="upload-status">CSV・Excelはこの画面だけに読み込みます。サーバーへ送信せず、ほかの端末にも共有されません。</p>',
+    '<p id="uploadStatus" class="upload-status">この画面で選んだCSV・Excelは一時確認用です。サーバーに保存されず、ほかの端末にも共有されません。教材の共通更新は管理者用のアップロード画面から行います。</p>',
     'upload disclosure');
   html = replacePatternOnce(html, /<link rel="stylesheet" href="\.\/style\.css[^"]*">/m,
     '<link rel="stylesheet" href="./style.css">', 'stylesheet URL');
@@ -131,6 +131,18 @@ function build() {
   fs.writeFileSync(path.join(OUTPUT, 'style.css'), css);
   fs.writeFileSync(path.join(OUTPUT, '_headers'), '/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Frame-Options: DENY\n');
   fs.writeFileSync(path.join(OUTPUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+
+  // Pages Functions are located in repository /functions and not copied to dist-junior.
+  // Only /api/* requests are routed to Functions; all static assets stay free to serve.
+  fs.writeFileSync(path.join(OUTPUT, '_routes.json'), JSON.stringify({
+    version: 1, include: ['/api/*'], exclude: [],
+  }, null, 2) + '\n');
+  const adminSrc = path.join(ROOT, 'admin', 'junior-data');
+  const adminOut = path.join(OUTPUT, 'admin', 'junior-data');
+  fs.mkdirSync(adminOut, { recursive: true });
+  for (const name of ['index.html', 'style.css', 'script.js', 'parser.mjs']) {
+    fs.copyFileSync(path.join(adminSrc, name), path.join(adminOut, name));
+  }
 
   for (const filename of DEMO_FILES) {
     let content = fs.readFileSync(path.join(SOURCE, 'data', filename), 'utf8');
