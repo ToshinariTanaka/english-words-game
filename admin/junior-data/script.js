@@ -89,12 +89,38 @@ $('publish').addEventListener('click', async () => {
   updatePublishButton();
   setText('uploadResult', '公開処理中です。画面を閉じずにお待ちください…');
   try {
+    const versionId = crypto.randomUUID();
+    const counts = {};
+    const modeNames = ['word', 'chunk', 'phrase', 'definition'];
+    for (const [index, mode] of modeNames.entries()) {
+      const rows = payload.modes[mode];
+      counts[mode] = rows.length;
+      setText('uploadResult', 'アップロード中：' + (index + 1) + ' / 4（' + MODES[mode].sheet + '）');
+      const response = await fetch('/api/admin/questions/stage/' + mode, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+          'X-Release-Id': versionId,
+          'X-Row-Count': String(rows.length),
+          'X-Filter': payload.filter,
+        },
+        body: JSON.stringify({
+          ok: true, mode, rows, count: rows.length,
+          filename: payload.filename, filter: payload.filter, versionId,
+        }),
+        cache: 'no-store', credentials: 'same-origin',
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(MODES[mode].sheet + '：' + (result.error || 'HTTP ' + response.status));
+    }
+    setText('uploadResult', '4モードの保存完了。公開データを切り替えています…');
     const response = await fetch('/api/admin/questions/publish', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify(payload),
-      cache: 'no-store',
-      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ version: 1, versionId, filename: payload.filename,
+        filter: payload.filter, counts }),
+      cache: 'no-store', credentials: 'same-origin',
     });
     const result = await response.json();
     if (!response.ok || !result.ok) throw new Error(result.error || 'HTTP ' + response.status);
