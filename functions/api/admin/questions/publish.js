@@ -1,42 +1,55 @@
 import {
-  jsonResponse, rejectRequest, limitedJsonBody, validateRelease,
-  readManifest, MANIFEST_KEY, versionObjectKey,
+  jsonResponse, rejectRequest, readManifest, limitedJsonBody, MANIFEST_KEY,
+  MODES, VERSION_RE, versionObjectKey,
 } from '../../../../cloudflare/junior-questions.js';
 
+// Commit four previously staged mode JSON objects by updating only the manifest.
+// This endpoint handles just small metadata, making it suitable for Workers Free.
 export async function onRequestPost({ request, env }) {
   const rejected = rejectRequest(request, env);
   if (rejected) return rejected;
 
-  let cleaned;
+  let input;
   try {
-    cleaned = validateRelease(await limitedJsonBody(request));
-  } catch (error) {
-    const tooLarge = error.message === 'FILE_TOO_LARGE';
-    return jsonResponse({ ok: false, error: tooLarge ? 'ファイルが大きすぎます（上限12MB）。'
-      : '教材データを確認してください：' + (error.message || '不正なデータ') }, tooLarge ? 413 : 400);
+    input = await limitedJsonBody(request);
+  } catch {
+    return jsonResponse({ ok: false, error: '公開情報の形式が不正です。' }, 400);
   }
-
-  try {
-    const previous = await readManifest(env);
-    const versionId = new Date().toISOString().replace(/[-:.]/g, '')
-      + '-' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
-    const options = { httpMetadata: { contentType: 'application/json; charset=utf-8' } };
-    // Write all four immutable objects before replacing the public manifest.
-    // A failed upload therefore leaves the previous publication intact.
-    for (const mode of ['word', 'chunk', 'phrase', 'definition']) {
-      const stored = await env.JUNIOR_DATA.put(
-        versionObjectKey(versionId, mode), JSON.stringify(cleaned.modes[mode]), options);
-      if (!stored) throw new Error('R2 object could not be stored');
+  const { versionId, filename, filter, counts } = input || {};
+  if (input?.version !== 1 || !VERSION_RE.test(String(versionId || ''))
+      || !/\.xlsx$/i.test(String(filename || '')) || String(filename).length > 180
+      || !['all','a1a2','target1800'].includes(filter)
+      || !counts || typeof counts !== 'object' || Array.isArray(counts)) {
+    return jsonResponse({ ok: false, error: '公開情報が不正です。' }, 400);
+  }
+  let total = 0;
+  for (const mode of MODES) {
+    if (!Number.isInteger(counts[mode]) || counts[mode] < 1 || counts[mode] > 12000) {
+      return jsonResponse({ ok: false, error: mode + ' の問題数が不正です。' }, 400);
     }
+    total += counts[mode];
+  }
+  if (total > 24000) return jsonResponse({ ok: false, error: '最大24000問まで対応しています。' }, 400);
+  try {
+    // Prevent publishing a partial Excel upload. No heavy per-row parsing occurs.
+    for (const mode of MODES) {
+      const stored = await env.JUNIOR_DATA.head(versionObjectKey(versionId, mode));
+      const meta = stored?.customMetadata || {};
+      if (!stored || meta.mode !== mode || meta.filter !== filter
+          || meta.count !== String(counts[mode])) {
+        return jsonResponse({ ok: false, error: mode + ' のデータが揃っていません。' }, 409);
+      }
+    }
+    const previous = await readManifest(env);
     const manifest = {
-      versionId, version: 1, filename: cleaned.filename, filter: cleaned.filter,
-      updatedAt: new Date().toISOString(), counts: cleaned.counts, total: cleaned.total,
-      previousVersionId: previous?.versionId || null,
+      version: 1, versionId, filename, filter, counts, total,
+      updatedAt: new Date().toISOString(), previousVersionId: previous?.versionId || null,
     };
-    const savedManifest = await env.JUNIOR_DATA.put(MANIFEST_KEY, JSON.stringify(manifest), options);
-    if (!savedManifest) throw new Error('R2 manifest could not be stored');
+    const stored = await env.JUNIOR_DATA.put(MANIFEST_KEY, JSON.stringify(manifest),
+      { httpMetadata: { contentType: 'application/json; charset=utf-8' } });
+    if (!stored) throw new Error('Manifest write rejected');
     return jsonResponse({ ok: true, published: true, ...manifest });
   } catch {
-    return jsonResponse({ ok: false, error: '公開保存に失敗しました。以前の公開データは保持されています。' }, 503);
+    return jsonResponse({ ok: false, error: '教材の公開に失敗しました。以前の公開版は保持されています。' }, 503);
   }
 }
