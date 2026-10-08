@@ -10,6 +10,8 @@ const LEVELS = new Set(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
 const FILTERS = new Set(['all', 'a1a2', 'target1800']);
 export const MANIFEST_KEY = 'junior-questions/manifest/current.json';
 export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+export const VERSION_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 
 export function jsonResponse(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
@@ -138,7 +140,7 @@ export async function readManifest(env) {
   const obj = await env.JUNIOR_DATA.get(MANIFEST_KEY);
   if (!obj) return null;
   const manifest = JSON.parse(await obj.text());
-  if (!manifest?.versionId || !/^[0-9a-fTZ._-]{15,90}$/.test(manifest.versionId)) {
+  if (!manifest?.versionId || !VERSION_RE.test(manifest.versionId)) {
     throw new Error('公開データの管理情報が不正です。');
   }
   return manifest;
