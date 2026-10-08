@@ -138,7 +138,7 @@ export async function readManifest(env) {
   const obj = await env.JUNIOR_DATA.get(MANIFEST_KEY);
   if (!obj) return null;
   const manifest = JSON.parse(await obj.text());
-  if (!manifest?.versionId || !/^[0-9TZ._-]{15,90}$/.test(manifest.versionId)) {
+  if (!manifest?.versionId || !/^[0-9a-fTZ._-]{15,90}$/.test(manifest.versionId)) {
     throw new Error('公開データの管理情報が不正です。');
   }
   return manifest;
