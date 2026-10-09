@@ -1,3 +1,5 @@
+import { ACCESS_PUBLIC_JWKS_SNAPSHOT } from './admin-public-jwks-snapshot.js';
+
 // Cloudflare Access JWT validation for the *separate* administrator Pages project.
 // Never use client-provided email headers as an authentication decision.
 // Validate JWT signature (Cloudflare JWKS), issuer, application audience, times
@@ -38,7 +40,7 @@ export function accessConfig(env) {
   return { domain: domain.origin, audience, allowedEmails: new Set(emails) };
 }
 
-export async function verifyAccessJWT(request, config, fetchCerts = fetch, now = Date.now()) {
+export async function verifyAccessJWT(request, config, fetchCerts = fetch, now = Date.now(), jwksSnapshot = ACCESS_PUBLIC_JWKS_SNAPSHOT) {
   // Only fixed diagnostic codes are logged; never tokens, emails, headers,
   // application audience, signing keys, cookies, or request URLs.
   const denied = (reason) => {
@@ -82,11 +84,33 @@ export async function verifyAccessJWT(request, config, fetchCerts = fetch, now =
       return denied('email_missing_or_not_allowed');
     }
 
-    phase = 'jwks_fetch';
-    const jwksResponse = await fetchCerts(config.domain + '/cdn-cgi/access/certs', { redirect: 'error' });
-    if (!jwksResponse.ok) return denied('jwks_fetch_http_error');
-    phase = 'jwks_response_parse';
-    const certs = await jwksResponse.json();
+    // Production Pages Functions cannot currently fetch this public endpoint
+    // even though GitHub CI can. A current public-key snapshot provides an
+    // offline backup. We STILL verify cryptographic signatures; no trusted
+    // identity may come from client-provided headers alone.
+    let certs;
+    let remoteFailure = 'jwks_fetch_http_error';
+    try {
+      phase = 'jwks_fetch';
+      const jwksResponse = await fetchCerts(config.domain + '/cdn-cgi/access/certs', { redirect: 'manual' });
+      if (jwksResponse.ok) {
+        phase = 'jwks_response_parse';
+        certs = await jwksResponse.json();
+      }
+    } catch {
+      remoteFailure = phase + '_exception';
+    }
+    if (!certs) {
+      const snapshotAgeMs = now - Date.parse(jwksSnapshot?.fetchedAt || '');
+      const snapshotUsable = jwksSnapshot?.issuer === config.domain
+        && Number.isFinite(snapshotAgeMs) && snapshotAgeMs >= -5 * 60 * 1000
+        && snapshotAgeMs <= 30 * 24 * 60 * 60 * 1000
+        && Array.isArray(jwksSnapshot.keys)
+        && jwksSnapshot.keys.length >= 1 && jwksSnapshot.keys.length <= 10;
+      if (!snapshotUsable) return denied(remoteFailure);
+      certs = { keys: jwksSnapshot.keys };
+      console.warn('junior_admin_access_public_jwks_snapshot_used');
+    }
     const candidates = Array.isArray(certs?.keys) ? certs.keys : [];
     const jwk = candidates.find(k => k.kid === header.kid && k.kty === 'RSA'
       && k.n && k.e && (k.alg === undefined || k.alg === 'RS256')

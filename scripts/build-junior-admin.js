@@ -71,5 +71,47 @@ function build() {
   process.stdout.write('Created isolated Cloudflare Access admin site in dist-junior-admin.\n');
 }
 
-if (require.main === module) build();
-module.exports = { adminHTML, adminJS, build };
+// The signing keys are intentionally PUBLIC. Capture fresh Cloudflare Access
+// verification keys at deploy time so Pages Functions do not need a working
+// outbound fetch on every request. Never bundle JWTs, cookies, or private keys.
+async function refreshPublicJwksSnapshot() {
+  const issuer = 'https://tight-voice-62ae.cloudflareaccess.com';
+  try {
+    const response = await fetch(issuer + '/cdn-cgi/access/certs', {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!response.ok) throw new Error('JWKS HTTP error');
+    const obj = await response.json();
+    const keys = obj?.keys;
+    if (!Array.isArray(keys) || keys.length < 1 || keys.length > 10
+        || !keys.every(k => typeof k.kid === 'string'
+          && k.kid.length > 5 && k.kty === 'RSA' && k.alg === 'RS256'
+          && k.use === 'sig' && typeof k.n === 'string'
+          && k.n.length > 150 && k.e === 'AQAB')) {
+      throw new Error('JWKS format invalid');
+    }
+    const snapshot = {
+      issuer,
+      fetchedAt: new Date().toISOString(),
+      keys: keys.map(({ kid, kty, alg, use, e, n }) => ({ kid, kty, alg, use, e, n })),
+    };
+    fs.writeFileSync(path.join(root, 'cloudflare', 'admin-public-jwks-snapshot.js'),
+      '// PUBLIC signing keys automatically refreshed during the admin Pages build.\n' +
+      'export const ACCESS_PUBLIC_JWKS_SNAPSHOT = ' +
+      JSON.stringify(snapshot, null, 2) + ';\n');
+    process.stdout.write('Access public JWKS snapshot refreshed for this build.\n');
+    return true;
+  } catch {
+    // Retain the known public-key snapshot already committed to the repository.
+    // The Functions middleware refuses old (>30-day) or mismatched keys.
+    process.stderr.write('Unable to refresh Access public JWKS; using bounded-age snapshot.\n');
+    return false;
+  }
+}
+
+if (require.main === module) {
+  build();
+  refreshPublicJwksSnapshot().catch(() => { process.exitCode = 1; });
+}
+module.exports = { adminHTML, adminJS, build, refreshPublicJwksSnapshot };
