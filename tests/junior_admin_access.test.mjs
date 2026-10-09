@@ -33,7 +33,7 @@ async function signedJWT(overrides={},changeSigningKey=null) {
     ok:url===team+'/cdn-cgi/access/certs',
     json:async()=>({keys:[{...pub,kid,alg:'RS256',use:'sig'}]}),
   });
-  return {token,fetchJwks};
+  return {token,fetchJwks,publicJwk:{...pub,kid,alg:'RS256',use:'sig'}};
 }
 function accessRequest(token='') {
   return new Request(base+'/',{headers:token?{'Cf-Access-Jwt-Assertion':token}:{}});
@@ -151,6 +151,41 @@ test('JWT diagnostics pinpoint exceptions without exposing private values',async
       assert.equal(message.includes(aud),false);
       assert.equal(message.includes(mail),false);
       assert.equal(message.includes('sensitive'),false);
+    }
+  } finally {
+    console.warn=original;
+  }
+});
+
+test('offline public JWKS snapshot permits only valid, fresh, signed Access identities',async()=>{
+  const {token,publicJwk}=await signedJWT();
+  const ts=Date.now();
+  const snapshot={issuer:team,fetchedAt:new Date(ts).toISOString(),keys:[publicJwk]};
+  const offline=async()=>{throw new Error('simulated Cloudflare edge fetch failure');};
+  const original=console.warn, messages=[];
+  console.warn=(...args)=>messages.push(args.map(String).join(' '));
+  try {
+    const valid=await verifyAccessJWT(accessRequest(token),config,offline,ts,snapshot);
+    assert.equal(valid?.email,mail);
+
+    const wrongIssuer={...snapshot,issuer:'https://wrong.cloudflareaccess.com'};
+    assert.equal(await verifyAccessJWT(accessRequest(token),config,offline,ts,wrongIssuer),null);
+
+    const stale={...snapshot,fetchedAt:new Date(ts-31*24*60*60*1000).toISOString()};
+    assert.equal(await verifyAccessJWT(accessRequest(token),config,offline,ts,stale),null);
+
+    const [head,body,signature]=token.split('.');
+    const corruptedPayload=Buffer.from(JSON.stringify({
+      iss:team,aud:[aud],email:mail,sub:'forged-user',
+      iat:Math.floor(ts/1000)-10,exp:Math.floor(ts/1000)+3600,
+    })).toString('base64url');
+    assert.equal(await verifyAccessJWT(
+      accessRequest([head,corruptedPayload,signature].join('.')),config,offline,ts,snapshot),null);
+    assert.ok(messages.includes('junior_admin_access_public_jwks_snapshot_used'));
+    for(const message of messages){
+      assert.equal(message.includes(token),false);
+      assert.equal(message.includes(mail),false);
+      assert.equal(message.includes(aud),false);
     }
   } finally {
     console.warn=original;
