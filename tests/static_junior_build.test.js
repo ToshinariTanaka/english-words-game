@@ -71,3 +71,15 @@ test('source drifts fail loudly rather than silently re-enabling APIs', () => {
   assert.throws(() => rewriteJavaScript('broken'), /unexpected source/);
   assert.throws(() => rewriteHtml('broken'), /unexpected source/);
 });
+
+test('shared-device statistics are partitioned by verified student ID without erasing anonymous history',()=>{
+  const source=fs.readFileSync(path.join(output,'script.js'),'utf8');
+  const snippet=source.slice(source.indexOf('const MODES ='),source.indexOf('function setLoadingState'));
+  const store=new Map();
+  const box={console,localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)},window:{UpJuniorStudent:{studentId:null},location:{origin:'http://localhost',hostname:'localhost'},confirm:()=>true},document:{querySelectorAll:()=>[],getElementById:()=>({})}};
+  vm.createContext(box);vm.runInContext(snippet+';this.read=readStudyCounts;this.add=incrementStudyCount;this.stat=getLearningStat;this.record=updateLearningStat;',box);
+  box.add();box.window.UpJuniorStudent.studentId='DUMMY001';assert.equal(box.read().total,0);box.add();box.add();box.record({questionKey:'w000001'},true);
+  box.window.UpJuniorStudent.studentId='DUMMY002';assert.equal(box.read().total,0);assert.equal(box.stat({questionKey:'w000001'}).total_correct,0);box.add();
+  box.window.UpJuniorStudent.studentId='DUMMY001';assert.equal(box.read().total,2);assert.equal(box.stat({questionKey:'w000001'}).total_correct,1);
+  box.window.UpJuniorStudent.studentId=null;assert.equal(box.read().total,1);
+});

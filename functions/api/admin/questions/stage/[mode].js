@@ -1,3 +1,5 @@
+import { SITE_ROLE } from '../../../../../cloudflare/junior-site-role.js';
+import { rejectUnauthenticatedAdminMutation } from '../../../../../cloudflare/admin-mutation-guard.js';
 import {
   jsonResponse, rejectRequest, MODES, VERSION_RE, MAX_UPLOAD_BYTES, versionObjectKey,
 } from '../../../../../cloudflare/junior-questions.js';
@@ -36,8 +38,8 @@ export async function readBoundedUpload(request) {
   return bytes;
 }
 
-export async function onRequestPost({ request, env, params }) {
-  const rejected = rejectRequest(request, env);
+export async function onRequestPost({ request, env, params, data }) {
+  const rejected = SITE_ROLE === 'admin' ? rejectUnauthenticatedAdminMutation({request,env,data}) : rejectRequest(request, env);
   if (rejected) return rejected;
   const mode = params.mode;
   const id = request.headers.get('X-Release-Id') || '';

@@ -24,6 +24,7 @@ const adminData={verifiedAdminEmail:'staff@example.com'};
 function memoryD1() {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../migrations/d1-junior/0001_student_learning.sql',import.meta.url),'utf8'));
+  sqlite.exec(readFileSync(new URL('../migrations/d1-junior/0002_attempt_study_time.sql',import.meta.url),'utf8'));
   const db={
     prepare(sql) {
       const statement=sqlite.prepare(sql);

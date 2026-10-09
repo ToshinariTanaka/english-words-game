@@ -14,13 +14,14 @@ export async function onRequestPost(context) {
   }
   try {
     const now=Date.now();
-    const result=await context.env.JUNIOR_DB.prepare(
+    const update=context.env.JUNIOR_DB.prepare(
       'UPDATE junior_students SET status=?,updated_at_ms=? WHERE student_id=?'
-    ).bind(body.status,now,id).run();
-    if (!result.meta?.changes) return jsonResponse({ok:false,error:'生徒IDが見つかりません。'},404);
-    if (body.status==='disabled') await context.env.JUNIOR_DB.prepare(
+    ).bind(body.status,now,id);
+    const revoke=context.env.JUNIOR_DB.prepare(
       'UPDATE junior_sessions SET revoked_at_ms=? WHERE student_id=? AND revoked_at_ms IS NULL'
-    ).bind(now,id).run();
+    ).bind(now,id);
+    const [result]=await context.env.JUNIOR_DB.batch(body.status==='disabled'?[update,revoke]:[update]);
+    if (!result.meta?.changes) return jsonResponse({ok:false,error:'生徒IDが見つかりません。'},404);
     return jsonResponse({ok:true,studentId:id,status:body.status});
   } catch {return jsonResponse({ok:false,error:'状態を変更できませんでした。'},503);}
 }

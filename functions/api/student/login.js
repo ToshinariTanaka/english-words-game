@@ -29,21 +29,25 @@ export async function onRequestPost({ request, env }) {
     }
     const accepted = await checkStudentPassword(password, student);
     if (!accepted) {
-      const failureCount = Math.max(0,Number(student.failed_login_count) || 0) + 1;
+      // Increment inside SQLite so concurrent wrong guesses cannot lose counts.
       await env.JUNIOR_DB.prepare(
-        'UPDATE junior_students SET failed_login_count=?, locked_until_ms=?, updated_at_ms=? WHERE student_id=?'
-      ).bind(failureCount >= MAX_FAILURES ? 0 : failureCount,
-        failureCount >= MAX_FAILURES ? now + LOCK_MS : 0, now, id).run();
+        'UPDATE junior_students SET locked_until_ms=CASE WHEN failed_login_count+1>=? THEN ? ELSE locked_until_ms END, failed_login_count=(failed_login_count+1)%?,updated_at_ms=? WHERE student_id=? AND password_hash=? AND status=\'active\' AND locked_until_ms<=?'
+      ).bind(MAX_FAILURES,now+LOCK_MS,MAX_FAILURES,now,id,student.password_hash,now).run();
       return jsonResponse({ok:false,error:'生徒IDまたはパスワードが違います。'},401);
     }
     const token = createSessionToken();
     const hash = await sha256Text(token);
-    await env.JUNIOR_DB.prepare(
-      'INSERT INTO junior_sessions (token_hash,student_id,created_at_ms,expires_at_ms) VALUES (?,?,?,?)'
-    ).bind(hash,id,now,now+SESSION_SECONDS*1000).run();
-    await env.JUNIOR_DB.prepare(
-      'UPDATE junior_students SET failed_login_count=0, locked_until_ms=0 WHERE student_id=?'
-    ).bind(id).run();
+    // A simultaneous reset/disable must not allow a stale password verification
+    // to create a new session. Guard insertion against the current credential.
+    const results=await env.JUNIOR_DB.batch([
+      env.JUNIOR_DB.prepare(
+        "INSERT INTO junior_sessions (token_hash,student_id,created_at_ms,expires_at_ms) SELECT ?,student_id,?,? FROM junior_students WHERE student_id=? AND password_hash=? AND status='active' AND locked_until_ms<=?"
+      ).bind(hash,now,now+SESSION_SECONDS*1000,id,student.password_hash,now),
+      env.JUNIOR_DB.prepare(
+        "UPDATE junior_students SET failed_login_count=0,locked_until_ms=0 WHERE student_id=? AND password_hash=? AND status='active' AND locked_until_ms<=?"
+      ).bind(id,student.password_hash,now),
+    ]);
+    if (!results[0].meta?.changes) return jsonResponse({ok:false,error:'生徒IDまたはパスワードが違います。'},401);
     return jsonResponse({ok:true,studentId:id,mustChangePassword:Boolean(student.must_change_password)},200,{
       'Set-Cookie': sessionCookie(token),
     });
