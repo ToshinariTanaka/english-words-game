@@ -103,6 +103,30 @@ test('blocks untrusted identity, signature, issuer, audience and expired JWT',as
   assert.equal(await verifyAccessJWT(accessRequest(),config,v.fetchJwks),null);
 });
 
+test('diagnostics disclose fixed rejection reason without JWT, email, or AUD',async()=>{
+  const original=console.warn;
+  const messages=[];
+  console.warn=(...args)=>messages.push(args.map(String).join(' '));
+  try {
+    const missing=await verifyAccessJWT(accessRequest(),config);
+    assert.equal(missing,null);
+    const {token,fetchJwks}=await signedJWT({email:'other@example.com'});
+    const invalid=await verifyAccessJWT(accessRequest(token),config,fetchJwks);
+    assert.equal(invalid,null);
+    assert.deepEqual(messages,[
+      'junior_admin_access_denied jwt_missing_header_and_cookie',
+      'junior_admin_access_denied email_missing_or_not_allowed',
+    ]);
+    for(const message of messages){
+      assert.doesNotMatch(message,/other@example.com|operator@example.com/);
+      assert.equal(message.includes(aud),false);
+      assert.equal(message.includes(token),false);
+    }
+  } finally {
+    console.warn=original;
+  }
+});
+
 test('missing Access JWT or settings blocks the entire admin page',async()=>{
   const deny=await middleware({request:accessRequest(),env:{
     CF_ACCESS_TEAM_DOMAIN:team,CF_ACCESS_AUD:aud,ADMIN_ALLOWED_EMAILS:mail,
