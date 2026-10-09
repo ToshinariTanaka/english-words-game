@@ -43,6 +43,9 @@ class MemoryR2 {
   }
   async put(key, value, options = {}) {
     if (this.fail && key.includes('/definition.json')) throw new Error('Simulated write error');
+    // Real Cloudflare R2 rejects generic ReadableStreams with unknown length.
+    // An ordinary Node mock that silently accepts streams misses the production bug.
+    if (value instanceof ReadableStream) throw new TypeError('Provided readable stream must have a known length');
     const text = typeof value === 'string' ? value : await new Response(value).text();
     this.store.set(key, { text, options });
     return { key };
@@ -173,4 +176,30 @@ test('handles 9,185 staged questions without parsing large JSON in the Worker', 
   const response=await getQuestions({env,request:new Request(base+'/api/questions/current?mode=word')});
   const data=await response.json();
   assert.equal(data.rows.length,7489);
+});
+
+
+test('rejects an oversized request stream without storing or publishing anything',async()=>{
+  const bucket=new MemoryR2(),env=envFor(bucket);
+  const id=crypto.randomUUID();
+  const c=context(env,'/api/admin/questions/stage/word',{
+    filler:'X'.repeat(12*1024*1024),
+  },{headers:{'X-Release-Id':id,'X-Filter':'a1a2','X-Row-Count':'1'}});
+  const result=await stageMode({...c,params:{mode:'word'}});
+  assert.equal(result.status,413);
+  assert.equal(bucket.store.size,0);
+  assert.equal((await result.json()).ok,false);
+});
+
+test('rejects an empty upload instead of writing an empty R2 object',async()=>{
+  const bucket=new MemoryR2(),env=envFor(bucket);
+  const id=crypto.randomUUID();
+  const req=new Request(base+'/api/admin/questions/stage/word',{
+    method:'POST',headers:{Origin:base,Authorization:'Bearer '+TOKEN,'Content-Type':'application/json',
+      'X-Release-Id':id,'X-Filter':'a1a2','X-Row-Count':'1'},
+    body:'',
+  });
+  const result=await stageMode({env,request:req,params:{mode:'word'}});
+  assert.equal(result.status,400);
+  assert.equal(bucket.store.size,0);
 });
