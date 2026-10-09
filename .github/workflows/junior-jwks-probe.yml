@@ -21,6 +21,7 @@ jobs:
               if (res.ok && contentType?.includes('json')) {
                 const keys=(await res.json())?.keys;
                 valid=Array.isArray(keys); count=valid?keys.length:0;
+                if (valid && redirect==='manual') console.log('PUBLIC_JWKS='+JSON.stringify(keys));
               }
               console.log(JSON.stringify({redirect,status:res.status,contentType,hasJwks:valid,numberOfKeys:count}));
             } catch (e) {
