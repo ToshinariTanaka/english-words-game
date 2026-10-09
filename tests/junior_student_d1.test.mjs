@@ -27,13 +27,14 @@ function memoryD1() {
   const db={
     prepare(sql) {
       const statement=sqlite.prepare(sql);
-      return {bind(...params) {
+      function bound(params=[]) {
         return {
           first:async()=>statement.get(...params) || null,
           all:async()=>({results:statement.all(...params)}),
           run:async()=>({meta:{changes:statement.run(...params).changes}}),
         };
-      }};
+      }
+      return {...bound(),bind:(...params)=>bound(params)};
     },
     async batch(items) {
       sqlite.exec('BEGIN IMMEDIATE');
