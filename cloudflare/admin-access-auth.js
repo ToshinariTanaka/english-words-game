@@ -57,6 +57,7 @@ export async function verifyAccessJWT(request, config, fetchCerts = fetch, now =
   const parts = token.split('.');
   if (parts.length !== 3) return denied('jwt_malformed_segments');
 
+  let phase = 'jwt_decode';
   try {
     const header = decodeJson(parts[0]);
     if (header.alg !== 'RS256' || typeof header.kid !== 'string'
@@ -81,18 +82,22 @@ export async function verifyAccessJWT(request, config, fetchCerts = fetch, now =
       return denied('email_missing_or_not_allowed');
     }
 
+    phase = 'jwks_fetch';
     const jwksResponse = await fetchCerts(config.domain + '/cdn-cgi/access/certs', { redirect: 'error' });
     if (!jwksResponse.ok) return denied('jwks_fetch_http_error');
+    phase = 'jwks_response_parse';
     const certs = await jwksResponse.json();
     const candidates = Array.isArray(certs?.keys) ? certs.keys : [];
     const jwk = candidates.find(k => k.kid === header.kid && k.kty === 'RSA'
       && k.n && k.e && (k.alg === undefined || k.alg === 'RS256')
       && (k.use === undefined || k.use === 'sig'));
     if (!jwk) return denied('jwks_signing_key_not_found');
+    phase = 'public_key_import';
     const publicKey = await crypto.subtle.importKey(
       'jwk', { kty: 'RSA', n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
       { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify'],
     );
+    phase = 'signature_verify';
     const isValid = await crypto.subtle.verify(
       'RSASSA-PKCS1-v1_5', publicKey, decodeSegment(parts[2]),
       new TextEncoder().encode(parts[0] + '.' + parts[1]),
@@ -100,7 +105,8 @@ export async function verifyAccessJWT(request, config, fetchCerts = fetch, now =
     if (!isValid) return denied('jwt_signature_invalid');
     return { email: claims.email.toLowerCase(), subject: claims.sub };
   } catch {
-    return denied('jwt_parse_jwks_or_crypto_exception');
+    // Fixed stage names only, never log JWTs, key material, email addresses, or config.
+    return denied(phase + '_exception');
   }
 }
 

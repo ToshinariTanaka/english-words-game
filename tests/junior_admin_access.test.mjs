@@ -127,6 +127,36 @@ test('diagnostics disclose fixed rejection reason without JWT, email, or AUD',as
   }
 });
 
+test('JWT diagnostics pinpoint exceptions without exposing private values',async()=>{
+  const original=console.warn;
+  const emitted=[];
+  console.warn=(...args)=>emitted.push(args.map(String).join(' '));
+  try {
+    const {token}=await signedJWT();
+    const req=accessRequest(token);
+    assert.equal(await verifyAccessJWT(req,config,async()=>{throw new Error('sensitive network exception');}),null);
+    assert.equal(await verifyAccessJWT(req,config,async()=>({ok:true,
+      json:async()=>{throw new Error('sensitive cert parse exception');}})),null);
+    const brokenJwk=async()=>({ok:true,json:async()=>({keys:[{
+      kid:'test-jwk-kid',kty:'RSA',alg:'RS256',use:'sig',n:'%%%invalid',e:'AQAB',
+    }]})});
+    assert.equal(await verifyAccessJWT(req,config,brokenJwk),null);
+    assert.deepEqual(emitted,[
+      'junior_admin_access_denied jwks_fetch_exception',
+      'junior_admin_access_denied jwks_response_parse_exception',
+      'junior_admin_access_denied jwt_signature_invalid',
+    ]);
+    for(const message of emitted) {
+      assert.equal(message.includes(token),false);
+      assert.equal(message.includes(aud),false);
+      assert.equal(message.includes(mail),false);
+      assert.equal(message.includes('sensitive'),false);
+    }
+  } finally {
+    console.warn=original;
+  }
+});
+
 test('missing Access JWT or settings blocks the entire admin page',async()=>{
   const deny=await middleware({request:accessRequest(),env:{
     CF_ACCESS_TEAM_DOMAIN:team,CF_ACCESS_AUD:aud,ADMIN_ALLOWED_EMAILS:mail,
