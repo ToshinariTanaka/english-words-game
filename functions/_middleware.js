@@ -5,7 +5,10 @@ import { accessConfig, verifyAccessJWT, authenticationFailure } from '../cloudfl
 // A missing or invalid Access setup fails closed, including static files.
 export async function onRequest({ request, env, data, next }) {
   const config = accessConfig(env);
-  if (!config) return authenticationFailure(503);
+  if (!config) {
+    console.warn('junior_admin_access_denied', 'config_invalid');
+    return authenticationFailure(503);
+  }
   const identity = await verifyAccessJWT(request, config);
   if (!identity) return authenticationFailure(403);
   data.verifiedAdminEmail = identity.email;
