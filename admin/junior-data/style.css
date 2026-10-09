@@ -1,0 +1,23 @@
+:root { font-family: system-ui, -apple-system, "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; color: #1c2b40; background: #f0f5fb; line-height: 1.65; }
+.container { width: min(780px, 100%); margin: auto; padding: 24px 16px 60px; }
+header { margin-bottom: 24px; }
+h1 { font-size: clamp(1.5rem, 4vw, 2rem); line-height: 1.35; }
+h2 { font-size: 1.2rem; margin: 0 0 14px; }
+.eyebrow { font-weight: 700; color: #25589a; }
+.card { padding: 24px; margin-bottom: 18px; background: #fff; border-radius: 15px; border: 1px solid #dae3ef; box-shadow: 0 2px 12px #1026470c; }
+label { display: block; font-weight: 700; margin: 18px 0 7px; }
+input[type=file], input[type=password], select { width: 100%; padding: 12px; border: 1px solid #9eafc5; border-radius: 8px; font-size: 1rem; background: white; }
+input[type=checkbox] { width: 20px; height: 20px; flex: none; }
+.confirm { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
+button { border: 0; border-radius: 8px; padding: 12px 18px; background: #195ba7; color: white; font-weight: 750; cursor: pointer; font-size: 1rem; margin-top: 12px; }
+button:disabled { background: #a6b7c8; cursor: not-allowed; }
+button.secondary { background: #4c647c; }
+.note { color: #596779; font-size: .94rem; }
+table { border-collapse: collapse; width: 100%; }
+td, th { border-bottom: 1px solid #d9e3ef; padding: 9px; text-align: left; }
+td:last-child, th:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+#error { color: #b3261e; }
+a { color: #155fae; }
+@media(max-width: 560px) { .card { padding: 18px; } .container { padding: 12px 12px 35px; } }

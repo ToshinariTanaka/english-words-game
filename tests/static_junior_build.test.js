@@ -23,13 +23,19 @@ test('builds a static standalone junior preview without changing application sou
   assert.equal(fs.existsSync(path.join(output, 'style.css')), true);
   assert.equal(fs.existsSync(path.join(output, 'script.js')), true);
   assert.equal(fs.existsSync(path.join(output, 'robots.txt')), true);
+  for (const file of ['index.html','style.css','script.js','parser.mjs']) {
+    assert.equal(fs.existsSync(path.join(output, 'admin','junior-data',file)), true);
+  }
+  const routes = JSON.parse(fs.readFileSync(path.join(output,'_routes.json'),'utf8'));
+  assert.deepEqual(routes.include,['/api/*']);
+  assert.deepEqual(routes.exclude,[]);
 });
 
 test('uses current application scoring logic with Render APIs disabled in static preview', () => {
   const js = fs.readFileSync(path.join(output, 'script.js'), 'utf8');
   assert.doesNotThrow(() => new vm.Script(js, { filename: 'static-junior/script.js' }));
   assert.match(js, /const STATIC_JUNIOR_PREVIEW = true;/);
-  assert.match(js, /if \(STATIC_JUNIOR_PREVIEW\) throw new Error\('静的試験版ではローカルのサンプル教材を使います。'\);/);
+  assert.match(js, /const response = await fetch\('\/api\/questions\/current\?mode='/);
   assert.match(js, /if \(STATIC_JUNIOR_PREVIEW\) return null;/);
   assert.match(js, /if \(STATIC_JUNIOR_PREVIEW\) throw new Error\('静的試験版はアップロードAPIを使用しません。'\);/);
   assert.match(js, /variant: 'junior-static-preview'/);

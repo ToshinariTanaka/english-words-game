@@ -1,0 +1,26 @@
+name: Junior Excel upload tests
+on:
+  push:
+    branches:
+      - feature/junior-excel-upload-r2-20261009
+  pull_request:
+    paths:
+      - 'admin/junior-data/**'
+      - 'cloudflare/**'
+      - 'functions/**'
+      - 'scripts/build-static-junior.js'
+      - 'tests/junior_excel_upload.test.mjs'
+      - 'tests/static_junior_build.test.js'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/build-static-junior.js
+      - run: node --test tests/static_junior_build.test.js tests/junior_excel_upload.test.mjs
+      - run: npx --yes wrangler@4 pages functions build functions --outfile /tmp/up-junior-pages-functions.js
