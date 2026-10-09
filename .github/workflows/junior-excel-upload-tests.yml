@@ -23,3 +23,4 @@ jobs:
           node-version: '22'
       - run: node scripts/build-static-junior.js
       - run: node --test tests/static_junior_build.test.js tests/junior_excel_upload.test.mjs
+      - run: npx --yes wrangler@4 pages functions build functions --outfile /tmp/up-junior-pages-functions.js
