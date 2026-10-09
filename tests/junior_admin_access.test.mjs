@@ -97,7 +97,9 @@ test('blocks untrusted identity, signature, issuer, audience and expired JWT',as
   v=await signedJWT({exp:Math.floor(Date.now()/1000)-10});
   assert.equal(await verifyAccessJWT(accessRequest(v.token),config,v.fetchJwks),null);
   v=await signedJWT();
-  assert.equal(await verifyAccessJWT(accessRequest(v.token.replace(/.$/,'A')),config,v.fetchJwks),null);
+  const [jwtHeader,jwtPayload,jwtSignature]=v.token.split('.');
+  const tamperedPayload=Buffer.from(JSON.stringify({iss:team,aud:[aud],email:mail,sub:'tampered',exp:Math.floor(Date.now()/1000)+300})).toString('base64url');
+  assert.equal(await verifyAccessJWT(accessRequest([jwtHeader,tamperedPayload,jwtSignature].join('.')),config,v.fetchJwks),null);
   assert.equal(await verifyAccessJWT(accessRequest(),config,v.fetchJwks),null);
 });
 
