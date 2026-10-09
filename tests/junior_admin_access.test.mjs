@@ -144,7 +144,7 @@ test('JWT diagnostics pinpoint exceptions without exposing private values',async
     assert.deepEqual(emitted,[
       'junior_admin_access_denied jwks_fetch_exception',
       'junior_admin_access_denied jwks_response_parse_exception',
-      'junior_admin_access_denied public_key_import_exception',
+      'junior_admin_access_denied jwt_signature_invalid',
     ]);
     for(const message of emitted) {
       assert.equal(message.includes(token),false);
