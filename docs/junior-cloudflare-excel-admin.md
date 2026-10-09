@@ -61,3 +61,7 @@ Node.js 22で次を実行する。
     node --test tests/static_junior_build.test.js tests/junior_excel_upload.test.mjs
 
 公開前にA1・A2、ターゲット1800のフラグ、全9,000問程度の処理、認証エラー、途中失敗時のロールバック、音声・復習・4モード出題を確認する。
+
+## Secretを再設定した後の再デプロイ
+
+Cloudflare Pagesで管理者Secret JUNIOR_UPLOAD_TOKENを更新した場合は、公開用ブランチで安全な変更を行って再デプロイする。Secretの実際の値や一部をこの文書・GitHub・ログに記載しない。既存R2データとRenderの本番サービスは変更しない。
