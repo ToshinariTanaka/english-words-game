@@ -81,3 +81,9 @@ R2をパブリックに設定しない。
 
 生徒用の /api/questions/current と /api/questions/status は維持する。
 古い共有URLをブックマークしている場合は、新しい管理者サイトへ切り替える。
+
+## 2026-10-09 確認済みのAccessチームドメイン
+
+Zero Trust → Access settings → Manage your App Launcher の表示から、チームドメインが `tight-voice-62ae.cloudflareaccess.com` であることを確認。管理者Pagesの `CF_ACCESS_TEAM_DOMAIN` は `https://tight-voice-62ae.cloudflareaccess.com` と一致させる。認証ポリシー、AUD、管理者メールの値は利用者がCloudflare画面で設定し、GitHubへ保存しない。
+
+認証設定の反映は管理者専用ブランチからの再デプロイで行う。塾生用サイト、R2保存データ、Render本番には変更を加えない。
