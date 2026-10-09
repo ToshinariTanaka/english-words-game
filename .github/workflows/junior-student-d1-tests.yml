@@ -30,6 +30,13 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements.txt
+      - name: Install existing Excel test dependency
+        run: python -m pip install -r tools/requirements.txt
       - run: npm ci
       - run: npm run test:junior
       - name: Verify original study app and Render regression tests
