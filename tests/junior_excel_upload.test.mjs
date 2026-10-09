@@ -199,7 +199,7 @@ test('rejects an empty upload instead of writing an empty R2 object',async()=>{
       'X-Release-Id':id,'X-Filter':'a1a2','X-Row-Count':'1'},
     body:'',
   });
-  const result=await stageMode({env,request:req,params:{mode:'word'}});
+  const result=await stageMode({env,request:req,params:{mode:'word'},data:{verifiedAdminEmail:'admin@example.com'}});
   assert.equal(result.status,400);
   assert.equal(bucket.store.size,0);
 });
