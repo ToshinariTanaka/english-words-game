@@ -31,7 +31,8 @@ export function accessConfig(env) {
   }
   const emails = rawEmails.split(',').map(email => email.trim().toLowerCase());
   if (!emails.length || emails.length > 20
-      || emails.some(email => email.length > 254 || !/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(email))) {
+      || emails.some(email => email.length > 254 || email.includes('*')
+        || !/^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/.test(email))) {
     return null;
   }
   return { domain: domain.origin, audience, allowedEmails: new Set(emails) };
