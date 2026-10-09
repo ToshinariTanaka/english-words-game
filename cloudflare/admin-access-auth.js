@@ -40,7 +40,14 @@ export function accessConfig(env) {
 
 export async function verifyAccessJWT(request, config, fetchCerts = fetch, now = Date.now()) {
   if (!config) return null;
-  const token = request.headers.get('Cf-Access-Jwt-Assertion') || '';
+  // Access normally forwards Cf-Access-Jwt-Assertion, but some Pages
+  // requests retain only the CF_Authorization cookie. Both tokens must pass
+  // the same signature/issuer/audience/email validation below.
+  const headerToken = request.headers.get('Cf-Access-Jwt-Assertion') || '';
+  const cookieHeader = request.headers.get('Cookie') || '';
+  const cookieToken = cookieHeader.split(';').map(part => part.trim())
+    .find(part => part.startsWith('CF_Authorization='))?.slice('CF_Authorization='.length) || '';
+  const token = headerToken || cookieToken;
   if (!token || token.length > 16000) return null;
   const parts = token.split('.');
   if (parts.length !== 3) return null;
