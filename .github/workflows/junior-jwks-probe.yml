@@ -1,0 +1,31 @@
+name: Junior JWKS connectivity probe
+on:
+  push:
+    branches: [diagnostic/junior-jwks-fetch-20261009]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe documented public Access JWKS endpoint (no credentials)
+        run: |
+          node --input-type=module - <<'NODE'
+          const url = 'https://tight-voice-62ae.cloudflareaccess.com/cdn-cgi/access/certs';
+          for (const redirect of ['manual','error']) {
+            try {
+              const res = await fetch(url,{redirect,signal:AbortSignal.timeout(12000)});
+              const contentType=res.headers.get('content-type');
+              let valid=false, count=0;
+              if (res.ok && contentType?.includes('json')) {
+                const keys=(await res.json())?.keys;
+                valid=Array.isArray(keys); count=valid?keys.length:0;
+              }
+              console.log(JSON.stringify({redirect,status:res.status,contentType,hasJwks:valid,numberOfKeys:count}));
+            } catch (e) {
+              console.log(JSON.stringify({redirect,exceptionName:e?.name ?? 'unknown',
+                causeCode:typeof e?.cause?.code==='string' ? e.cause.code.slice(0,40):'none'}));
+            }
+          }
+          NODE
