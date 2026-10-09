@@ -93,6 +93,16 @@ function rewriteJavaScript(js) {
     "const hostingMessage = STATIC_JUNIOR_PREVIEW ? 'Cloudflareの共有教材を優先します。未公開なら各3問のデモを表示します。' : IS_GITHUB_PAGES ?",
     'mode-level hosting notice',
   );
+  // Student tracking is opt-in during the pilot. Rendering and scoring are
+  // unchanged; the answer hook sends only question ID, correctness and bounded time.
+  js = replaceExactlyOnce(js,
+    '  state.currentQuestion = current || null;',
+    '  state.currentQuestion = current || null;\n  if (STATIC_JUNIOR_PREVIEW) window.UpJuniorStudent?.questionShown();',
+    'question displayed hook');
+  js = replaceExactlyOnce(js,
+    '  updateLearningStat(current, isCorrect);',
+    "  updateLearningStat(current, isCorrect);\n  if (STATIC_JUNIOR_PREVIEW) window.UpJuniorStudent?.recordAnswer({mode:state.mode,questionKey:current.questionKey||current.id,correct:isCorrect});",
+    'answer log hook');
   return js;
 }
 
@@ -111,6 +121,29 @@ function rewriteHtml(html) {
     '<link rel="stylesheet" href="./style.css">', 'stylesheet URL');
   html = replacePatternOnce(html, /<script src="\.\/script\.js[^"]*"><\/script>/m,
     '<script src="./script.js"></script>', 'script URL');
+  html = replaceExactlyOnce(html,'    </header>', '    </header>\n'+
+    '    <section class="junior-student-login" id="juniorStudentPanel" aria-label="学習記録用の生徒ログイン">\n'+
+    '      <h2>生徒ログイン（学習履歴の共有・試験中）</h2>\n'+
+    '      <p id="juniorStudentStatus" role="status">ログイン状態を確認中です。</p>\n'+
+    '      <div id="juniorStudentLoginFields">\n'+
+    '        <label>生徒ID <input id="juniorStudentId" autocomplete="username" maxlength="24"></label>\n'+
+    '        <label>パスワード <input id="juniorStudentPassword" type="password" autocomplete="current-password"></label>\n'+
+    '        <button id="juniorStudentLogin" type="button">ログイン</button>\n'+
+    '      </div>\n'+
+    '      <div id="juniorStudentChangeFields" hidden>\n'+
+    '        <p>初回は仮パスワードを変更してください。</p>\n'+
+    '        <label>現在のパスワード <input id="juniorStudentCurrentPassword" type="password" autocomplete="current-password"></label>\n'+
+    '        <label>新しいパスワード（12文字以上） <input id="juniorStudentNewPassword" type="password" autocomplete="new-password"></label>\n'+
+    '        <button id="juniorStudentChange" type="button">パスワードを変更する</button>\n'+
+    '      </div>\n'+
+    '      <button id="juniorStudentLogout" type="button" hidden>ログアウト</button>\n'+
+    '      <button id="juniorStudentRetry" type="button">学習記録の再送信</button>\n'+
+    '      <p class="student-login-hint">未ログインでも演習できますが、塾長に学習記録は共有されません。学習時間は解答間隔から求める推定値です。</p>\n'+
+    '    </section>', 'student login section');
+  html = replaceExactlyOnce(html,
+    '  <script src="./script.js"></script>',
+    '  <script src="./script.js"></script>\n  <script src="./junior-student-sync.js"></script>',
+    'student session UI script');
   return html;
 }
 
@@ -124,10 +157,18 @@ function build() {
   const html = rewriteHtml(fs.readFileSync(path.join(SOURCE, 'index.html'), 'utf8'));
   const js = rewriteJavaScript(fs.readFileSync(path.join(SOURCE, 'script.js'), 'utf8'));
   const css = fs.readFileSync(path.join(SOURCE, 'style.css'), 'utf8')
-    + '\n.static-preview-notice { color: #fff; background: #573e10; padding: 8px 12px; border-radius: 9px; font-weight: 700; }\n';
+    + '\n.static-preview-notice { color: #fff; background: #573e10; padding: 8px 12px; border-radius: 9px; font-weight: 700; }\n'
+    + '.junior-student-login {background:#203458;color:#fff;border:1px solid #4c6ea4;border-radius:14px;padding:18px;margin:12px 0}\n'
+    + '.junior-student-login h2 {font-size:1.2rem;margin:0 0 10px}\n'
+    + '.junior-student-login label {display:block;margin:8px 0;font-size:1rem}\n'
+    + '.junior-student-login input {display:block;width:100%;box-sizing:border-box;padding:10px;font-size:1rem;border-radius:8px}\n'
+    + '.junior-student-login button {margin:6px 6px 6px 0;padding:10px 14px;cursor:pointer;border-radius:9px;background:#2378c9;color:#fff;font-size:1rem}\n'
+    + '.junior-student-login [hidden] {display:none !important}\n'
+    + '.junior-student-login .student-login-hint {font-size:.85rem;opacity:.9}\n';
 
   fs.writeFileSync(path.join(OUTPUT, 'index.html'), html);
   fs.writeFileSync(path.join(OUTPUT, 'script.js'), js);
+  fs.copyFileSync(path.join(SOURCE, 'junior-student-sync.js'), path.join(OUTPUT, 'junior-student-sync.js'));
   fs.writeFileSync(path.join(OUTPUT, 'style.css'), css);
   fs.writeFileSync(path.join(OUTPUT, '_headers'), '/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Frame-Options: DENY\n');
   fs.writeFileSync(path.join(OUTPUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
