@@ -51,22 +51,40 @@
 
 ローカル試験は実際のCloudflareアカウントの設定確認やスマートフォン実機試験の代替ではない。
 
-## Cloudflare側：未完了と確認待ち
+## Cloudflare側：2026-10-10 08:09（日本時間）の確認状況
 
-Cloudflare Dashboardはログイン画面で `There was a problem with verification. Please reload and try again.` が表示され、再読み込み後もSign inが無効だった。API認証情報もこの実行環境にはない。設定変更やオンラインのダミー登録は行っていない。
+エージェントのCloudflare Dashboardはログイン画面の認証エラーで操作できない。以下は利用者が自身のEdgeで操作し、共有した画面を照合した結果。エージェントによる直接操作・実機試験の完了を意味しない。利用可能な連携の検索でもCloudflare用は見つからなかった。
 
-引き継ぎ情報として以下を受領しているが、Dashboard上での再確認は未実施。
+| 項目 | 画面から確認した状態 |
+|---|---|
+| 試験D1 | `up-junior-learning-pilot` を新規作成 |
+| 試験スキーマ | `junior_students`、`junior_sessions`、`junior_attempts` の3テーブルと名前付き4インデックスをSQLで確認。学習日時列と学習日時インデックスを含む |
+| 生徒Pages Preview | `JUNIOR_DB → up-junior-learning-pilot` の保存を確認 |
+| 管理者Pages Preview | `JUNIOR_DB → up-junior-learning-pilot` の保存を確認 |
+| 管理者Previewの環境変数 | `ADMIN_ALLOWED_EMAILS` と `CF_ACCESS_TEAM_DOMAIN` が設定画面に表示。ドメインの入力ミスを修正済み |
+| 管理者PreviewのAUD | Preview用Accessアプリからコピーした英数字が `CF_ACCESS_AUD` の入力欄に一致。最後の画面は保存前のため、保存完了は未確認 |
+| 管理者Previewの保護範囲 | Preview accessが有効。対応するAccessアプリが `*.up-junior-words-admin.pages.dev` を対象としていることを確認 |
+| Accessの許可ルール | Policiesの内容・許可メールとの一致は未確認 |
+| 管理者の試験版ビルド | PR #115のCloudflare公式botは `1f21c55` のPreviewデプロイ成功を報告。ただし今回のBinding・環境変数設定前のビルド。設定反映後の再デプロイ・動作は未確認 |
+| 生徒の試験版ビルド | 画面共有時点で試験コミットは `No deployment available`。Previewブランチ制御・ビルド設定・公開状態の確認が必要 |
+| 既存環境 | 既存 `up-junior-learning` のデータ・スキーマ変更、本番ブランチ切替、R2教材更新、Render変更はこの手順では実施していない |
 
-- D1 `up-junior-learning`：初期3テーブル・3インデックスを作成済み。
-- 管理者Pagesの `JUNIOR_DB` Binding：保存済み。
-- 生徒Pagesの `JUNIOR_DB` Binding：未完了。
+試験DBはConsoleへ最終スキーマをまとめて入力して初期化した。`occurred_at_ms` は既に存在するため、この同じDBへ `0002_attempt_study_time.sql` のALTER TABLEをそのまま再実行しない。Wranglerのマイグレーション履歴はこの手動手順では登録していない。今後CLI管理に移す場合は実スキーマと履歴を照合する。
+
+認証の設定値、許可メールの実値、AUD、セッショントークンはこの報告へ記載しない。次の操作はAUD保存の確認とAccessのPolicies確認。その後に両PagesのPreviewビルド・教材読み出し設定を確認し、試験版を再デプロイする。オンラインのダミー登録、再送試験、CSV取得、実D1のバックアップ／復元はまだ未実施。
+
+当初の引き継ぎ情報（Production側での確認・変更は別途必要）：
+
+- D1 `up-junior-learning`：初期3テーブル・3インデックスを作成済みとの申告。
+- 管理者Pages Productionの `JUNIOR_DB` Binding：保存済みとの申告。
+- 生徒Pages Productionの `JUNIOR_DB` Binding：未確認。今回保存したのはPreviewのみ。
 
 ## 認証復旧後の試験導入手順
 
 1. 現在の生徒・管理者PagesのProductionブランチ、Build設定、Preview Binding、Access保護対象を読み取り確認する。本番のブランチは変更しない。
 2. 既存D1が空か・実データがあるかを読み取り確認する。ダミー試験には別D1 `up-junior-learning-pilot` を推奨。生徒／管理者の **Preview環境** の `JUNIOR_DB` を同じ試験D1へ結び付ける。本番・試験のDBを混同しない。
 3. 生徒プロジェクト `up-junior-words-preview` の接続設定を完成させる。Production側への `up-junior-learning` Bindingを保存しても、本番コードの切替・再デプロイは承認まで行わない。
-4. 新しい空の試験D1へ `0001_student_learning.sql` → `0002_attempt_study_time.sql` を順に適用する。既存の `up-junior-learning` への追加マイグレーションは承認後に行う。
+4. 新しい空の試験D1へ `0001_student_learning.sql` → `0002_attempt_study_time.sql` を順に適用する。上記チェックポイントの試験DBは同等スキーマを手動作成済みのため再適用しない。既存の `up-junior-learning` への追加マイグレーションは承認後に行う。
 5. 両Pagesの試験デプロイに新ブランチを使用する。生徒Build commandは `node scripts/build-static-junior.js`、出力は `dist-junior`。管理者は `node scripts/build-junior-admin.js`、出力は `dist-junior-admin`。
 6. 管理者PreviewにもAccessの環境変数と許可メール設定を継承し、**PreviewのURLもAccessの保護対象**に入れる。既存の認証制御を無効にして試験しない。
 7. 匿名の管理URL/APIが拒否されること、生徒サイトがAccessログインを要求しないこと、教材数が1,691問のままであることを確認する。教材アップロード／公開ボタンは押さない。
@@ -103,7 +121,7 @@ Cloudflare公式資料：
 
 ## 本番前の残作業・運用上の限界
 
-- クラウド実環境のBinding、追加マイグレーション、再デプロイ、Access Preview保護、実機試験は未完了。
+- PreviewのD1 Binding保存と試験スキーマ作成は画面で確認済み。AUD保存完了・Access許可ルール・設定反映後の再デプロイ・実機試験は未確認。本番D1への追加マイグレーションは未実施。
 - 実アカウントでのバックアップ取得・復元試験、WAF/IP単位の制限、CPU・D1容量・料金の確認が必要。
 - IndexedDBの消去、端末紛失、プライベート閲覧モード終了などでは未送信記録を失う可能性がある。端末に保存できない場合は画面に明示する。
 - 学習ページ自体を完全オフラインで読み込むPWA、端末をまたぐ生徒側の復習状態統合、課題配信、保護者公開は今回の対象外。
