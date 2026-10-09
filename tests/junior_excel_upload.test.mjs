@@ -54,11 +54,11 @@ class MemoryR2 {
 const envFor = (bucket) => ({ JUNIOR_DATA:bucket, JUNIOR_UPLOAD_TOKEN:TOKEN });
 const base='https://junior.pages.dev';
 
-function context(env, path, body, { token=TOKEN, origin=base, headers={} }={}) {
+function context(env, path, body, { token=TOKEN, origin=base, headers={}, authenticated=true }={}) {
   const request = new Request(base + path, { method:'POST',
     headers: { Origin:origin, Authorization:'Bearer ' + token,
       'Content-Type':'application/json', ...headers }, body:JSON.stringify(body) });
-  return {env,request};
+  return {env,request,data:authenticated?{verifiedAdminEmail:'admin@example.com'}:{}};
 }
 
 async function stageAll(env, dataset, id) {
@@ -125,20 +125,20 @@ test('stages 4 modes, publishes one manifest and streams questions to students',
   assert.equal(bucket.store.get(MANIFEST_KEY).text,oldManifest);
 });
 
-test('unauthorized and cross-site staging or publication never write R2 data',async()=>{
+test('unauthenticated Access identity and cross-site requests never write R2 data',async()=>{
   const bucket=new MemoryR2(),env=envFor(bucket),id=crypto.randomUUID();
   const data=prepareWorkbook(fixture(),'a1a2',converter);
   const row=data.modes.word;
   const input={ok:true,mode:'word',rows:row,count:row.length};
   const headers={'X-Release-Id':id,'X-Filter':'a1a2','X-Row-Count':String(row.length)};
-  const badToken=await stageMode({...context(env,'/api/admin/questions/stage/word',input,{token:'wrong',headers}),params:{mode:'word'}});
-  assert.equal(badToken.status,401);
+  const missingIdentity=await stageMode({...context(env,'/api/admin/questions/stage/word',input,{authenticated:false,headers}),params:{mode:'word'}});
+  assert.equal(missingIdentity.status,403);
   const badOrigin=await stageMode({...context(env,'/api/admin/questions/stage/word',input,{origin:'https://evil.example',headers}),params:{mode:'word'}});
   assert.equal(badOrigin.status,403);
-  const missingSecret=await publish(context({JUNIOR_DATA:bucket},'/api/admin/questions/publish',{
+  const missingStorage=await publish(context({},'/api/admin/questions/publish',{
     version:1,versionId:id,filename:'junior.xlsx',filter:'a1a2',counts:data.counts,
   }));
-  assert.equal(missingSecret.status,503);
+  assert.equal(missingStorage.status,503);
   assert.equal(bucket.store.size,0);
 });
 
