@@ -79,6 +79,14 @@ test('validates a genuine signed Cloudflare Access-style JWT',async()=>{
   assert.equal(identity?.subject,'test-subject');
 });
 
+test('accepts cryptographically verified Access cookie if JWT assertion header is absent',async()=>{
+  const {token,fetchJwks}=await signedJWT();
+  const req=new Request(base+'/',{headers:{Cookie:'other=value; CF_Authorization='+token}});
+  assert.equal((await verifyAccessJWT(req,config,fetchJwks))?.email,mail);
+  const forged=new Request(base+'/',{headers:{Cookie:'CF_Authorization='+token.slice(0,-2)+'aa'}});
+  assert.equal(await verifyAccessJWT(forged,config,fetchJwks),null);
+});
+
 test('blocks untrusted identity, signature, issuer, audience and expired JWT',async()=>{
   let v=await signedJWT({email:'somebody@example.com'});
   assert.equal(await verifyAccessJWT(accessRequest(v.token),config,v.fetchJwks),null);
