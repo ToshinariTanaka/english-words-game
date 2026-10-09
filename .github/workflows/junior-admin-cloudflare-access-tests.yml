@@ -1,0 +1,33 @@
+name: Junior Cloudflare Access admin
+on:
+  push:
+    branches:
+      - feature/junior-admin-cloudflare-access-20261009
+  pull_request:
+    paths:
+      - 'scripts/build-junior-admin.js'
+      - 'cloudflare/admin-*.js'
+      - 'functions/_middleware.js'
+      - 'functions/api/admin/**'
+      - 'tests/junior_admin_access.test.mjs'
+      - 'tests/junior_excel_upload.test.mjs'
+      - '.github/workflows/junior-admin-cloudflare-access-tests.yml'
+permissions:
+  contents: read
+jobs:
+  access-admin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test Access login and Excel upload
+        run: |
+          node scripts/build-junior-admin.js
+          node --test tests/junior_admin_access.test.mjs tests/junior_excel_upload.test.mjs
+      - name: Compile protected Pages Functions
+        run: npx --yes wrangler@4 pages functions build functions --outfile /tmp/up-junior-admin-worker.js
