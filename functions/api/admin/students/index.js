@@ -2,6 +2,7 @@ import { jsonResponse } from '../../../../cloudflare/junior-questions.js';
 import { adminStudentGetGuard, adminStudentPostGuard } from '../../../../cloudflare/junior-student-admin.js';
 import {
   normalizeStudentId, makeTemporaryPassword, makePasswordRecord, limitedStudentBody,
+  passwordProcessingUnavailable,
 } from '../../../../cloudflare/junior-student-auth.js';
 
 // Available only on the separate Access-protected admin Pages project.
@@ -29,7 +30,9 @@ export async function onRequestPost(context) {
     return jsonResponse({ok:false,error:'生徒IDまたは表示名が不正です。'},400);
   }
   const tempPassword=makeTemporaryPassword();
-  const record=await makePasswordRecord(tempPassword);
+  let record;
+  try { record=await makePasswordRecord(tempPassword); }
+  catch (error) { return passwordProcessingUnavailable(error); }
   const now=Date.now();
   try {
     await context.env.JUNIOR_DB.prepare(

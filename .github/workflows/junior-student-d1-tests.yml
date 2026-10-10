@@ -1,20 +1,25 @@
-name: Junior student login D1 tests
+name: Junior student learning pilot tests
 on:
   push:
     branches:
       - feature/junior-student-auth-d1-20261009
+      - feature/junior-learning-dashboard-pilot-20261010
   pull_request:
     paths:
-      - 'cloudflare/junior-student-*'
-      - 'functions/api/student/**'
-      - 'functions/api/admin/students/**'
+      - 'cloudflare/**'
+      - 'functions/**'
+      - 'admin/junior-students/**'
+      - 'study-app/junior-student-*.js'
+      - 'scripts/*junior*'
       - 'migrations/d1-junior/**'
-      - 'tests/junior_student_d1.test.mjs'
+      - 'tests/junior*'
+      - 'tests/fixtures/junior*'
+      - 'package*.json'
       - '.github/workflows/junior-student-d1-tests.yml'
 permissions:
   contents: read
 jobs:
-  student-d1:
+  student-learning:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -23,12 +28,16 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Run auth and D1 SQLite integration tests
-        run: node --test tests/junior_student_d1.test.mjs
-      - name: Existing R2 and static app regression tests
-        run: |
-          node scripts/build-static-junior.js
-          node --test tests/static_junior_build.test.js tests/junior_excel_upload.test.mjs
-      - name: Verify Cloudflare Pages Functions compile
-        run: npx --yes wrangler@4 pages functions build functions --outfile /tmp/junior-student-functions.js
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements.txt
+      - name: Install existing Excel test dependency
+        run: python -m pip install -r tools/requirements.txt
+      - run: npm ci
+      - run: npm run test:junior
+      - name: Verify original study app and Render regression tests
+        run: npm test

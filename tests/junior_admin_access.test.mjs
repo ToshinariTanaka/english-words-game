@@ -1,0 +1,222 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import { accessConfig, verifyAccessJWT } from '../cloudflare/admin-access-auth.js';
+import { rejectUnauthenticatedAdminMutation } from '../cloudflare/admin-mutation-guard.js';
+import { onRequest as middleware } from '../cloudflare/junior-admin-middleware.js';
+import { adminHTML, adminJS, build } from '../scripts/build-junior-admin.js';
+
+const team='https://up-juku.cloudflareaccess.com';
+const aud='1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef';
+const mail='operator@example.com';
+const config=accessConfig({CF_ACCESS_TEAM_DOMAIN:team,CF_ACCESS_AUD:aud,ADMIN_ALLOWED_EMAILS:mail});
+const base='https://admin.pages.dev';
+
+async function signedJWT(overrides={},changeSigningKey=null) {
+  const pair=await crypto.subtle.generateKey({
+    name:'RSASSA-PKCS1-v1_5',modulusLength:2048,
+    publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256',
+  },true,['sign','verify']);
+  const pub=await crypto.subtle.exportKey('jwk',pair.publicKey);
+  const kid='test-jwk-kid';
+  const h=Buffer.from(JSON.stringify({alg:'RS256',kid,typ:'JWT'})).toString('base64url');
+  const now=Math.floor(Date.now()/1000);
+  const p=Buffer.from(JSON.stringify({
+    iss:team,aud:[aud],email:mail,sub:'test-subject',iat:now-10,exp:now+3600,...overrides,
+  })).toString('base64url');
+  const sig=await crypto.subtle.sign('RSASSA-PKCS1-v1_5', changeSigningKey || pair.privateKey,
+    new TextEncoder().encode(h+'.'+p));
+  const token=h+'.'+p+'.'+Buffer.from(sig).toString('base64url');
+  const fetchJwks=async(url)=>({
+    ok:url===team+'/cdn-cgi/access/certs',
+    json:async()=>({keys:[{...pub,kid,alg:'RS256',use:'sig'}]}),
+  });
+  return {token,fetchJwks,publicJwk:{...pub,kid,alg:'RS256',use:'sig'}};
+}
+function accessRequest(token='') {
+  return new Request(base+'/',{headers:token?{'Cf-Access-Jwt-Assertion':token}:{}});
+}
+
+test('admin project build contains no upload token and protects every path',()=>{
+  const root=path.resolve(import.meta.dirname,'..');
+  const inputHTML=fs.readFileSync(path.join(root,'admin/junior-data/index.html'),'utf8');
+  const inputJS=fs.readFileSync(path.join(root,'admin/junior-data/script.js'),'utf8');
+  build();
+  assert.equal(fs.readFileSync(path.join(root,'admin/junior-data/index.html'),'utf8'),inputHTML);
+  assert.equal(fs.readFileSync(path.join(root,'admin/junior-data/script.js'),'utf8'),inputJS);
+  const out=path.join(root,'dist-junior-admin');
+  const html=fs.readFileSync(path.join(out,'index.html'),'utf8');
+  const js=fs.readFileSync(path.join(out,'script.js'),'utf8');
+  assert.doesNotMatch(html, /id="token"|管理者専用トークン/);
+  assert.doesNotMatch(js, /['"]Authorization['"]|Bearer |getElementById\(['"]token['"]\)|\$\(['"]token['"]\)/);
+  assert.match(html,/64文字の認証キーの入力は不要/);
+  assert.match(html,/https:\/\/up-junior-words-preview\.pages\.dev\//);
+  assert.doesNotThrow(()=>new vm.Script(js.replace(/^import [^\n]+\n/,''),
+    {filename:'admin-script.js'}));
+  const routes=JSON.parse(fs.readFileSync(path.join(out,'_routes.json'),'utf8'));
+  assert.deepEqual(routes,{version:1,include:['/*'],exclude:[]});
+  assert.equal(fs.existsSync(path.join(out,'parser.mjs')),true);
+  assert.throws(()=>adminJS('broken'),/source drift/);
+  assert.throws(()=>adminHTML('broken'),/source drift/);
+});
+
+test('rejects incomplete Access configuration rather than falling back to public access',()=>{
+  assert.equal(accessConfig({}),null);
+  assert.equal(accessConfig({CF_ACCESS_TEAM_DOMAIN:'http://up-juku.cloudflareaccess.com',
+    CF_ACCESS_AUD:aud,ADMIN_ALLOWED_EMAILS:mail}),null);
+  assert.equal(accessConfig({CF_ACCESS_TEAM_DOMAIN:team,CF_ACCESS_AUD:aud,
+    ADMIN_ALLOWED_EMAILS:'*@example.com'}),null);
+  assert.equal(accessConfig({CF_ACCESS_TEAM_DOMAIN:team,CF_ACCESS_AUD:aud,
+    ADMIN_ALLOWED_EMAILS:mail})?.allowedEmails.has(mail),true);
+});
+
+test('validates a genuine signed Cloudflare Access-style JWT',async()=>{
+  const {token,fetchJwks}=await signedJWT();
+  const identity=await verifyAccessJWT(accessRequest(token),config,fetchJwks);
+  assert.equal(identity?.email,mail);
+  assert.equal(identity?.subject,'test-subject');
+});
+
+test('accepts cryptographically verified Access cookie if JWT assertion header is absent',async()=>{
+  const {token,fetchJwks}=await signedJWT();
+  const req=new Request(base+'/',{headers:{Cookie:'other=value; CF_Authorization='+token}});
+  assert.equal((await verifyAccessJWT(req,config,fetchJwks))?.email,mail);
+  const forged=new Request(base+'/',{headers:{Cookie:'CF_Authorization='+token.slice(0,-2)+'aa'}});
+  assert.equal(await verifyAccessJWT(forged,config,fetchJwks),null);
+});
+
+test('blocks untrusted identity, signature, issuer, audience and expired JWT',async()=>{
+  let v=await signedJWT({email:'somebody@example.com'});
+  assert.equal(await verifyAccessJWT(accessRequest(v.token),config,v.fetchJwks),null);
+  v=await signedJWT({iss:'https://attacker.cloudflareaccess.com'});
+  assert.equal(await verifyAccessJWT(accessRequest(v.token),config,v.fetchJwks),null);
+  v=await signedJWT({aud:['wrong-aud']});
+  assert.equal(await verifyAccessJWT(accessRequest(v.token),config,v.fetchJwks),null);
+  v=await signedJWT({exp:Math.floor(Date.now()/1000)-10});
+  assert.equal(await verifyAccessJWT(accessRequest(v.token),config,v.fetchJwks),null);
+  v=await signedJWT();
+  const [jwtHeader,jwtPayload,jwtSignature]=v.token.split('.');
+  const tamperedPayload=Buffer.from(JSON.stringify({iss:team,aud:[aud],email:mail,sub:'tampered',exp:Math.floor(Date.now()/1000)+300})).toString('base64url');
+  assert.equal(await verifyAccessJWT(accessRequest([jwtHeader,tamperedPayload,jwtSignature].join('.')),config,v.fetchJwks),null);
+  assert.equal(await verifyAccessJWT(accessRequest(),config,v.fetchJwks),null);
+});
+
+test('diagnostics disclose fixed rejection reason without JWT, email, or AUD',async()=>{
+  const original=console.warn;
+  const messages=[];
+  console.warn=(...args)=>messages.push(args.map(String).join(' '));
+  try {
+    const missing=await verifyAccessJWT(accessRequest(),config);
+    assert.equal(missing,null);
+    const {token,fetchJwks}=await signedJWT({email:'other@example.com'});
+    const invalid=await verifyAccessJWT(accessRequest(token),config,fetchJwks);
+    assert.equal(invalid,null);
+    assert.deepEqual(messages,[
+      'junior_admin_access_denied jwt_missing_header_and_cookie',
+      'junior_admin_access_denied email_missing_or_not_allowed',
+    ]);
+    for(const message of messages){
+      assert.doesNotMatch(message,/other@example.com|operator@example.com/);
+      assert.equal(message.includes(aud),false);
+      assert.equal(message.includes(token),false);
+    }
+  } finally {
+    console.warn=original;
+  }
+});
+
+test('JWT diagnostics pinpoint exceptions without exposing private values',async()=>{
+  const original=console.warn;
+  const emitted=[];
+  console.warn=(...args)=>emitted.push(args.map(String).join(' '));
+  try {
+    const {token}=await signedJWT();
+    const req=accessRequest(token);
+    assert.equal(await verifyAccessJWT(req,config,async()=>{throw new Error('sensitive network exception');}),null);
+    assert.equal(await verifyAccessJWT(req,config,async()=>({ok:true,
+      json:async()=>{throw new Error('sensitive cert parse exception');}})),null);
+    const brokenJwk=async()=>({ok:true,json:async()=>({keys:[{
+      kid:'test-jwk-kid',kty:'RSA',alg:'RS256',use:'sig',n:'%%%invalid',e:'AQAB',
+    }]})});
+    assert.equal(await verifyAccessJWT(req,config,brokenJwk),null);
+    assert.deepEqual(emitted,[
+      'junior_admin_access_denied jwks_fetch_exception',
+      'junior_admin_access_denied jwks_response_parse_exception',
+      'junior_admin_access_denied jwt_signature_invalid',
+    ]);
+    for(const message of emitted) {
+      assert.equal(message.includes(token),false);
+      assert.equal(message.includes(aud),false);
+      assert.equal(message.includes(mail),false);
+      assert.equal(message.includes('sensitive'),false);
+    }
+  } finally {
+    console.warn=original;
+  }
+});
+
+test('offline public JWKS snapshot permits only valid, fresh, signed Access identities',async()=>{
+  const {token,publicJwk}=await signedJWT();
+  const ts=Date.now();
+  const snapshot={issuer:team,fetchedAt:new Date(ts).toISOString(),keys:[publicJwk]};
+  const offline=async()=>{throw new Error('simulated Cloudflare edge fetch failure');};
+  const original=console.warn, messages=[];
+  console.warn=(...args)=>messages.push(args.map(String).join(' '));
+  try {
+    const valid=await verifyAccessJWT(accessRequest(token),config,offline,ts,snapshot);
+    assert.equal(valid?.email,mail);
+
+    const wrongIssuer={...snapshot,issuer:'https://wrong.cloudflareaccess.com'};
+    assert.equal(await verifyAccessJWT(accessRequest(token),config,offline,ts,wrongIssuer),null);
+
+    const stale={...snapshot,fetchedAt:new Date(ts-31*24*60*60*1000).toISOString()};
+    assert.equal(await verifyAccessJWT(accessRequest(token),config,offline,ts,stale),null);
+
+    const [head,body,signature]=token.split('.');
+    const corruptedPayload=Buffer.from(JSON.stringify({
+      iss:team,aud:[aud],email:mail,sub:'forged-user',
+      iat:Math.floor(ts/1000)-10,exp:Math.floor(ts/1000)+3600,
+    })).toString('base64url');
+    assert.equal(await verifyAccessJWT(
+      accessRequest([head,corruptedPayload,signature].join('.')),config,offline,ts,snapshot),null);
+    assert.ok(messages.includes('junior_admin_access_public_jwks_snapshot_used'));
+    for(const message of messages){
+      assert.equal(message.includes(token),false);
+      assert.equal(message.includes(mail),false);
+      assert.equal(message.includes(aud),false);
+    }
+  } finally {
+    console.warn=original;
+  }
+});
+
+test('missing Access JWT or settings blocks the entire admin page',async()=>{
+  const deny=await middleware({request:accessRequest(),env:{
+    CF_ACCESS_TEAM_DOMAIN:team,CF_ACCESS_AUD:aud,ADMIN_ALLOWED_EMAILS:mail,
+  },data:{},next:()=>new Response('private content')});
+  assert.equal(deny.status,403);
+  const missing=await middleware({request:accessRequest(),env:{},
+    data:{},next:()=>new Response('private content')});
+  assert.equal(missing.status,503);
+});
+
+test('staging and publication write APIs require middleware identity and same-origin',()=>{
+  const env={JUNIOR_DATA:{}};
+  const valid=new Request(base+'/api/admin/questions/publish',{
+    method:'POST',headers:{Origin:base,'Content-Type':'application/json'},
+    body:'{}',
+  });
+  assert.equal(rejectUnauthenticatedAdminMutation({request:valid,env,data:{}})?.status,403);
+  assert.equal(rejectUnauthenticatedAdminMutation({request:valid,env,data:{
+    verifiedAdminEmail:mail,
+  }}),null);
+  const evil=new Request(base+'/api/admin/questions/publish',{
+    method:'POST',headers:{Origin:'https://attacker.test','Content-Type':'application/json'},
+    body:'{}',
+  });
+  assert.equal(rejectUnauthenticatedAdminMutation({
+    request:evil,env,data:{verifiedAdminEmail:mail},
+  })?.status,403);
+});

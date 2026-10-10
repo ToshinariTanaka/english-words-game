@@ -42,7 +42,7 @@ function rewriteJavaScript(js) {
   js = replaceExactlyOnce(
     js,
     'async function loadAppVariantConfig() {',
-    "async function loadAppVariantConfig() {\n  if (STATIC_JUNIOR_PREVIEW) {\n    return applyAppVariantConfig({variant: 'junior-static-preview', title: '中学生英単語アプリ（試験版）', subtitle: '4モード・静的配信の動作確認'});\n  }",
+    "async function loadAppVariantConfig() {\n  if (STATIC_JUNIOR_PREVIEW) {\n    await window.UpJuniorStudent?.ready;\n    return applyAppVariantConfig({variant: 'junior-static-preview', title: '中学生英単語アプリ（試験版）', subtitle: '4モード・静的配信の動作確認'});\n  }",
     'local-only app config',
   );
   js = replaceExactlyOnce(
@@ -103,6 +103,11 @@ function rewriteJavaScript(js) {
     '  updateLearningStat(current, isCorrect);',
     "  updateLearningStat(current, isCorrect);\n  if (STATIC_JUNIOR_PREVIEW) window.UpJuniorStudent?.recordAnswer({mode:state.mode,questionKey:current.questionKey||current.id,correct:isCorrect});",
     'answer log hook');
+  // Local practice statistics also belong to the signed-in student on shared devices.
+  // Existing anonymous history remains untouched in its original storage key.
+  js = js.replace(/localStorage\.(getItem|setItem|removeItem)\((LEARNING_STATS_STORAGE_KEY|STUDY_COUNTS_STORAGE_KEY)/g,
+    (_,method,key) => 'localStorage.'+method+'('+key+" + (window.UpJuniorStudent?.studentId ? ':' + window.UpJuniorStudent.studentId : '')");
+  js += "\nwindow.addEventListener('up-junior-student-changed', () => { void loadMode(state.mode); });\n";
   return js;
 }
 
@@ -125,6 +130,7 @@ function rewriteHtml(html) {
     '    <section class="junior-student-login" id="juniorStudentPanel" aria-label="学習記録用の生徒ログイン">\n'+
     '      <h2>生徒ログイン（学習履歴の共有・試験中）</h2>\n'+
     '      <p id="juniorStudentStatus" role="status">ログイン状態を確認中です。</p>\n'+
+    '      <p id="juniorStudentSyncStatus" role="status" aria-live="polite">未送信記録は端末内に保存し、自動再送します。</p>\n'+
     '      <div id="juniorStudentLoginFields">\n'+
     '        <label>生徒ID <input id="juniorStudentId" autocomplete="username" maxlength="24"></label>\n'+
     '        <label>パスワード <input id="juniorStudentPassword" type="password" autocomplete="current-password"></label>\n'+
@@ -142,12 +148,13 @@ function rewriteHtml(html) {
     '    </section>', 'student login section');
   html = replaceExactlyOnce(html,
     '  <script src="./script.js"></script>',
-    '  <script src="./script.js"></script>\n  <script src="./junior-student-sync.js"></script>',
+    '  <script src="./junior-student-queue.js"></script>\n  <script src="./junior-student-sync.js"></script>\n  <script src="./script.js"></script>',
     'student session UI script');
   return html;
 }
 
 function build() {
+  fs.writeFileSync(path.join(ROOT, 'cloudflare', 'junior-site-role.js'), "export const SITE_ROLE = 'student';\n");
   if (!fs.existsSync(path.join(SOURCE, 'index.html'))) {
     throw new Error('Cannot locate study-app sources.');
   }
@@ -168,6 +175,7 @@ function build() {
 
   fs.writeFileSync(path.join(OUTPUT, 'index.html'), html);
   fs.writeFileSync(path.join(OUTPUT, 'script.js'), js);
+  fs.copyFileSync(path.join(SOURCE, 'junior-student-queue.js'), path.join(OUTPUT, 'junior-student-queue.js'));
   fs.copyFileSync(path.join(SOURCE, 'junior-student-sync.js'), path.join(OUTPUT, 'junior-student-sync.js'));
   fs.writeFileSync(path.join(OUTPUT, 'style.css'), css);
   fs.writeFileSync(path.join(OUTPUT, '_headers'), '/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Frame-Options: DENY\n');

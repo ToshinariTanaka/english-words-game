@@ -2,6 +2,8 @@
 // All identifiers are pseudonymous IDs; do not store plaintext passwords.
 // PBKDF2-SHA256 and HttpOnly host-scoped session cookies need Web Crypto only.
 import { jsonResponse } from './junior-questions.js';
+import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 export const COOKIE_NAME = '__Host-up_junior_session';
 export const SESSION_SECONDS = 14 * 24 * 60 * 60;
@@ -29,11 +31,26 @@ export function validatePassword(password) {
     && encoder.encode(password).byteLength <= 256 && !/[\u0000-\u001f\u007f]/.test(password);
 }
 async function pbkdf2(password, saltBytes, iterations) {
-  const inputKey = await crypto.subtle.importKey('raw', encoder.encode(password),
-    { name: 'PBKDF2' }, false, ['deriveBits']);
-  return new Uint8Array(await crypto.subtle.deriveBits({
-    name: 'PBKDF2', salt: saltBytes, iterations, hash: 'SHA-256',
-  }, inputKey, 256));
+  const bytes = encoder.encode(password);
+  try {
+    const inputKey = await crypto.subtle.importKey('raw', bytes,
+      { name: 'PBKDF2' }, false, ['deriveBits']);
+    try {
+      return new Uint8Array(await crypto.subtle.deriveBits({
+        name: 'PBKDF2', salt: saltBytes, iterations, hash: 'SHA-256',
+      }, inputKey, 256));
+    } catch (error) {
+      if (!isHostedIterationLimit(error)) throw error;
+      // Hosted Workers cap native PBKDF2; local workerd does not. Use the
+      // identical algorithm/work factor, never silently weaken stored hashes.
+      // This remains subject to the account's CPU limit (including Free).
+      return await pbkdf2Async(sha256, bytes, saltBytes, {c:iterations,dkLen:32});
+    }
+  } finally { bytes.fill(0); }
+}
+function isHostedIterationLimit(error) {
+  return error?.name === 'NotSupportedError'
+    && /Pbkdf2.*iteration counts above \d+ are not supported/i.test(String(error.message));
 }
 export async function makePasswordRecord(password) {
   if (!validatePassword(password)) throw new Error('INVALID_PASSWORD');
@@ -43,6 +60,16 @@ export async function makePasswordRecord(password) {
     password_hash: hex(await pbkdf2(password, salt, PBKDF2_ITERATIONS)),
     password_iterations: PBKDF2_ITERATIONS,
   };
+}
+// Never expose raw crypto exceptions: vendor messages can contain input details.
+// Local workerd does not enforce every limit of hosted Cloudflare Workers.
+export function passwordProcessingUnavailable(error) {
+  const limited = isHostedIterationLimit(error);
+  return jsonResponse({
+    ok: false,
+    code: limited ? 'PASSWORD_KDF_LIMIT' : 'PASSWORD_KDF_UNAVAILABLE',
+    error: 'パスワードの安全な保存処理をこの実行環境で利用できません。管理者による設定の確認が必要です。',
+  }, 503);
 }
 function equalFixedBytes(left, right) {
   if (!(left instanceof Uint8Array) || !(right instanceof Uint8Array) || left.length !== right.length) return false;

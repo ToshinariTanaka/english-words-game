@@ -70,19 +70,25 @@ test('セッショントークンはランダムで、保存用ハッシュとCS
   assert.notEqual(first.csrfToken, first.token);
 });
 
-test('本番CookieはHttpOnly・Secure・SameSite・30日相当の期限を持つ', () => {
+test('本番CookieはHttpOnly・Secure・SameSite・30日相当の期限を持つ', (t) => {
+  // Freeze the clock so setup and serialization cannot straddle a millisecond.
+  t.mock.method(Date, 'now', () => Date.UTC(2026, 9, 10));
   const previous = process.env.NODE_ENV;
   process.env.NODE_ENV = 'production';
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  const cookies = sessionCookies('member', {
-    token: 'raw-session-token', csrfToken: 'csrf-token', expiresAt,
-  });
-  process.env.NODE_ENV = previous;
-  assert.match(cookies[0], /HttpOnly/);
-  assert.match(cookies[0], /Secure/);
-  assert.match(cookies[0], /SameSite=Lax/);
-  assert.match(cookies[0], /Max-Age=2592\d{3}/);
-  assert.doesNotMatch(cookies[1], /HttpOnly/);
+  try {
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const cookies = sessionCookies('member', {
+      token: 'raw-session-token', csrfToken: 'csrf-token', expiresAt,
+    });
+    assert.match(cookies[0], /HttpOnly/);
+    assert.match(cookies[0], /Secure/);
+    assert.match(cookies[0], /SameSite=Lax/);
+    assert.match(cookies[0], /(?:^|; )Max-Age=2592000(?:;|$)/);
+    assert.doesNotMatch(cookies[1], /HttpOnly/);
+  } finally {
+    if (previous === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previous;
+  }
 });
 
 test('CSRFのOrigin検証は同一オリジンだけを許可する', () => {
