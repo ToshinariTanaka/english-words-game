@@ -6,6 +6,7 @@ import { onRequestPost as stageMode } from '../functions/api/admin/questions/sta
 import { onRequestPost as publish } from '../functions/api/admin/questions/publish.js';
 import { onRequestGet as getQuestions } from '../functions/api/questions/current.js';
 import { onRequestGet as getStatus } from '../functions/api/questions/status.js';
+import { SITE_ROLE } from '../cloudflare/junior-site-role.js';
 
 const SHEETS = { word:'★英単語', chunk:'★チャンク', phrase:'★文節和訳', definition:'★英文和訳' };
 const PREFIXES = { word:'w', chunk:'c', phrase:'p', definition:'s' };
@@ -125,14 +126,18 @@ test('stages 4 modes, publishes one manifest and streams questions to students',
   assert.equal(bucket.store.get(MANIFEST_KEY).text,oldManifest);
 });
 
-test('unauthenticated Access identity and cross-site requests never write R2 data',async()=>{
+test('unauthorized uploads and cross-site requests never write R2 data in either build',async()=>{
   const bucket=new MemoryR2(),env=envFor(bucket),id=crypto.randomUUID();
   const data=prepareWorkbook(fixture(),'a1a2',converter);
   const row=data.modes.word;
   const input={ok:true,mode:'word',rows:row,count:row.length};
   const headers={'X-Release-Id':id,'X-Filter':'a1a2','X-Row-Count':String(row.length)};
-  const missingIdentity=await stageMode({...context(env,'/api/admin/questions/stage/word',input,{authenticated:false,headers}),params:{mode:'word'}});
-  assert.equal(missingIdentity.status,403);
+  // Admin builds must reject even a valid legacy token without Access identity.
+  // Student builds retain the existing token-based upload compatibility.
+  const denied=await stageMode({...context(env,'/api/admin/questions/stage/word',input,{
+    authenticated:false,token:SITE_ROLE==='admin'?TOKEN:'wrong',headers,
+  }),params:{mode:'word'}});
+  assert.equal(denied.status,SITE_ROLE==='admin'?403:401);
   const badOrigin=await stageMode({...context(env,'/api/admin/questions/stage/word',input,{origin:'https://evil.example',headers}),params:{mode:'word'}});
   assert.equal(badOrigin.status,403);
   const missingStorage=await publish(context({},'/api/admin/questions/publish',{

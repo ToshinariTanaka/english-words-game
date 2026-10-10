@@ -1,22 +1,14 @@
-import { accessConfig, verifyAccessJWT, authenticationFailure } from '../cloudflare/admin-access-auth.js';
+import { SITE_ROLE } from '../cloudflare/junior-site-role.js';
+import { onRequest as adminMiddleware } from '../cloudflare/junior-admin-middleware.js';
+import { jsonResponse } from '../cloudflare/junior-questions.js';
 
-// Runs for EVERY request on the separate administrator Pages project.
-// dist-junior-admin/_routes.json must include "/*" with no exclusions.
-// A missing or invalid Access setup fails closed, including static files.
-export async function onRequest({ request, env, data, next }) {
-  const config = accessConfig(env);
-  if (!config) {
-    console.warn('junior_admin_access_denied', 'config_invalid');
-    return authenticationFailure(503);
+// Build-time constant, never a browser header. Unknown builds fail closed.
+export async function onRequest(context) {
+  if (SITE_ROLE === 'admin') return adminMiddleware(context);
+  if (SITE_ROLE !== 'student') return jsonResponse({ok:false,error:'サイト設定を確認してください。'},503);
+  delete context.data.verifiedAdminEmail;
+  if (new URL(context.request.url).pathname.startsWith('/api/admin/students')) {
+    return jsonResponse({ok:false,error:'管理者専用サイトを利用してください。'},403);
   }
-  const identity = await verifyAccessJWT(request, config);
-  if (!identity) return authenticationFailure(403);
-  data.verifiedAdminEmail = identity.email;
-  const response = await next();
-  const headers = new Headers(response.headers);
-  headers.set('Cache-Control', 'private, no-store, max-age=0');
-  headers.set('X-Frame-Options', 'DENY');
-  headers.set('X-Content-Type-Options', 'nosniff');
-  headers.set('Referrer-Policy', 'no-referrer');
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  return context.next();
 }

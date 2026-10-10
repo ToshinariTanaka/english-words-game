@@ -1,13 +1,14 @@
+import { SITE_ROLE } from '../../../../cloudflare/junior-site-role.js';
+import { rejectUnauthenticatedAdminMutation } from '../../../../cloudflare/admin-mutation-guard.js';
 import {
-  jsonResponse, readManifest, limitedJsonBody, MANIFEST_KEY,
+  jsonResponse, rejectRequest, readManifest, limitedJsonBody, MANIFEST_KEY,
   MODES, VERSION_RE, versionObjectKey,
 } from '../../../../cloudflare/junior-questions.js';
-import { rejectUnauthenticatedAdminMutation } from '../../../../cloudflare/admin-mutation-guard.js';
 
 // Commit four previously staged mode JSON objects by updating only the manifest.
 // This endpoint handles just small metadata, making it suitable for Workers Free.
 export async function onRequestPost({ request, env, data }) {
-  const rejected = rejectUnauthenticatedAdminMutation({ request, env, data });
+  const rejected = SITE_ROLE === 'admin' ? rejectUnauthenticatedAdminMutation({request,env,data}) : rejectRequest(request, env);
   if (rejected) return rejected;
 
   let input;

@@ -9,6 +9,12 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const source = path.join(root, 'admin', 'junior-data');
 const output = path.join(root, 'dist-junior-admin');
+const productionStudentUrl = 'https://up-junior-words-preview.pages.dev/';
+function studentUrl() {
+  return process.env.CF_PAGES_BRANCH === 'feature/junior-learning-dashboard-pilot-20261010'
+    ? 'https://feature-junior-learning-dash.up-junior-words-preview.pages.dev/'
+    : productionStudentUrl;
+}
 
 function once(text, original, replacement, label) {
   const start = text.indexOf(original);
@@ -30,7 +36,7 @@ function adminHTML(html) {
     '      <p class="note">認証済みの管理者として操作できます。64文字の認証キーの入力は不要です。</p>\n',
     'remove secret input');
   html = once(html,'<p><a href="../../">学習画面を開く</a></p>',
-    '<p><a href="https://up-junior-words-preview.pages.dev/" target="_blank" rel="noopener noreferrer">公開中の学習画面を開く</a></p>',
+    '<p><a href="'+studentUrl()+'" target="_blank" rel="noopener noreferrer">学習画面を開く</a></p>',
     'link to public student site');
   return html;
 }
@@ -54,11 +60,16 @@ function adminJS(js) {
 }
 
 function build() {
+  fs.writeFileSync(path.join(root, 'cloudflare', 'junior-site-role.js'), "export const SITE_ROLE = 'admin';\n");
   fs.rmSync(output, { recursive: true, force: true });
   fs.mkdirSync(output, { recursive: true });
   const html = adminHTML(fs.readFileSync(path.join(source, 'index.html'), 'utf8'));
   const script = adminJS(fs.readFileSync(path.join(source, 'script.js'), 'utf8'));
-  fs.writeFileSync(path.join(output, 'index.html'), html);
+  fs.writeFileSync(path.join(output, 'index.html'), html.replace('<body>', '<body><nav class="learning-nav"><a href="/students/">生徒管理・学習ダッシュボード →</a></nav>'));
+  fs.cpSync(path.join(root, 'admin', 'junior-students'), path.join(output, 'students'), { recursive: true });
+  const studentIndex = path.join(output, 'students', 'index.html');
+  fs.writeFileSync(studentIndex, once(fs.readFileSync(studentIndex, 'utf8'),
+    productionStudentUrl, studentUrl(), 'dashboard student link'));
   fs.writeFileSync(path.join(output, 'script.js'), script);
   for (const file of ['style.css', 'parser.mjs']) {
     fs.copyFileSync(path.join(source, file), path.join(output, file));
