@@ -1,6 +1,6 @@
 import { jsonResponse } from '../../../../cloudflare/junior-questions.js';
 import { adminStudentPostGuard } from '../../../../cloudflare/junior-student-admin.js';
-import { normalizeStudentId,limitedStudentBody,makeTemporaryPassword,makePasswordRecord } from '../../../../cloudflare/junior-student-auth.js';
+import { normalizeStudentId,limitedStudentBody,makeTemporaryPassword,makePasswordRecord,passwordProcessingUnavailable } from '../../../../cloudflare/junior-student-auth.js';
 
 export async function onRequestPost(context) {
   const rejected=adminStudentPostGuard(context);
@@ -11,7 +11,9 @@ export async function onRequestPost(context) {
   const id=normalizeStudentId(body.studentId);
   if (!id) return jsonResponse({ok:false,error:'生徒IDが不正です。'},400);
   const now=Date.now(), password=makeTemporaryPassword();
-  const record=await makePasswordRecord(password);
+  let record;
+  try { record=await makePasswordRecord(password); }
+  catch (error) { return passwordProcessingUnavailable(error); }
   try {
     const update=context.env.JUNIOR_DB.prepare(
       'UPDATE junior_students SET password_salt=?,password_hash=?,password_iterations=?,must_change_password=1,failed_login_count=0,locked_until_ms=0,updated_at_ms=? WHERE student_id=?'

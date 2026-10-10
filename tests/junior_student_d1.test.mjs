@@ -110,6 +110,37 @@ test('only Access-verified staff can provision, reset or list student accounts',
   const duplicate=await adminCreate(ctx('/api/admin/students',{body:{studentId:'U0001'},db,base:adminOrigin,data:adminData}));
   assert.equal(duplicate.status,409);
 });
+test('hosted PBKDF2 limits fail closed with JSON and never change accounts or sessions',async(t)=>{
+  const db=memoryD1();
+  const password=await createByAdmin(db);
+  const login=await studentLogin(ctx('/api/student/login',{body:{studentId:'U0001',password},db}));
+  assert.equal(login.status,200);
+  const beforeStudents=db.raw.prepare('SELECT * FROM junior_students').all();
+  const beforeSessions=db.raw.prepare('SELECT * FROM junior_sessions').all();
+  t.mock.method(crypto.subtle,'deriveBits',()=>{
+    throw new DOMException('Pbkdf2 failed: iteration counts above 100000 are not supported (requested 600000)','NotSupportedError');
+  });
+  for(const [handler,id] of [[adminCreate,'U0002'],[adminReset,'U0001']]) {
+    const response=await handler(ctx('/api/admin/students',{body:{studentId:id},db,base:adminOrigin,data:adminData}));
+    assert.equal(response.status,503);
+    const body=await response.json();
+    assert.equal(body.code,'PASSWORD_KDF_LIMIT');
+    assert.equal(body.temporaryPassword,undefined);
+    assert.doesNotMatch(JSON.stringify(body),/600000|100000|NotSupportedError/);
+  }
+  assert.deepEqual(db.raw.prepare('SELECT * FROM junior_students').all(),beforeStudents);
+  assert.deepEqual(db.raw.prepare('SELECT * FROM junior_sessions').all(),beforeSessions);
+});
+test('unexpected crypto errors are sanitized without reporting an unsupported-iteration diagnosis',async(t)=>{
+  const db=memoryD1();
+  t.mock.method(crypto.subtle,'deriveBits',()=>{throw new Error('private crypto failure details');});
+  const response=await adminCreate(ctx('/api/admin/students',{body:{studentId:'U0002'},db,base:adminOrigin,data:adminData}));
+  assert.equal(response.status,503);
+  const body=await response.json();
+  assert.equal(body.code,'PASSWORD_KDF_UNAVAILABLE');
+  assert.doesNotMatch(JSON.stringify(body),/private crypto failure details/);
+  assert.equal(db.raw.prepare('SELECT COUNT(*) AS n FROM junior_students').get().n,0);
+});
 test('student logs in with ID and password, changes temporary password, records idempotent attempts',async()=>{
   const db=memoryD1();
   const temp=await createByAdmin(db);

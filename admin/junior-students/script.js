@@ -14,7 +14,11 @@
   async function api(path,body) {
     const r=await fetch('/api/admin/students'+path,{method:body===undefined?'GET':'POST',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(20000)});
     let data;try{data=await r.json();}catch{throw new Error('管理者認証が切れているか、サーバーに接続できません。ページを再読み込みしてください。');}
-    if(!r.ok||!data.ok)throw new Error(data.error||'操作できませんでした。');return data;
+    if(!r.ok||!data.ok){
+      // Fixed diagnostic identifiers only; never log response bodies or passwords.
+      if(['PASSWORD_KDF_LIMIT','PASSWORD_KDF_UNAVAILABLE'].includes(data.code))console.warn('Junior password processing: '+data.code);
+      throw new Error(data.error||'操作できませんでした。');
+    }return data;
   }
   function metrics(target,items) {const box=$(target);box.replaceChildren();for(const [label,value]of items){const card=el('div',undefined,'metric');card.append(el('span',label,'label'),el('strong',value));box.append(card);}}
   function empty(body,cols,text){const tr=el('tr');const td=el('td',text,'empty');td.colSpan=cols;tr.append(td);body.append(tr);}

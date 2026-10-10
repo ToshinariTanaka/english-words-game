@@ -44,6 +44,17 @@ export async function makePasswordRecord(password) {
     password_iterations: PBKDF2_ITERATIONS,
   };
 }
+// Never expose raw crypto exceptions: vendor messages can contain input details.
+// Local workerd does not enforce every limit of hosted Cloudflare Workers.
+export function passwordProcessingUnavailable(error) {
+  const limited = error?.name === 'NotSupportedError'
+    && /Pbkdf2.*iteration counts above \d+ are not supported/i.test(String(error.message));
+  return jsonResponse({
+    ok: false,
+    code: limited ? 'PASSWORD_KDF_LIMIT' : 'PASSWORD_KDF_UNAVAILABLE',
+    error: 'パスワードの安全な保存処理をこの実行環境で利用できません。管理者による設定の確認が必要です。',
+  }, 503);
+}
 function equalFixedBytes(left, right) {
   if (!(left instanceof Uint8Array) || !(right instanceof Uint8Array) || left.length !== right.length) return false;
   let mismatch = 0;
