@@ -11,6 +11,8 @@ on:
       - 'scripts/build-static-junior.js'
       - 'tests/junior_excel_upload.test.mjs'
       - 'tests/static_junior_build.test.js'
+      - 'package*.json'
+      - '.github/workflows/junior-excel-upload-tests.yml'
 permissions:
   contents: read
 jobs:
@@ -20,7 +22,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
+          cache: npm
+      - run: npm ci
       - run: node scripts/build-static-junior.js
       - run: node --test tests/static_junior_build.test.js tests/junior_excel_upload.test.mjs
-      - run: npx --yes wrangler@4 pages functions build functions --outfile /tmp/up-junior-pages-functions.js
+      - run: node node_modules/wrangler/bin/wrangler.js pages functions build functions --outfile /tmp/up-junior-pages-functions.js
