@@ -1,0 +1,43 @@
+name: Junior student learning pilot tests
+on:
+  push:
+    branches:
+      - feature/junior-student-auth-d1-20261009
+      - feature/junior-learning-dashboard-pilot-20261010
+  pull_request:
+    paths:
+      - 'cloudflare/**'
+      - 'functions/**'
+      - 'admin/junior-students/**'
+      - 'study-app/junior-student-*.js'
+      - 'scripts/*junior*'
+      - 'migrations/d1-junior/**'
+      - 'tests/junior*'
+      - 'tests/fixtures/junior*'
+      - 'package*.json'
+      - '.github/workflows/junior-student-d1-tests.yml'
+permissions:
+  contents: read
+jobs:
+  student-learning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements.txt
+      - name: Install existing Excel test dependency
+        run: python -m pip install -r tools/requirements.txt
+      - run: npm ci
+      - run: npm run test:junior
+      - name: Verify original study app and Render regression tests
+        run: npm test

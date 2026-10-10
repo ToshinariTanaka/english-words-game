@@ -7,3 +7,10 @@ npm-debug.log*
 .qa-bin/
 __pycache__/
 *.py[cod]
+
+dist-junior/
+dist-junior-admin/
+cloudflare/junior-site-role.js
+.wrangler/
+.qa/
+backups/
