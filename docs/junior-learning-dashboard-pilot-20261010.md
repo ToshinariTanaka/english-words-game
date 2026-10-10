@@ -51,7 +51,7 @@
 
 ローカル試験は実際のCloudflareアカウントの設定確認やスマートフォン実機試験の代替ではない。
 
-## Cloudflare側：2026-10-10 08:09（日本時間）の確認状況
+## Cloudflare側：2026-10-10 10:04（日本時間）の確認状況
 
 エージェントのCloudflare Dashboardはログイン画面の認証エラーで操作できない。以下は利用者が自身のEdgeで操作し、共有した画面を照合した結果。エージェントによる直接操作・実機試験の完了を意味しない。利用可能な連携の検索でもCloudflare用は見つからなかった。
 
@@ -61,17 +61,19 @@
 | 試験スキーマ | `junior_students`、`junior_sessions`、`junior_attempts` の3テーブルと名前付き4インデックスをSQLで確認。学習日時列と学習日時インデックスを含む |
 | 生徒Pages Preview | `JUNIOR_DB → up-junior-learning-pilot` の保存を確認 |
 | 管理者Pages Preview | `JUNIOR_DB → up-junior-learning-pilot` の保存を確認 |
-| 管理者Previewの環境変数 | `ADMIN_ALLOWED_EMAILS` と `CF_ACCESS_TEAM_DOMAIN` が設定画面に表示。ドメインの入力ミスを修正済み |
-| 管理者PreviewのAUD | Preview用Accessアプリからコピーした英数字が `CF_ACCESS_AUD` の入力欄に一致。最後の画面は保存前のため、保存完了は未確認 |
+| 管理者Previewの環境変数 | `ADMIN_ALLOWED_EMAILS`、`CF_ACCESS_TEAM_DOMAIN`、`CF_ACCESS_AUD` を保存して再デプロイ。既存の許可管理者で管理画面と集計APIの読み込み成功を確認 |
+| 管理者PreviewのAUD | Preview用AccessアプリのAUDを設定。再デプロイ後の署名・issuer・audience・許可メール検証を通過し、管理画面が表示された |
 | 管理者Previewの保護範囲 | Preview accessが有効。対応するAccessアプリが `*.up-junior-words-admin.pages.dev` を対象としていることを確認 |
-| Accessの許可ルール | Policiesの内容・許可メールとの一致は未確認 |
-| 管理者の試験版ビルド | PR #115のCloudflare公式botは `1f21c55` のPreviewデプロイ成功を報告。ただし今回のBinding・環境変数設定前のビルド。設定反映後の再デプロイ・動作は未確認 |
+| Accessの許可ルール | `Allow Members - Cloudflare Pages` はAllow／Include Emails。既存1件のメールとアプリ側設定を照合。適用先はこのPreviewアプリ1件 |
+| 管理者の試験版ビルド | Buildは `node scripts/build-junior-admin.js`／`dist-junior-admin`、Previewは全非本番ブランチが対象。設定反映後、コミット `1f21c55` のデプロイ `430d536e` が08:52に成功（Cloudflare公式botでも確認） |
+| 管理画面の実表示 | 09:45の利用者画面で `/students/`、集計API取得後の成功メッセージ、更新時刻、生徒0人・解答0問を確認。試験D1の読み込みが成功。実データを使った登録・学習試験はまだ未実施 |
+| 追加管理者2件 | 利用者の明示依頼により既存1件と合わせて計3件へ拡張中。Preview環境変数にカンマ区切りで入力（スクリーンショットでは末尾が省略）。Accessのポリシー編集後、10:04時点ではアプリ全体の最終Saveが残る画面。追加2件でのログインは未検証 |
 | 生徒の試験版ビルド | 画面共有時点で試験コミットは `No deployment available`。Previewブランチ制御・ビルド設定・公開状態の確認が必要 |
 | 既存環境 | 既存 `up-junior-learning` のデータ・スキーマ変更、本番ブランチ切替、R2教材更新、Render変更はこの手順では実施していない |
 
 試験DBはConsoleへ最終スキーマをまとめて入力して初期化した。`occurred_at_ms` は既に存在するため、この同じDBへ `0002_attempt_study_time.sql` のALTER TABLEをそのまま再実行しない。Wranglerのマイグレーション履歴はこの手動手順では登録していない。今後CLI管理に移す場合は実スキーマと履歴を照合する。
 
-認証の設定値、許可メールの実値、AUD、セッショントークンはこの報告へ記載しない。次の操作はAUD保存の確認とAccessのPolicies確認。その後に両PagesのPreviewビルド・教材読み出し設定を確認し、試験版を再デプロイする。オンラインのダミー登録、再送試験、CSV取得、実D1のバックアップ／復元はまだ未実施。
+認証の設定値、許可メールの実値、AUD、セッショントークンはこの報告へ記載しない。次の操作はAccessアプリ全体の保存を確定し、追加管理者設定を読み込むPreview再デプロイと追加メールでのログイン確認。この進捗更新は試験ブランチにのみコミットし、既存のPages Git連携からPreviewの再ビルドを開始する。本番へのマージはしない。その後、生徒PagesのPreviewブランチ制御・教材読み出し設定を確認する。オンラインのダミー登録、再送試験、CSV取得、実D1のバックアップ／復元はまだ未実施。
 
 当初の引き継ぎ情報（Production側での確認・変更は別途必要）：
 
@@ -121,7 +123,7 @@ Cloudflare公式資料：
 
 ## 本番前の残作業・運用上の限界
 
-- PreviewのD1 Binding保存と試験スキーマ作成は画面で確認済み。AUD保存完了・Access許可ルール・設定反映後の再デプロイ・実機試験は未確認。本番D1への追加マイグレーションは未実施。
+- 両PreviewのD1 Binding保存、試験スキーマ作成、管理者Previewの認証設定と再デプロイ、Windowsでの管理画面・空の集計読み込みは確認済み。追加管理者2件の保存・反映・ログイン確認、生徒Previewのデプロイ、ダミー生徒による一連の実機試験が残る。本番D1への追加マイグレーションは未実施。
 - 実アカウントでのバックアップ取得・復元試験、WAF/IP単位の制限、CPU・D1容量・料金の確認が必要。
 - IndexedDBの消去、端末紛失、プライベート閲覧モード終了などでは未送信記録を失う可能性がある。端末に保存できない場合は画面に明示する。
 - 学習ページ自体を完全オフラインで読み込むPWA、端末をまたぐ生徒側の復習状態統合、課題配信、保護者公開は今回の対象外。
