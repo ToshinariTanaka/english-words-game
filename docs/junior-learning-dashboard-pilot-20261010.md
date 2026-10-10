@@ -51,29 +51,30 @@
 
 ローカル試験は実際のCloudflareアカウントの設定確認やスマートフォン実機試験の代替ではない。
 
-## Cloudflare側：2026-10-10 10:04（日本時間）の確認状況
+## Cloudflare側：2026-10-10 11:21（日本時間）の確認状況
 
-エージェントのCloudflare Dashboardはログイン画面の認証エラーで操作できない。以下は利用者が自身のEdgeで操作し、共有した画面を照合した結果。エージェントによる直接操作・実機試験の完了を意味しない。利用可能な連携の検索でもCloudflare用は見つからなかった。
+エージェントのCloudflare Dashboardはログイン画面の認証エラーで操作できない。設定状態は利用者が自身のEdgeで操作し、共有した画面を照合した結果。GitHub連携による試験ブランチの更新とチェック結果の確認はエージェントが実施できる。利用可能な連携の検索でもCloudflare用は見つからなかった。
 
-| 項目 | 画面から確認した状態 |
+| 項目 | 確認した状態 |
 |---|---|
 | 試験D1 | `up-junior-learning-pilot` を新規作成 |
 | 試験スキーマ | `junior_students`、`junior_sessions`、`junior_attempts` の3テーブルと名前付き4インデックスをSQLで確認。学習日時列と学習日時インデックスを含む |
-| 生徒Pages Preview | `JUNIOR_DB → up-junior-learning-pilot` の保存を確認 |
-| 管理者Pages Preview | `JUNIOR_DB → up-junior-learning-pilot` の保存を確認 |
-| 管理者Previewの環境変数 | `ADMIN_ALLOWED_EMAILS`、`CF_ACCESS_TEAM_DOMAIN`、`CF_ACCESS_AUD` を保存して再デプロイ。既存の許可管理者で管理画面と集計APIの読み込み成功を確認 |
+| 生徒Pages Preview | `JUNIOR_DB → up-junior-learning-pilot`、`JUNIOR_DATA → up-junior-words-data` の保存を確認 |
+| 管理者Pages Preview | `JUNIOR_DB → up-junior-learning-pilot`、`JUNIOR_DATA → up-junior-words-data` の保存を確認 |
+| Runtime | 両PagesのPreviewが `Fail closed` であることを画面で確認 |
+| 管理者Previewの環境変数 | `ADMIN_ALLOWED_EMAILS`、`CF_ACCESS_TEAM_DOMAIN`、`CF_ACCESS_AUD` を保存して再デプロイ。管理画面と集計APIの読み込み成功を確認 |
 | 管理者PreviewのAUD | Preview用AccessアプリのAUDを設定。再デプロイ後の署名・issuer・audience・許可メール検証を通過し、管理画面が表示された |
 | 管理者Previewの保護範囲 | Preview accessが有効。対応するAccessアプリが `*.up-junior-words-admin.pages.dev` を対象としていることを確認 |
-| Accessの許可ルール | `Allow Members - Cloudflare Pages` はAllow／Include Emails。既存1件のメールとアプリ側設定を照合。適用先はこのPreviewアプリ1件 |
-| 管理者の試験版ビルド | Buildは `node scripts/build-junior-admin.js`／`dist-junior-admin`、Previewは全非本番ブランチが対象。設定反映後、コミット `1f21c55` のデプロイ `430d536e` が08:52に成功（Cloudflare公式botでも確認） |
-| 管理画面の実表示 | 09:45の利用者画面で `/students/`、集計API取得後の成功メッセージ、更新時刻、生徒0人・解答0問を確認。試験D1の読み込みが成功。実データを使った登録・学習試験はまだ未実施 |
-| 追加管理者2件 | 利用者の明示依頼により既存1件と合わせて計3件へ拡張中。Preview環境変数にカンマ区切りで入力（スクリーンショットでは末尾が省略）。Accessのポリシー編集後、10:04時点ではアプリ全体の最終Saveが残る画面。追加2件でのログインは未検証 |
-| 生徒の試験版ビルド | 画面共有時点で試験コミットは `No deployment available`。Previewブランチ制御・ビルド設定・公開状態の確認が必要 |
+| Accessの許可ルール | PreviewアプリのAllow／Include Emailsに、利用者が指定した追加2件を含む計3件を登録。ポリシーとアプリ全体の保存を確認。Productionの別Accessアプリは変更していない |
+| 管理者の試験版ビルド | Buildは `node scripts/build-junior-admin.js`／`dist-junior-admin`、Previewは全非本番ブランチが対象。コミット `9a31a0b` のデプロイ `d44f1d0e` が成功し、GitHub上のチェックも成功 |
+| 管理画面の実表示 | 利用者画面で `/students/`、集計API取得後の成功メッセージ、更新時刻、生徒0人・解答0問を確認。試験D1の読み込みが成功 |
+| 追加管理者2件 | Yahooの追加アドレスによるInPrivateでの管理画面表示を10:14に確認。Gmailによるログイン成功の利用者申告とInPrivateの管理画面表示を10:20に確認。画面自体にメール表示はない |
+| 生徒の試験版ビルド | PreviewのCustom対象を `feature/junior-learning-dashboard-pilot-20261010` の1ブランチに限定して保存。Productionは `feature/static-junior-preview-20261008` のまま。Buildは `node scripts/build-static-junior.js && node --test tests/static_junior_build.test.js`、出力は `dist-junior`。新設定反映後のデプロイはこれから |
 | 既存環境 | 既存 `up-junior-learning` のデータ・スキーマ変更、本番ブランチ切替、R2教材更新、Render変更はこの手順では実施していない |
 
 試験DBはConsoleへ最終スキーマをまとめて入力して初期化した。`occurred_at_ms` は既に存在するため、この同じDBへ `0002_attempt_study_time.sql` のALTER TABLEをそのまま再実行しない。Wranglerのマイグレーション履歴はこの手動手順では登録していない。今後CLI管理に移す場合は実スキーマと履歴を照合する。
 
-認証の設定値、許可メールの実値、AUD、セッショントークンはこの報告へ記載しない。次の操作はAccessアプリ全体の保存を確定し、追加管理者設定を読み込むPreview再デプロイと追加メールでのログイン確認。この進捗更新は試験ブランチにのみコミットし、既存のPages Git連携からPreviewの再ビルドを開始する。本番へのマージはしない。その後、生徒PagesのPreviewブランチ制御・教材読み出し設定を確認する。オンラインのダミー登録、再送試験、CSV取得、実D1のバックアップ／復元はまだ未実施。
+認証の設定値、許可メールの実値、AUD、セッショントークンはこの報告へ記載しない。この進捗更新を試験ブランチにのみコミットし、既存のPages Git連携から両Previewの再ビルドを開始する。本番へのマージはしない。次は生徒Previewの教材1,691問の読み出し・API経路分離を確認する。オンラインのダミー登録、再送試験、CSV取得、実D1のバックアップ／復元はまだ未実施。管理画面の「生徒用アプリ」リンクは現時点ではProductionを指すため、試験時は実際に生成された生徒Preview URLを使用する。
 
 当初の引き継ぎ情報（Production側での確認・変更は別途必要）：
 
@@ -123,7 +124,7 @@ Cloudflare公式資料：
 
 ## 本番前の残作業・運用上の限界
 
-- 両PreviewのD1 Binding保存、試験スキーマ作成、管理者Previewの認証設定と再デプロイ、Windowsでの管理画面・空の集計読み込みは確認済み。追加管理者2件の保存・反映・ログイン確認、生徒Previewのデプロイ、ダミー生徒による一連の実機試験が残る。本番D1への追加マイグレーションは未実施。
+- 両PreviewのD1／R2 Binding保存とFail closed、試験スキーマ作成、管理者Previewの認証設定と追加管理者2件のログイン、Windowsでの管理画面・空の集計読み込みは確認済み。新設定反映後の両Previewデプロイ、生徒版のオンライン確認、ダミー生徒による一連の実機試験が残る。本番D1への追加マイグレーションは未実施。
 - 実アカウントでのバックアップ取得・復元試験、WAF/IP単位の制限、CPU・D1容量・料金の確認が必要。
 - IndexedDBの消去、端末紛失、プライベート閲覧モード終了などでは未送信記録を失う可能性がある。端末に保存できない場合は画面に明示する。
 - 学習ページ自体を完全オフラインで読み込むPWA、端末をまたぐ生徒側の復習状態統合、課題配信、保護者公開は今回の対象外。
