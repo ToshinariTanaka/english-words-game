@@ -7,10 +7,10 @@ const origin='https://test-junior.pages.dev';
 export const adminOrigin='https://test-junior-admin.pages.dev';
 export const adminData={verifiedAdminEmail:'staff@example.com'};
 
-export function memoryD1() {
+export function memoryD1({studyTime=true}={}) {
   const sqlite=new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../migrations/d1-junior/0001_student_learning.sql',import.meta.url),'utf8'));
-  sqlite.exec(readFileSync(new URL('../migrations/d1-junior/0002_attempt_study_time.sql',import.meta.url),'utf8'));
+  if(studyTime)sqlite.exec(readFileSync(new URL('../migrations/d1-junior/0002_attempt_study_time.sql',import.meta.url),'utf8'));
   const db={
     prepare(sql) {
       const statement=sqlite.prepare(sql);
