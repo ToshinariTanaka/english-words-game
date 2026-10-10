@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
+import {pbkdf2Sync} from 'node:crypto';
 import {
   makePasswordRecord,checkStudentPassword,normalizeStudentId,
   sessionCookie,COOKIE_NAME,postGuard,makeTemporaryPassword,
@@ -110,7 +111,19 @@ test('only Access-verified staff can provision, reset or list student accounts',
   const duplicate=await adminCreate(ctx('/api/admin/students',{body:{studentId:'U0001'},db,base:adminOrigin,data:adminData}));
   assert.equal(duplicate.status,409);
 });
-test('hosted PBKDF2 limits fail closed with JSON and never change accounts or sessions',async(t)=>{
+test('hosted native iteration cap falls back to the identical 600000-round hash',async(t)=>{
+  const password='試験用だけの強いパスワード42!';
+  const nativeRecord=await makePasswordRecord(password);
+  t.mock.method(crypto.subtle,'deriveBits',()=>{
+    throw new DOMException('Pbkdf2 failed: iteration counts above 100000 are not supported (requested 600000)','NotSupportedError');
+  });
+  assert.equal(await checkStudentPassword(password,nativeRecord),true);
+  assert.equal(await checkStudentPassword('IncorrectDummyPassword42!',nativeRecord),false);
+  const fallbackRecord=await makePasswordRecord(password);
+  assert.equal(fallbackRecord.password_iterations,600000);
+  assert.equal(fallbackRecord.password_hash,pbkdf2Sync(password,Buffer.from(fallbackRecord.password_salt,'hex'),600000,32,'sha256').toString('hex'));
+});
+test('crypto failures fail closed with JSON and never change accounts or sessions',async(t)=>{
   const db=memoryD1();
   const password=await createByAdmin(db);
   const login=await studentLogin(ctx('/api/student/login',{body:{studentId:'U0001',password},db}));
@@ -118,13 +131,13 @@ test('hosted PBKDF2 limits fail closed with JSON and never change accounts or se
   const beforeStudents=db.raw.prepare('SELECT * FROM junior_students').all();
   const beforeSessions=db.raw.prepare('SELECT * FROM junior_sessions').all();
   t.mock.method(crypto.subtle,'deriveBits',()=>{
-    throw new DOMException('Pbkdf2 failed: iteration counts above 100000 are not supported (requested 600000)','NotSupportedError');
+    throw new Error('private crypto failure details');
   });
   for(const [handler,id] of [[adminCreate,'U0002'],[adminReset,'U0001']]) {
     const response=await handler(ctx('/api/admin/students',{body:{studentId:id},db,base:adminOrigin,data:adminData}));
     assert.equal(response.status,503);
     const body=await response.json();
-    assert.equal(body.code,'PASSWORD_KDF_LIMIT');
+    assert.equal(body.code,'PASSWORD_KDF_UNAVAILABLE');
     assert.equal(body.temporaryPassword,undefined);
     assert.doesNotMatch(JSON.stringify(body),/600000|100000|NotSupportedError/);
   }

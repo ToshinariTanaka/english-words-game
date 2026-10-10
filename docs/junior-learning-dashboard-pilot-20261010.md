@@ -82,6 +82,26 @@
 - 管理者Pages Productionの `JUNIOR_DB` Binding：保存済みとの申告。
 - 生徒Pages Productionの `JUNIOR_DB` Binding：未確認。今回保存したのはPreviewのみ。
 
+## オンライン確認とパスワード処理の修正（2026-10-10）
+
+- コミット `b1dd347`：生徒 `1452998c`、管理者 `ca56f865` の両Previewデプロイと全CIが成功。
+- 生徒APIから英単語1,652問、チャンク29問、文節和訳5問、英文和訳5問、合計1,691問を取得。各モードの応答本文SHA-256がProductionと一致。教材には書き込んでいない。
+- 未ログインの管理画面と集計APIはAccessへ302。生徒サイトの管理者一覧・集計・CSV APIは403、生徒の本人確認APIは401。生徒画面はAccessログインを要求せず起動。
+- クラウドブラウザーで英単語・チャンク・文節和訳の表示と各1問の正解判定を確認。匿名演習のため学習記録は試験D1に送っていない。音声はこのブラウザーでは候補0件であり、実機の音声確認は未完了。
+- 利用者によるメール認証後、エージェントのブラウザーでも管理者の集計取得が成功。生徒0人・解答0問を確認。
+- オンラインで `DUMMY20261010` の新規登録を試したが、標準Web CryptoのPBKDF2反復回数制限で失敗。コミット `03a5b22` で例外を機密情報のないJSONへ変換し、管理者画面の固定診断コード `PASSWORD_KDF_LIMIT` を実環境で確認した。失敗後の一覧は0人のまま。
+- 生徒0人の一覧CSVをブラウザーからダウンロードし、UTF-8 BOMと8列の見出しを確認。学習記録を含むオンラインCSVの検証はまだ未実施。
+- 修正案：標準Web Cryptoがこの特定の制限を返した場合だけ、固定版 `@noble/hashes` 2.4.0で同じPBKDF2-SHA256・600,000回・32バイトを計算する。salt・ハッシュ形式・テーブル定義は変えず、既存データの変換は行わない。他の暗号処理エラーでは停止する。
+- Node.jsの独立したPBKDF2実装と出力一致、既存ハッシュとの互換、誤パスワード拒否、暗号処理失敗時のアカウント・セッション保持をテスト。workerdのテストfixtureにもホスト側の100,000回制限を再現し、登録→ログイン→変更→同期→集計の一連を通過。
+- 互換実装もCloudflareのCPU制限の対象となる。無料プランでの動作は未保証であり、実環境で検証する。契約変更や課金開始は承認なしに行わない。
+- 試験ブランチで管理者版をビルドした際の「生徒用アプリ」リンクを、確認済みの同じ試験ブランチの生徒URLへ向ける。本番へのリンクと取り違えないための修正。
+
+公式資料・実装元：
+- [Cloudflare workerd：標準PBKDF2の反復回数上限とローカルとの差](https://github.com/cloudflare/workerd/issues/1346)
+- [Cloudflare WorkersのCPU制限](https://developers.cloudflare.com/workers/platform/limits/)
+- [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)
+- [noble-hashes](https://github.com/paulmillr/noble-hashes)
+
 ## 認証復旧後の試験導入手順
 
 1. 現在の生徒・管理者PagesのProductionブランチ、Build設定、Preview Binding、Access保護対象を読み取り確認する。本番のブランチは変更しない。

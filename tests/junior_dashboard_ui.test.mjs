@@ -10,6 +10,17 @@ import {onRequestGet as summary} from '../functions/api/admin/students/summary.j
 import {onRequestGet as detail} from '../functions/api/admin/students/detail.js';
 const tick=()=>new Promise(r=>setTimeout(r,5));
 async function until(fn){for(let i=0;i<200;i++){if(fn())return;await tick();}assert.fail('UI state did not complete');}
+test('non-JSON platform failures explain resource limits without exposing raw response details',async()=>{
+ for(const [body,expected] of [['<h1>Error 1102</h1><p>private upstream details</p>',/Cloudflare 1102/],['<h1>private upstream details</h1>',/HTTP 503/]]) {
+  const dom=new JSDOM(readFileSync(new URL('../admin/junior-students/index.html',import.meta.url),'utf8'),{url:adminOrigin+'/students/',runScripts:'outside-only'});
+  const w=dom.window;w.AbortSignal=AbortSignal;w.fetch=async()=>new Response(body,{status:503});
+  w.eval(readFileSync(new URL('../admin/junior-students/script.js',import.meta.url),'utf8'));
+  await until(()=>w.document.getElementById('message').className==='error');
+  assert.match(w.document.getElementById('message').textContent,expected);
+  assert.doesNotMatch(w.document.getElementById('message').textContent,/private upstream details/);
+  w.close();
+ }
+});
 test('admin screen registers student, shows safe text, detail, reset, disable/reactivate and clears secret',async()=>{
  const db=memoryD1();const dom=new JSDOM(readFileSync(new URL('../admin/junior-students/index.html',import.meta.url),'utf8'),{url:adminOrigin+'/students/',runScripts:'outside-only'});const w=dom.window,$=id=>w.document.getElementById(id);
  w.AbortSignal=AbortSignal;w.confirm=()=>true;w.HTMLElement.prototype.scrollIntoView=()=>{};w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};

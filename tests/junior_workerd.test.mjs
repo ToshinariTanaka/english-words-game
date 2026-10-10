@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {build} from 'esbuild';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
-test('real workerd WebCrypto + D1: create, login, password change, sync and dashboard',async()=>{
+test('workerd + hosted PBKDF2 cap + D1: create, login, password change, sync and dashboard',async()=>{
  const bundled=await build({entryPoints:[new URL('./fixtures/junior-workerd-worker.mjs',import.meta.url).pathname],bundle:true,write:false,format:'esm'});
  const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:bundled.outputFiles[0].text,compatibilityDate:'2026-10-01',d1Databases:['JUNIOR_DB']}));
  try {

@@ -13,7 +13,11 @@
   function params(extra={}) {const p=new URLSearchParams(extra);if($('from').value)p.set('from',$('from').value);if($('to').value)p.set('to',$('to').value);return p;}
   async function api(path,body) {
     const r=await fetch('/api/admin/students'+path,{method:body===undefined?'GET':'POST',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(20000)});
-    let data;try{data=await r.json();}catch{throw new Error('管理者認証が切れているか、サーバーに接続できません。ページを再読み込みしてください。');}
+    const raw=await r.text();let data;
+    try{data=JSON.parse(raw);}catch{
+      if(/Error\s*1102|error code:\s*1102|Worker exceeded resource limits/i.test(raw))throw new Error('サーバーの処理時間またはメモリの上限に達しました（Cloudflare 1102）。登録状況を一覧で確認し、管理者にお知らせください。');
+      throw new Error('サーバーから正常な応答を受け取れませんでした（HTTP '+r.status+'）。ページを再読み込みして登録状況を確認してください。');
+    }
     if(!r.ok||!data.ok){
       // Fixed diagnostic identifiers only; never log response bodies or passwords.
       if(['PASSWORD_KDF_LIMIT','PASSWORD_KDF_UNAVAILABLE'].includes(data.code))console.warn('Junior password processing: '+data.code);
