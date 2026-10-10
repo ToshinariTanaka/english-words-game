@@ -1,4 +1,5 @@
 import {reportFilter} from '../../../../cloudflare/junior-learning-report.js';
+import {learningReportFailure} from '../../../../cloudflare/junior-report-diagnostics.js';
 import { jsonResponse } from '../../../../cloudflare/junior-questions.js';
 import { adminStudentGetGuard,jstBoundaries } from '../../../../cloudflare/junior-student-admin.js';
 
@@ -23,5 +24,5 @@ export async function onRequestGet(context) {
     return jsonResponse({ok:true,asOf:Date.now(),timezone:'Asia/Tokyo',
       metricNote:'学習時間は端末が送信したアクティブ解答時間の合計（推定値）です。',
       students:result.results||[]});
-  } catch {return jsonResponse({ok:false,error:'集計結果を取得できませんでした。'},503);}
+  } catch {return learningReportFailure(context.env.JUNIOR_DB);}
 }

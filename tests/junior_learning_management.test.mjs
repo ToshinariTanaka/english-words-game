@@ -24,6 +24,48 @@ async function signedIn(db,id='DUMMY001') {
  return token;
 }
 const attempt=(extra={})=>({eventId:crypto.randomUUID(),mode:'word',questionKey:'w000001',correct:true,activeMs:2300,occurredAtMs:Date.now(),...extra});
+test('old production schema gives a fixed actionable diagnosis without modifying schema or records',async()=>{
+ const db=memoryD1({studyTime:false});
+ try{
+  await createByAdmin(db,'OLD-SCHEMA-DUMMY');
+  const before={schema:db.raw.prepare('SELECT * FROM sqlite_master ORDER BY name').all(),students:db.raw.prepare('SELECT * FROM junior_students').all()};
+  const r=await summary(get('/summary',db));assert.equal(r.status,503);assert.match(r.headers.get('Cache-Control'),/no-store/);
+  const payload=await r.json();assert.equal(payload.code,'DB_STUDY_TIME_MISSING');assert.match(payload.error,/学習日時の保存欄/);
+  assert.deepEqual(db.raw.prepare('SELECT * FROM sqlite_master ORDER BY name').all(),before.schema);
+  assert.deepEqual(db.raw.prepare('SELECT * FROM junior_students').all(),before.students);
+  assert.ok(!JSON.stringify(payload).includes(before.students[0].password_hash));
+ }finally{db.raw.close();}
+});
+test('missing tables and incompatible schema are distinguished from a missing study time column',async()=>{
+ const db=memoryD1();
+ try{
+  db.raw.exec('DROP TABLE junior_attempts');
+  assert.equal((await (await summary(get('/summary',db))).json()).code,'DB_TABLES_MISSING');
+  db.raw.exec('CREATE TABLE junior_attempts (unexpected TEXT)');
+  assert.equal((await (await summary(get('/summary',db))).json()).code,'DB_SCHEMA_MISMATCH');
+ }finally{db.raw.close();}
+});
+test('summary diagnostics do not run before authentication or on successful queries',async()=>{
+ const db=memoryD1();let metadataReads=0;const original=db.prepare.bind(db);
+ db.prepare=sql=>{if(sql.startsWith('PRAGMA'))metadataReads++;return original(sql);};
+ try{
+  assert.equal((await summary(get('/summary',db))).status,200);assert.equal(metadataReads,0);
+  db.prepare=()=>{throw new Error('Database must not be touched');};
+  assert.equal((await summary(get('/summary',db,false))).status,403);
+  assert.equal((await summary(get('/summary',undefined))).status,503);
+ }finally{db.raw.close();}
+});
+test('diagnostics keep unknown query and metadata errors private',async()=>{
+ const db=memoryD1(),original=db.prepare.bind(db);
+ try{
+  db.prepare=sql=>{if(sql.startsWith('SELECT'))throw new Error('private-error-sentinel');return original(sql);};
+  const queryPayload=await (await summary(get('/summary',db))).json();
+  assert.equal(queryPayload.code,'DB_SUMMARY_FAILED');assert.ok(!JSON.stringify(queryPayload).includes('private-error-sentinel'));
+  db.prepare=()=>{throw new Error('private-error-sentinel');};
+  const metadataPayload=await (await summary(get('/summary',db))).json();
+  assert.equal(metadataPayload.code,'DB_CHECK_FAILED');assert.ok(!JSON.stringify(metadataPayload).includes('private-error-sentinel'));
+ }finally{db.raw.close();}
+});
 test('delayed offline answers use original JST day; account mismatch and UUID case duplicates rejected',async()=>{
  const db=memoryD1(),token=await signedIn(db);
  const past=Date.parse('2026-09-30T14:59:59Z');
