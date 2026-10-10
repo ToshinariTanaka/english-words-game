@@ -1,7 +1,8 @@
-import {
-  jsonResponse, MODES, VERSION_RE, MAX_UPLOAD_BYTES, versionObjectKey,
-} from '../../../../../cloudflare/junior-questions.js';
+import { SITE_ROLE } from '../../../../../cloudflare/junior-site-role.js';
 import { rejectUnauthenticatedAdminMutation } from '../../../../../cloudflare/admin-mutation-guard.js';
+import {
+  jsonResponse, rejectRequest, MODES, VERSION_RE, MAX_UPLOAD_BYTES, versionObjectKey,
+} from '../../../../../cloudflare/junior-questions.js';
 
 // Cloudflare R2.put requires an upload body with a known byte length.
 // The readable side of a generic TransformStream does not carry that length.
@@ -37,8 +38,8 @@ export async function readBoundedUpload(request) {
   return bytes;
 }
 
-export async function onRequestPost({ request, env, data, params }) {
-  const rejected = rejectUnauthenticatedAdminMutation({ request, env, data });
+export async function onRequestPost({ request, env, params, data }) {
+  const rejected = SITE_ROLE === 'admin' ? rejectUnauthenticatedAdminMutation({request,env,data}) : rejectRequest(request, env);
   if (rejected) return rejected;
   const mode = params.mode;
   const id = request.headers.get('X-Release-Id') || '';

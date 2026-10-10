@@ -5,7 +5,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { accessConfig, verifyAccessJWT } from '../cloudflare/admin-access-auth.js';
 import { rejectUnauthenticatedAdminMutation } from '../cloudflare/admin-mutation-guard.js';
-import { onRequest as middleware } from '../functions/_middleware.js';
+import { onRequest as middleware } from '../cloudflare/junior-admin-middleware.js';
 import { adminHTML, adminJS, build } from '../scripts/build-junior-admin.js';
 
 const team='https://up-juku.cloudflareaccess.com';
