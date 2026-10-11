@@ -10,6 +10,9 @@ on:
       - 'functions/**'
       - 'admin/junior-students/**'
       - 'study-app/junior-student-*.js'
+      - 'study-app/junior-saved-audio.js'
+      - 'tools/prepare_study_audio.py'
+      - 'tests/test_prepare_study_audio.py'
       - 'scripts/*junior*'
       - 'migrations/d1-junior/**'
       - 'tests/junior*'
@@ -39,5 +42,7 @@ jobs:
         run: python -m pip install -r tools/requirements.txt
       - run: npm ci
       - run: npm run test:junior
+      - name: Verify offline audio preparation without API calls
+        run: python -m unittest discover -s tests -p test_prepare_study_audio.py
       - name: Verify original study app and Render regression tests
         run: npm test

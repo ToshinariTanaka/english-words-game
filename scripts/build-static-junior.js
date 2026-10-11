@@ -55,8 +55,19 @@ function rewriteJavaScript(js) {
     js,
     'function getCurrentQuestionAudioUrl() {',
     "function getCurrentQuestionAudioUrl() {\n  if (STATIC_JUNIOR_PREVIEW) return null;",
-    'disable Render MP3 endpoint',
+    'keep legacy Render endpoint disabled; saved audio uses its own controller',
   );
+  js = replaceExactlyOnce(js, 'function getSelectedVoiceValue() {',
+    "function getSelectedVoiceValue() {\n  if (STATIC_JUNIOR_PREVIEW) return '';", 'device fallback voice');
+  js = replaceExactlyOnce(js, 'function populateVoiceSelect() {',
+    'function populateVoiceSelect() {\n  if (STATIC_JUNIOR_PREVIEW) return window.UpJuniorAudio.populate();', 'saved voice options');
+  js = replaceExactlyOnce(js, 'function setupVoiceSelect() {',
+    'function setupVoiceSelect() {\n  if (STATIC_JUNIOR_PREVIEW) return window.UpJuniorAudio.setup(stopQuestionPlayback);', 'saved voice settings');
+  js = replaceExactlyOnce(js, 'function stopQuestionPlayback() {',
+    'function stopQuestionPlayback() {\n  if (STATIC_JUNIOR_PREVIEW) window.UpJuniorAudio?.stop();', 'stop saved playback');
+  js = replaceExactlyOnce(js, 'async function speakCurrentQuestion(options = {}) {',
+    "async function speakCurrentQuestion(options = {}) {\n  if (STATIC_JUNIOR_PREVIEW) return window.UpJuniorAudio.speak({mode:state.mode, question:state.questions[state.index], manual:options.statusPrefix === '手動再生：', fallback:() => speakCurrentQuestionWithWebSpeech('保存音声は未準備のため、端末音声を使用します。', {synchronous:true,exactStatus:true})});",
+    'saved playback before iOS legacy branch');
   js = replaceExactlyOnce(
     js,
     'function updateHostingStatus() {',
@@ -97,7 +108,7 @@ function rewriteJavaScript(js) {
   // unchanged; the answer hook sends only question ID, correctness and bounded time.
   js = replaceExactlyOnce(js,
     '  state.currentQuestion = current || null;',
-    '  state.currentQuestion = current || null;\n  if (STATIC_JUNIOR_PREVIEW) window.UpJuniorStudent?.questionShown();',
+    '  state.currentQuestion = current || null;\n  if (STATIC_JUNIOR_PREVIEW) { window.UpJuniorStudent?.questionShown(); void window.UpJuniorAudio.showQuestion(state.mode, current); }',
     'question displayed hook');
   js = replaceExactlyOnce(js,
     '  updateLearningStat(current, isCorrect);',
@@ -126,6 +137,12 @@ function rewriteHtml(html) {
     '<link rel="stylesheet" href="./style.css">', 'stylesheet URL');
   html = replacePatternOnce(html, /<script src="\.\/script\.js[^"]*"><\/script>/m,
     '<script src="./script.js"></script>', 'script URL');
+  html = replacePatternOnce(html, /<select id="voiceSelect">[\s\S]*?<\/select>/,
+    '<select id="voiceSelect"><option value="nova" selected>Nova</option><option value="ash">Ash</option><option value="random">ランダム（Nova／Ash）</option></select>', 'saved voice options');
+  html = replaceExactlyOnce(html,
+    '音声候補は指定した10種類のうち、このブラウザで利用できるものだけを表示します。',
+    'AI生成音声を使用します。ランダムは問題ごとに声を選び、聞き直すときは同じ声です。未準備の問題は端末音声を使います。', 'saved voice disclosure');
+  html = replaceExactlyOnce(html, '現在の音声：ブラウザ自動選択', '音声：Nova', 'initial saved voice');
   html = replaceExactlyOnce(html,'    </header>', '    </header>\n'+
     '    <section class="junior-student-login" id="juniorStudentPanel" aria-label="学習記録用の生徒ログイン">\n'+
     '      <h2>生徒ログイン（学習履歴の共有・試験中）</h2>\n'+
@@ -148,7 +165,7 @@ function rewriteHtml(html) {
     '    </section>', 'student login section');
   html = replaceExactlyOnce(html,
     '  <script src="./script.js"></script>',
-    '  <script src="./junior-student-queue.js"></script>\n  <script src="./junior-student-sync.js"></script>\n  <script src="./script.js"></script>',
+    '  <script src="./junior-student-queue.js"></script>\n  <script src="./junior-student-sync.js"></script>\n  <script src="./junior-saved-audio.js"></script>\n  <script src="./script.js"></script>',
     'student session UI script');
   return html;
 }
@@ -177,6 +194,7 @@ function build() {
   fs.writeFileSync(path.join(OUTPUT, 'script.js'), js);
   fs.copyFileSync(path.join(SOURCE, 'junior-student-queue.js'), path.join(OUTPUT, 'junior-student-queue.js'));
   fs.copyFileSync(path.join(SOURCE, 'junior-student-sync.js'), path.join(OUTPUT, 'junior-student-sync.js'));
+  fs.copyFileSync(path.join(SOURCE, 'junior-saved-audio.js'), path.join(OUTPUT, 'junior-saved-audio.js'));
   fs.writeFileSync(path.join(OUTPUT, 'style.css'), css);
   fs.writeFileSync(path.join(OUTPUT, '_headers'), '/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Frame-Options: DENY\n');
   fs.writeFileSync(path.join(OUTPUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
