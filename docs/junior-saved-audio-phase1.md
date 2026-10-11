@@ -2,6 +2,8 @@
 
 2026-10-11。基点は `release/junior-admin-learning-20261010` の `bf1261c9aef035528df02c8644965d3967e9f9a2`。
 
+**運用方針の更新：** Cloudflareは全年齢共通の教材基盤とし、中学生向けはレベル・教材フラグで抽出する。旧Renderの英単語データは引継ぎ不要。[共通教材と旧Render廃止の確定方針](cloudflare-shared-catalog-20261011.md)を参照。以下の内部名 `junior` は既存構成との互換性のために使用しており、音声の利用対象を中学生に限定しない。
+
 ## 今回の実装
 
 - Cloudflare生徒版の音声選択を **Nova（初期値）／Ash／ランダム** にする。
