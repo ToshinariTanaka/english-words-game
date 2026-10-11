@@ -86,6 +86,11 @@ export function validateRelease(input) {
         }
         clean[field] = value;
       }
+      if (Object.hasOwn(row, 'target1800')) {
+        const flag = String(row.target1800).trim();
+        if (!['0', '1'].includes(flag)) throw new Error(mode + ' のtarget1800は0または1にしてください。');
+        clean.target1800 = flag;
+      }
       clean.level = clean.level.toUpperCase();
       if (!LEVELS.has(clean.level)) throw new Error(mode + ' のCEFRレベルに不正があります。');
       if (input.filter === 'a1a2' && !['A1', 'A2'].includes(clean.level)) {

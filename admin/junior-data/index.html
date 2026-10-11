@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <title>教材アップロード | 中学生英単語アプリ</title>
+  <title>教材アップロード | Up英語トレーニング</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <main class="container">
     <header>
       <p class="eyebrow">Up塾・管理者専用</p>
-      <h1>中学生英単語アプリ<br>教材アップロード</h1>
+      <h1>Up英語トレーニング<br>教材アップロード</h1>
       <p>Excelを読み込み、検査結果を確認してから「公開」を押すと、塾生全員が新しい問題を利用します。</p>
       <p class="note">※このページへのアクセス自体は公開されています。保存操作には管理者専用の認証トークンが必要です。一般利用者にURLやトークンを配布しないでください。</p>
     </header>
@@ -22,13 +22,11 @@
       <input id="workbook" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
       <p class="note">必要なシート：★英単語／★チャンク／★文節和訳／★英文和訳</p>
 
-      <label for="filter">出題対象</label>
+      <label for="filter">保存する教材</label>
       <select id="filter">
-        <option value="a1a2">A1・A2のみ（中学生版の初期公開に推奨）</option>
-        <option value="target1800">中学ターゲット1800フラグ（英単語）＋A1/A2（他3モード）</option>
-        <option value="all">全問題（システムテスト専用・上級問題も公開されます）</option>
+        <option value="all" selected>全問題（全年齢共通）</option>
       </select>
-      <p class="note">フラグ方式は、英単語シートのN列に「target1800」という見出しを追加し、対象行に1を入力します。</p>
+      <p class="note">全問を保存し、学習画面でレベル・教材条件を選択します。教材フラグを使う場合は、英単語シートのN列に「target1800」という見出しを追加し、対象行に1を入力します。</p>
       <button id="check" type="button">Excelを検査する</button>
     </section>
 

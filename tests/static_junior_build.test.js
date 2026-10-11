@@ -47,7 +47,7 @@ test('uses current application scoring logic with Render APIs disabled in static
 test('page warns about demo-only local storage and discourages search indexing', () => {
   const html = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
   assert.match(html, /noindex,nofollow/);
-  assert.match(html, /実際の塾生データは含みません/);
+  assert.match(html, /レベル・教材条件で出題範囲を選べます/);
   assert.match(html, /ほかの端末にも共有されません/);
   assert.match(html, /<script src="\.\/script\.js"><\/script>/);
   assert.doesNotMatch(html, /cdn\.render\.com|onrender\.com/);

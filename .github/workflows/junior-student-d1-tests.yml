@@ -11,6 +11,8 @@ on:
       - 'admin/junior-students/**'
       - 'study-app/junior-student-*.js'
       - 'study-app/junior-saved-audio.js'
+      - 'study-app/junior-catalog.*'
+      - 'admin/junior-data/**'
       - 'tools/prepare_study_audio.py'
       - 'tests/test_prepare_study_audio.py'
       - 'scripts/*junior*'

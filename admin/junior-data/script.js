@@ -45,7 +45,7 @@ $('check').addEventListener('click', async () => {
       (sheet) => window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false }));
     const data = { version: 1, filename: file.name, filter, modes: converted.modes };
     if (new TextEncoder().encode(JSON.stringify(data)).length > 12 * 1024 * 1024) {
-      throw new Error('変換後のデータが12MBを超えています。対象問題を絞ってください。');
+      throw new Error('変換後のデータが12MBを超えています。公開可能な容量を超えるため、管理者に確認してください。');
     }
     payload = data;
     checkedFile = file;
@@ -61,7 +61,7 @@ $('check').addEventListener('click', async () => {
       $('counts').appendChild(tr);
     }
     const warning = filter === 'all'
-      ? '警告：上級レベルを含む全問題を一般公開します。システムテスト以外で使わないでください。'
+      ? '全レベルの問題を共通教材として公開します。学習画面で出題範囲を選べます。現在の公開教材は新しい版に切り替わります。'
       : '各モードをまとめて公開します。現在の公開教材は新しい版に切り替わります。';
     setText('releaseWarning', warning);
     setText('result', '検査完了：' + converted.total.toLocaleString('ja-JP') + '問。確認してから公開してください。');

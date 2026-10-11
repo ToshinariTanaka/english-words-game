@@ -42,7 +42,7 @@ function rewriteJavaScript(js) {
   js = replaceExactlyOnce(
     js,
     'async function loadAppVariantConfig() {',
-    "async function loadAppVariantConfig() {\n  if (STATIC_JUNIOR_PREVIEW) {\n    await window.UpJuniorStudent?.ready;\n    return applyAppVariantConfig({variant: 'junior-static-preview', title: '中学生英単語アプリ（試験版）', subtitle: '4モード・静的配信の動作確認'});\n  }",
+    "async function loadAppVariantConfig() {\n  if (STATIC_JUNIOR_PREVIEW) {\n    await window.UpJuniorStudent?.ready;\n    return applyAppVariantConfig({variant: 'junior-static-preview', title: 'Up英語トレーニング', subtitle: '全年齢共通｜レベル・教材から選択'});\n  }",
     'local-only app config',
   );
   js = replaceExactlyOnce(
@@ -104,6 +104,18 @@ function rewriteJavaScript(js) {
     "const hostingMessage = STATIC_JUNIOR_PREVIEW ? 'Cloudflareの共有教材を優先します。未公開なら各3問のデモを表示します。' : IS_GITHUB_PAGES ?",
     'mode-level hosting notice',
   );
+  js = replaceExactlyOnce(js, '  return state.questionPool.filter(isQuestionInSelectedLevelRange);',
+    '  return state.questionPool.filter(question => isQuestionInSelectedLevelRange(question) && isQuestionInSelectedCatalog(question));', 'shared catalog filtering');
+  js = replaceExactlyOnce(js, '      questionKey: pickField(normalizedRow, COMMON_ALIASES.questionKey),',
+    "      questionKey: pickField(normalizedRow, COMMON_ALIASES.questionKey),\n      target1800: normalizedRow.target1800 === '1',", 'keep curriculum flag');
+  js = replaceExactlyOnce(js, '    if (filteredCount > 0) beginConfiguredSession();',
+    '    if (filteredCount > 0) beginConfiguredSession(); else clearEmptyCatalogSelection();', 'clear empty level selection');
+  js = replacePatternOnce(js, /  if \(filteredCount === 0\) \{\n    state\.questions = \[\];[\s\S]*?\n    return;\n  \}/,
+    '  if (filteredCount === 0) {\n    clearEmptyCatalogSelection();\n    return;\n  }', 'clear empty loaded catalog');
+  js = replaceExactlyOnce(js, 'async function initApp() {',
+    fs.readFileSync(path.join(SOURCE, 'junior-catalog.js'), 'utf8') + '\nasync function initApp() {', 'shared catalog helpers');
+  js = replaceExactlyOnce(js, '  setupLevelRangeSetting();',
+    '  setupLevelRangeSetting();\n  setupSharedCatalog();', 'shared catalog setup');
   // Student tracking is opt-in during the pilot. Rendering and scoring are
   // unchanged; the answer hook sends only question ID, correctness and bounded time.
   js = replaceExactlyOnce(js,
@@ -124,11 +136,11 @@ function rewriteJavaScript(js) {
 
 function rewriteHtml(html) {
   html = replaceExactlyOnce(html, '<title>英語学習アプリ</title>',
-    '<title>中学生英単語アプリ（静的試験版）</title>\n  <meta name="robots" content="noindex,nofollow">', 'page title and indexing');
+    '<title>Up英語トレーニング</title>\n  <meta name="robots" content="noindex,nofollow">', 'page title and indexing');
   html = replaceExactlyOnce(html, '<h1 id="appTitle">英語学習アプリ</h1>',
-    '<h1 id="appTitle">中学生英単語アプリ（試験版）</h1>', 'visible title');
+    '<h1 id="appTitle">Up英語トレーニング</h1>', 'visible title');
   html = replaceExactlyOnce(html, '<header class="hero">',
-    '<header class="hero">\n      <p class="static-preview-notice">試験公開｜共有教材が未公開の場合、各モード3問の内蔵デモを表示します。実際の塾生データは含みません。</p>',
+    '<header class="hero">\n      <p class="static-preview-notice">全年齢共通｜レベル・教材条件で出題範囲を選べます。共有教材が未公開の場合は各モード3問のデモを表示します。</p>',
     'preview banner');
   html = replacePatternOnce(html, /<p id="uploadStatus" class="upload-status">.*<\/p>/m,
     '<p id="uploadStatus" class="upload-status">この画面で選んだCSV・Excelは一時確認用です。サーバーに保存されず、ほかの端末にも共有されません。教材の共通更新は管理者用のアップロード画面から行います。</p>',
@@ -167,6 +179,8 @@ function rewriteHtml(html) {
     '  <script src="./script.js"></script>',
     '  <script src="./junior-student-queue.js"></script>\n  <script src="./junior-student-sync.js"></script>\n  <script src="./junior-saved-audio.js"></script>\n  <script src="./script.js"></script>',
     'student session UI script');
+  html = replaceExactlyOnce(html, '          <label class="setting-field" for="levelStart">',
+    fs.readFileSync(path.join(SOURCE, 'junior-catalog.html'), 'utf8') + '\n          <label class="setting-field" for="levelStart">', 'shared catalog controls');
   return html;
 }
 
@@ -183,6 +197,7 @@ function build() {
   const css = fs.readFileSync(path.join(SOURCE, 'style.css'), 'utf8')
     + '\n.static-preview-notice { color: #fff; background: #573e10; padding: 8px 12px; border-radius: 9px; font-weight: 700; }\n'
     + '.junior-student-login {background:#203458;color:#fff;border:1px solid #4c6ea4;border-radius:14px;padding:18px;margin:12px 0}\n'
+    + '.setting-grid > * {min-width:0} #catalogHint {grid-column:1 / -1;margin:0;font-size:.85rem;color:var(--muted)} #catalogScope {max-width:100%}\n'
     + '.junior-student-login h2 {font-size:1.2rem;margin:0 0 10px}\n'
     + '.junior-student-login label {display:block;margin:8px 0;font-size:1rem}\n'
     + '.junior-student-login input {display:block;width:100%;box-sizing:border-box;padding:10px;font-size:1rem;border-radius:8px}\n'
