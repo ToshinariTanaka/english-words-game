@@ -1,5 +1,7 @@
 # 中学生版・静的試験移転（2026-10-08）
 
+> 2026-10-11追記：以下は初期移行時の記録。旧Renderデータのバックアップ・引継ぎを停止の前提とする方針は、田中塾長の「Renderの英単語は全部捨ててよい」という指示により終了した。今後は[Cloudflare共通教材と旧Render廃止の確定方針](cloudflare-shared-catalog-20261011.md)に従う。
+
 ## 目的と安全条件
 
 - 調査対象の本番サービス：Render の english-words-game-junior。
