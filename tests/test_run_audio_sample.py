@@ -33,6 +33,20 @@ class TrialTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'uncertain'):
                 trial.run(PLAN, root, True, opener=lambda *a, **k: self.fail('must not retry'))
 
+    def test_unresolved_pronunciation_blocks_generation(self):
+        bad = json.loads(json.dumps(PLAN))
+        bad['jobs'][0]['pronunciation_review'] = True
+        with self.assertRaisesRegex(ValueError, 'pronunciation'):
+            trial.validate(bad)
+
+    def test_homographs_have_semantic_guidance(self):
+        jobs = {j['question_key']: j for j in PLAN['jobs']}
+        for key in ('w003673', 'w003674'):
+            self.assertIn('/lɪv/', jobs[key]['instructions'])
+        self.assertIn('/riːd/', jobs['w005122']['instructions'])
+        self.assertIn('/wɪnd/', jobs['w007170']['instructions'])
+        self.assertFalse(any(j['pronunciation_review'] for j in PLAN['jobs']))
+
     def test_decode_and_normalize(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

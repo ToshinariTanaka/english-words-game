@@ -23,6 +23,8 @@ def validate(plan):
         raise ValueError('This runner only accepts the 30-question, 60-file trial.')
     seen = set()
     for j in jobs:
+        if j.get('pronunciation_review'):
+            raise ValueError('Resolve pronunciation guidance before generation')
         pair = (j['question_key'], j['voice'])
         if pair in seen or j['voice'] not in ('nova', 'ash'):
             raise ValueError('Invalid voice or duplicate job')
