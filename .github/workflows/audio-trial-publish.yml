@@ -1,0 +1,56 @@
+name: Publish approved audio trial
+on:
+  push:
+    branches: [feature/audio-trial-publication-20261012]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish the existing 30-question / 60-file trial for app playback'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: audio-r2-writes
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test transfer safeguards offline
+        run: python -m unittest discover -s tests -p test_publish_audio_trial.py
+      - name: Download the successful approved trial
+        uses: actions/download-artifact@v4
+        with:
+          name: nova-ash-trial
+          path: audio-preparation/trial
+          run-id: '38191239119'
+          github-token: ${{ github.token }}
+      - name: Validate all source files before any upload
+        run: python tools/publish_audio_trial.py
+      - name: Install R2 client
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        run: python -m pip install boto3==1.40.0
+      - name: Publish verified trial and check app delivery
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python tools/publish_audio_trial.py --publish
+      - name: Preserve upload verification report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-trial-publication
+          path: audio-preparation/publication-report/
+          if-no-files-found: ignore
+          retention-days: 30
