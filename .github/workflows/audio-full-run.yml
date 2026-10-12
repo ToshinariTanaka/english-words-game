@@ -1,0 +1,61 @@
+name: Prepare and audit full audio
+on:
+  push:
+    branches: [feature/audio-full-runner-20261012]
+  pull_request:
+    paths:
+      - tools/run_full_audio.py
+      - tools/audio-full-catalog.json.gz.b64
+      - tests/test_run_full_audio.py
+      - .github/workflows/audio-full-run.yml
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'validate = offline; audit = verify existing R2 audio without writing'
+        type: choice
+        options: [validate, audit]
+        default: validate
+      batch:
+        description: 'Batch to inspect (1..37)'
+        type: number
+        default: 1
+permissions:
+  contents: read
+concurrency:
+  group: audio-r2-writes
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install openpyxl==3.1.5
+      - name: Test resume and duplicate-request safeguards without API calls
+        run: python -m unittest discover -s tests -p test_run_full_audio.py
+      - name: Validate all 18370 planned files offline
+        run: python tools/run_full_audio.py
+      - name: Install R2 client for read-only audit
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'audit' }}
+        run: python -m pip install boto3==1.40.0
+      - name: Verify trial files and inspect selected batch without generating
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'audit' }}
+        env:
+          AUDIO_BATCH: ${{ inputs.batch }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python tools/run_full_audio.py --mode audit --batch "$AUDIO_BATCH"
+      - name: Save audit report and any local recovery files
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-audio-report
+          path: audio-preparation/full-run/
+          if-no-files-found: ignore
+          retention-days: 30
