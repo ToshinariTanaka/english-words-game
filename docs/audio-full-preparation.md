@@ -3,14 +3,28 @@
 現在公開した30問・60本を全問生成時に再利用するための、課金なしの準備段階です。
 この変更はAPIを呼ばず、R2にも書き込みません。アプリの公開音声は変わりません。
 
-## 手元の全問計画から作成
+## Excelから全問計画・分割計画を作成
+
+Python 3.12と元のExcelファイルを用意します。今回の対象は
+`☆英語学習ゲーム__英単語_111(2).xlsx`、SHA-256は
+`2a5193afdf95ac35b5b106c2b4dd567489cc1b1f3a5a880ea37194c31712d99b`です。
+Excelはこのリポジトリには含めていません。手元の原本へのパスを指定してください。
+別の原本は試作と一致しないため分割時に拒否されます。
+
+```sh
+python -m pip install openpyxl==3.1.5
+python tools/prepare_study_audio.py '/path/to/☆英語学習ゲーム__英単語_111(2).xlsx' --output audio-preparation/from-excel
+python tools/prepare_full_audio_batches.py --full-plan audio-preparation/from-excel/generation-plan.json --output audio-preparation/full-reviewed
+python -m unittest discover -s tests -p 'test_prepare*audio*.py'
+```
+
+既存の全問計画がある場合は、2番目の処理から実行できます。
 
 ```sh
 python tools/prepare_full_audio_batches.py --full-plan audio-preparation/generation-plan.json --output audio-preparation/full-reviewed
-python -m unittest discover -s tests -p test_prepare_full_audio_batches.py
 ```
 
-入力はCloudflare用Excelから既存のprepare_study_audio.pyで作成した計画です。
+入力はCloudflare用Excelから同梱のtools/prepare_study_audio.pyで作成した計画です。
 mainブランチの古いstudy-app/dataの教材は使いません。
 既存の出力ディレクトリには上書きせず、混在を防ぎます。
 
