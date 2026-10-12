@@ -1,0 +1,59 @@
+name: Nova Ash audio trial
+on:
+  push:
+    branches: [feature/audio-sample-runner-20261012]
+  workflow_dispatch:
+    inputs:
+      generate:
+        description: 'Generate the paid 30-question x 2-voice trial'
+        type: boolean
+        default: false
+      resume_run_id:
+        description: 'Previous run ID to resume (download its saved audio first)'
+        type: string
+        required: false
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: nova-ash-audio-trial
+  cancel-in-progress: false
+jobs:
+  trial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install audio utilities
+        run: sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+      - name: Test without API calls
+        run: python -m unittest discover -s tests -p test_run_audio_sample.py
+      - name: Restore prior trial
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.resume_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: nova-ash-trial
+          path: audio-preparation/trial
+          run-id: ${{ inputs.resume_run_id }}
+          github-token: ${{ github.token }}
+      - name: Prepare trial without API calls
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs.generate }}
+        run: python tools/run_audio_sample.py
+      - name: Generate paid trial
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.generate }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python tools/run_audio_sample.py --generate
+      - name: Save raw audio, MP3, ledger and listening page
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-ash-trial
+          path: audio-preparation/trial/
+          retention-days: 30
+          if-no-files-found: warn
