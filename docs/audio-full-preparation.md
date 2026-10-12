@@ -1,0 +1,51 @@
+# 全問音声の生成準備
+
+現在公開した30問・60本を全問生成時に再利用するための、課金なしの準備段階です。
+この変更はAPIを呼ばず、R2にも書き込みません。アプリの公開音声は変わりません。
+
+## Excelから全問計画・分割計画を作成
+
+Python 3.12と元のExcelファイルを用意します。今回の対象は
+`☆英語学習ゲーム__英単語_111(2).xlsx`、SHA-256は
+`2a5193afdf95ac35b5b106c2b4dd567489cc1b1f3a5a880ea37194c31712d99b`です。
+Excelはこのリポジトリには含めていません。手元の原本へのパスを指定してください。
+別の原本は試作と一致しないため分割時に拒否されます。
+
+```sh
+python -m pip install openpyxl==3.1.5
+python tools/prepare_study_audio.py '/path/to/☆英語学習ゲーム__英単語_111(2).xlsx' --output audio-preparation/from-excel
+python tools/prepare_full_audio_batches.py --full-plan audio-preparation/from-excel/generation-plan.json --output audio-preparation/full-reviewed
+python -m unittest discover -s tests -p 'test_prepare*audio*.py'
+```
+
+既存の全問計画がある場合は、2番目の処理から実行できます。
+
+```sh
+python tools/prepare_full_audio_batches.py --full-plan audio-preparation/generation-plan.json --output audio-preparation/full-reviewed
+```
+
+入力はCloudflare用Excelから同梱のtools/prepare_study_audio.pyで作成した計画です。
+mainブランチの古いstudy-app/dataの教材は使いません。
+既存の出力ディレクトリには上書きせず、混在を防ぎます。
+
+全9,185問・18,370本の音量処理条件を試作と統一します。試作60本は発音指示、
+asset_id、R2キーをそのまま引き継ぎます。残り18,310本を最大250問・500本ずつ、
+37組に分割します。同じ問題のNova/Ashは同じ組に入ります。
+
+再利用候補は生成済みの証明ではありません。実行プログラムは、生成前にR2にある60本の
+バイト数・SHA-256を試作台帳と照合する必要があります。不一致時には止めて調査します。
+
+## 次の実装条件
+
+- 提供モデルと料金を公式情報で再確認し、予算を決める。文字数・音声秒数の見積もりを
+  請求額の保証に使わない。実際の使用量と予算停止の扱いを定める。
+- R2に各リクエスト開始記録を条件付きで保存し、元音声・処理済み音声・検証結果を
+  1本ずつ保存する。完了済みを再生成しない。結果不明のリクエストを自動再送しない。
+- 全実行の同時起動を防ぎ、失敗後もR2上の記録から再開する。
+- 今回は既存の発音要確認フラグを解消しただけであり、全単語の同綴異音語を監査した
+  という意味ではない。量産前に追加の発音確認対象を点検する。
+- 全件の保存・ハッシュ・長さ・Nova/Ash両方の存在を確認し、試聴を行う。
+- 現行の試作公開ポインタを無条件に上書きせず、旧値と一致するときだけ全問の新しい
+  マニフェストへ切り替える。旧音声と旧マニフェストを残して戻せるようにする。
+
+この準備スクリプトには生成・途中再開・課金上限・全問公開の実装は含まれていません。
