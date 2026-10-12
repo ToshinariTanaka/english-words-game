@@ -1,0 +1,56 @@
+name: Upload approved audio trial to R2
+on:
+  push:
+    branches: [feature/audio-r2-trial-upload-20261012]
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Copy the existing 60-file trial to up-words-audio (no audio generation)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: audio-r2-writes
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test transfer safeguards offline
+        run: python -m unittest discover -s tests -p test_upload_audio_trial.py
+      - name: Download the successful approved trial
+        uses: actions/download-artifact@v4
+        with:
+          name: nova-ash-trial
+          path: audio-preparation/trial
+          run-id: '38191239119'
+          github-token: ${{ github.token }}
+      - name: Validate all source files before any upload
+        run: python tools/upload_audio_trial.py
+      - name: Install R2 client
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        run: python -m pip install boto3==1.40.0
+      - name: Upload and read back every object
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload }}
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python tools/upload_audio_trial.py --upload
+      - name: Preserve upload verification report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-r2-verification
+          path: audio-preparation/r2-report.json
+          if-no-files-found: ignore
+          retention-days: 30
