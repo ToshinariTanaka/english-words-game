@@ -1,10 +1,10 @@
 name: Complete all 9185 questions
 on:
   pull_request:
-    paths: ['tools/run_audio_all.py', 'tools/publish_audio_all.py', 'tests/test_audio_all.py', '.github/workflows/audio-all-9185.yml']
+    paths: ['tools/**', 'tests/**', '.github/workflows/audio-all-9185.yml']
   push:
     branches: [main]
-    paths: ['tools/run_audio_all.py', 'tools/publish_audio_all.py', 'tests/test_audio_all.py', '.github/workflows/audio-all-9185.yml']
+    paths: ['tools/**', 'tests/**', '.github/workflows/audio-all-9185.yml']
   workflow_dispatch:
     inputs:
       action:
