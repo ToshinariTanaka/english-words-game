@@ -1,0 +1,149 @@
+name: Complete all 9185 questions
+on:
+  pull_request:
+    paths: ['tools/run_audio_all.py', 'tools/publish_audio_all.py', 'tests/test_audio_all.py', '.github/workflows/audio-all-9185.yml']
+  push:
+    branches: [main]
+    paths: ['tools/run_audio_all.py', 'tools/publish_audio_all.py', 'tests/test_audio_all.py', '.github/workflows/audio-all-9185.yml']
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Resume the approved fixed 17290 files, publish completed files, or restore 1080 files'
+        type: choice
+        options: [validate, resume, publish, rollback]
+        default: validate
+permissions:
+  contents: read
+concurrency:
+  group: audio-r2-writes
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install openpyxl==3.1.5
+      - name: Test fixed scope, resume and publication without API calls
+        run: python -m unittest discover -s tests -p test_audio_all.py
+      - name: Export all fixed keys without generation
+        run: python tools/run_audio_all.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: all-9185-audio-keys
+          path: audio-preparation/all-9185/
+          retention-days: 30
+  prepare:
+    needs: validate
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'resume') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      run: ${{ steps.prepare.outputs.run }}
+      matrix: ${{ steps.prepare.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install openpyxl==3.1.5 boto3==1.40.0
+      - id: prepare
+        name: Verify existing audio and initialize this fixed request once
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          ACTION: ${{ github.event_name == 'push' && 'start-once' || 'start' }}
+        run: python tools/run_audio_all.py --action "$ACTION"
+  generate:
+    needs: prepare
+    if: ${{ needs.prepare.outputs.run == 'true' }}
+    strategy:
+      # Do not cancel requests already in flight. The R2 stop record prevents new work.
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        batch: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - name: Install generation tools
+        run: |
+          python -m pip install openpyxl==3.1.5 boto3==1.40.0
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Complete this fixed batch and preserve every successful file
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          BATCH: ${{ matrix.batch }}
+        run: python tools/run_audio_all.py --action generate --batch "$BATCH" --run "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Preserve progress and raw audio rescue copies
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-all-batch-${{ matrix.batch }}-attempt-${{ github.run_attempt }}
+          path: audio-preparation/all-9185/
+          if-no-files-found: ignore
+          retention-days: 30
+  publish:
+    needs: [prepare, generate]
+    if: ${{ needs.prepare.outputs.run == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install openpyxl==3.1.5 boto3==1.40.0
+      - name: Verify all 18370 MP3 files and publish the complete catalog
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python tools/publish_audio_all.py
+      - if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-9185-publication
+          path: audio-preparation/all-publication/
+          retention-days: 30
+  maintenance:
+    needs: validate
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.action == 'publish' || inputs.action == 'rollback') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install openpyxl==3.1.5 boto3==1.40.0
+      - name: Explicit publication or rollback, no generation
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          ACTION: ${{ inputs.action }}
+        run: |
+          if [ "$ACTION" = rollback ]; then
+            python tools/publish_audio_all.py --rollback
+          else
+            python tools/publish_audio_all.py
+          fi
+      - if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-9185-maintenance
+          path: audio-preparation/all-publication/
+          retention-days: 30
