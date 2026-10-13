@@ -165,6 +165,27 @@ class PublicationTests(unittest.TestCase):
             p.smoke(self.jobs, self.ledger, self.manifests,
                     lambda url: self.fetch(url) if '/manifest?' in url else b'wrong voice')
 
+    def test_later_push_cannot_undo_rollback(self):
+        self.execute('publish-once')
+        self.execute('rollback')
+        writes = self.client.writes
+        result = self.execute('publish-once')
+        self.assertEqual(result['status'], 'automatic_publication_skipped')
+        self.assertEqual(self.client.writes, writes)
+        self.assertEqual(json.loads(self.store.read(p.POINTER))['release_id'], self.old)
+        self.assertEqual(self.execute('publish')['status'], 'published_and_verified')
+
+    def test_partial_initial_publication_requires_explicit_resume(self):
+        self.client.race = True
+        with self.assertRaises(Collision):
+            self.execute('publish-once')
+        self.client.race = False
+        self.seed(p.POINTER, f.encode({'release_id': self.old}))
+        writes = self.client.writes
+        self.assertEqual(self.execute('publish-once')['status'], 'automatic_publication_skipped')
+        self.assertEqual(self.client.writes, writes)
+        self.assertEqual(self.execute('publish')['status'], 'published_and_verified')
+
     def test_offline_default_never_connects(self):
         with patch.object(sys, 'argv', ['publish', '--output', str(self.root)]), \
                 patch.object(p, 'connect', side_effect=AssertionError('Unexpected network')):

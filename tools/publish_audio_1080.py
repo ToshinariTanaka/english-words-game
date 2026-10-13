@@ -168,6 +168,12 @@ def execute(store, root, action='publish', check=smoke):
     export_keys(jobs, root)
     report = dict(status='verifying', paid_api_calls=0, files=1080, questions=540)
     try:
+        if action == 'publish-once' and store.read(TRANSITION) is not None:
+            # This durable record is written before the first pointer change and is
+            # never removed by rollback. Later code/test pushes cannot republish.
+            report.update(status='automatic_publication_skipped',
+                          reason='A prior publication attempt exists; use explicit publish to resume or republish')
+            return report
         if action == 'rollback':
             # Recovery must work even if a newly published MP3 is damaged or missing.
             saved = store.read(TRANSITION)
@@ -210,7 +216,7 @@ def execute(store, root, action='publish', check=smoke):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--action', choices=('validate', 'publish', 'rollback'), default='validate')
+    parser.add_argument('--action', choices=('validate', 'publish', 'publish-once', 'rollback'), default='validate')
     parser.add_argument('--output', type=Path, default=Path('audio-preparation/publication-1080'))
     args = parser.parse_args()
     jobs, _, _, _ = target()

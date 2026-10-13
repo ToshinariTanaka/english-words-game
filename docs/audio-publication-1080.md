@@ -11,7 +11,12 @@ learning records are renumbered. Nova/Ash/random selection uses the existing app
 
 ## Publication
 
-Merging this workflow to main automatically publishes this fixed completed set.
+Merging this workflow to main automatically publishes this fixed completed set
+only if its durable transition record does not yet exist. The record is written
+before switching the pointer and is retained on rollback. Later code/test pushes
+and reruns skip publication, so they cannot silently undo a rollback. If the first
+attempt stopped after writing the record, use the explicit manual `publish` action
+to resume after inspection.
 PR runs are offline only. Manual Actions: **Publish completed 1080 audio files**,
 action `validate`, `publish`, or `rollback`. No OpenAI secret or API call is used.
 
@@ -31,7 +36,8 @@ this workflow cannot generate or repair audio.
 and a UTF-8 CSV of all 1080 existing audio keys. A successful result says
 `published_and_verified`. If delivery fails after the switch, it says
 `published_delivery_check_pending`: publication has already occurred. Rerunning
-rechecks the same release without generation. Investigate before changing anything.
+with explicit `publish` rechecks the same release without generation. Investigate
+before changing anything.
 
 ## Rollback
 
