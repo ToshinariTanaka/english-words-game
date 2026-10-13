@@ -1,0 +1,61 @@
+name: Publish completed 1080 audio files
+on:
+  pull_request:
+    paths: ['tools/publish_audio_1080.py', 'tests/test_publish_audio_1080.py', '.github/workflows/audio-publish-1080.yml']
+  push:
+    branches: [main]
+    paths: ['tools/publish_audio_1080.py', 'tests/test_publish_audio_1080.py', '.github/workflows/audio-publish-1080.yml']
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Publish completed audio or restore the original 60-file trial; no generation'
+        type: choice
+        options: [validate, publish, rollback]
+        default: validate
+permissions:
+  contents: read
+concurrency:
+  group: audio-r2-writes
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install plan reader
+        run: python -m pip install openpyxl==3.1.5
+      - name: Test publication and rollback safeguards offline
+        run: python -m unittest discover -s tests -p test_publish_audio_1080.py
+      - name: Export fixed audio keys offline
+        run: python tools/publish_audio_1080.py
+      - name: Install R2 client
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action != 'validate') }}
+        run: python -m pip install boto3==1.40.0
+      - name: Publish existing audio and verify app delivery
+        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'publish') }}
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python tools/publish_audio_1080.py --action publish
+      - name: Restore verified original trial
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.action == 'rollback' }}
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python tools/publish_audio_1080.py --action rollback
+      - name: Preserve publication report and audio keys
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: audio-publication-1080
+          path: audio-preparation/publication-1080/
+          if-no-files-found: error
+          retention-days: 30
