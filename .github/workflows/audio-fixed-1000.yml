@@ -1,0 +1,61 @@
+name: Generate fixed 1000 audio files
+on:
+  push:
+    branches: [feature/audio-fixed-1000-20261014]
+  pull_request:
+    paths:
+      - tools/run_audio_1000.py
+      - tools/run_full_audio.py
+      - tools/run_audio_pilot.py
+      - tests/test_run_audio_1000.py
+      - .github/workflows/audio-fixed-1000.yml
+  workflow_dispatch:
+    inputs:
+      generate:
+        description: 'Paid generation: fixed 500 words x Nova/Ash (1000 files maximum; no publication)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: audio-r2-writes
+  cancel-in-progress: false
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install openpyxl==3.1.5
+      - name: Install audio utilities before tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg
+      - name: Test without paid API calls
+        run: python -m unittest discover -s tests -p 'test_run*audio*.py'
+      - name: Validate fixed 1000 targets without API calls
+        run: python tools/run_audio_1000.py
+      - name: Install R2 client
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.generate }}
+        run: python -m pip install boto3==1.40.0
+      - name: Generate or resume fixed 1000 files, then verify reuse
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.generate }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: python tools/run_audio_1000.py --generate
+      - name: Save listening files, progress and rescue audio
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-ash-fixed-1000
+          path: audio-preparation/fixed-1000/
+          retention-days: 30
+          if-no-files-found: ignore
