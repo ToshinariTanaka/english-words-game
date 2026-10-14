@@ -135,6 +135,9 @@ function rewriteJavaScript(js) {
 }
 
 function rewriteHtml(html) {
+  html = replaceExactlyOnce(html, '<main class="app-shell">',
+    '<main class="app-shell">\n    <nav class="uptra-navigation" aria-label="アプトレへの移動"><a class="uptra-menu-link" href="https://uptra-v2.savorymorel.chatgpt.site/home">← アプトレのメニューに戻る</a></nav>',
+    'UpTra menu return link');
   html = replaceExactlyOnce(html, '<title>英語学習アプリ</title>',
     '<title>Up英語トレーニング</title>\n  <meta name="robots" content="noindex,nofollow">', 'page title and indexing');
   html = replaceExactlyOnce(html, '<h1 id="appTitle">英語学習アプリ</h1>',
@@ -195,6 +198,7 @@ function build() {
   const html = rewriteHtml(fs.readFileSync(path.join(SOURCE, 'index.html'), 'utf8'));
   const js = rewriteJavaScript(fs.readFileSync(path.join(SOURCE, 'script.js'), 'utf8'));
   const css = fs.readFileSync(path.join(SOURCE, 'style.css'), 'utf8')
+    + '\n.uptra-navigation {margin-bottom:12px} .uptra-menu-link {display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;max-width:100%;padding:10px 16px;border:1px solid #799dd4;border-radius:10px;background:#203458;color:#fff;text-decoration:none;font-weight:700;line-height:1.5} .uptra-menu-link:hover {background:#2b4673} .uptra-menu-link:focus-visible {outline:3px solid #60ccff;outline-offset:3px}\n'
     + '\n.static-preview-notice { color: #fff; background: #573e10; padding: 8px 12px; border-radius: 9px; font-weight: 700; }\n'
     + '.junior-student-login {background:#203458;color:#fff;border:1px solid #4c6ea4;border-radius:14px;padding:18px;margin:12px 0}\n'
     + '.setting-grid > * {min-width:0} #catalogHint {grid-column:1 / -1;margin:0;font-size:.85rem;color:var(--muted)} #catalogScope {max-width:100%}\n'
