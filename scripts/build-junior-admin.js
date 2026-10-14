@@ -25,7 +25,7 @@ function once(text, original, replacement, label) {
 }
 
 function adminHTML(html) {
-  html = once(html, '<title>教材アップロード | 中学生英単語アプリ</title>',
+  html = once(html, '<title>教材アップロード | Up英語トレーニング</title>',
     '<title>Up塾・教材アップロード（管理者専用）</title>', 'title');
   html = once(html,
     '※このページへのアクセス自体は公開されています。保存操作には管理者専用の認証トークンが必要です。一般利用者にURLやトークンを配布しないでください。',

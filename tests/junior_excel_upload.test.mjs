@@ -62,11 +62,11 @@ function context(env, path, body, { token=TOKEN, origin=base, headers={}, authen
   return {env,request,data:authenticated?{verifiedAdminEmail:'admin@example.com'}:{}};
 }
 
-async function stageAll(env, dataset, id) {
+async function stageAll(env, dataset, id, filter = 'a1a2') {
   for (const [mode, rows] of Object.entries(dataset.modes)) {
     const request=context(env,'/api/admin/questions/stage/'+mode,{
-      ok:true, mode, rows, count:rows.length, filename:'junior.xlsx', filter:'a1a2', versionId:id,
-    },{headers:{'X-Release-Id':id,'X-Filter':'a1a2','X-Row-Count':String(rows.length)}});
+      ok:true, mode, rows, count:rows.length, filename:'junior.xlsx', filter, versionId:id,
+    },{headers:{'X-Release-Id':id,'X-Filter':filter,'X-Row-Count':String(rows.length)}});
     const result=await stageMode({...request,params:{mode}});
     if (!result.ok) throw new Error('stage '+mode+' failed: '+await result.text());
   }
@@ -207,4 +207,25 @@ test('rejects an empty upload instead of writing an empty R2 object',async()=>{
   const result=await stageMode({env,request:req,params:{mode:'word'},data:{verifiedAdminEmail:'admin@example.com'}});
   assert.equal(result.status,400);
   assert.equal(bucket.store.size,0);
+});
+
+
+test('full shared catalog preserves advanced levels and optional flags through publication', async () => {
+  const dataset = prepareWorkbook(fixture(), 'all', converter);
+  const release = validateRelease({version:1, filename:'full.xlsx', filter:'all', modes:dataset.modes});
+  assert.deepEqual(release.modes.word.map(r => r.target1800), ['1','0','1']);
+  assert.deepEqual(release.modes.word.map(r => r.level), ['A1','A2','B1']);
+  assert.equal(prepareWorkbook(fixture(false), 'all', converter).modes.word[0].target1800, undefined);
+  const bad = fixture(); bad.Sheets['★英単語'][1][13] = 'maybe';
+  assert.throws(() => prepareWorkbook(bad, 'all', converter), /target1800/);
+  const bucket = new MemoryR2(), env = envFor(bucket), id = crypto.randomUUID();
+  await stageAll(env, dataset, id, 'all');
+  const response = await publish(context(env, '/api/admin/questions/publish', {
+    version:1, versionId:id, filename:'full.xlsx', filter:'all', counts:dataset.counts,
+  }));
+  assert.equal(response.status, 200);
+  const result = await (await getQuestions({env, request:new Request(base+'/api/questions/current?mode=word')})).json();
+  assert.deepEqual(result.rows.map(r => [r.question_key,r.level,r.target1800]), [
+    ['w000001','A1','1'], ['w000002','A2','0'], ['w000003','B1','1'],
+  ]);
 });

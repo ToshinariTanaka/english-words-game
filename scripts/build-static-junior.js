@@ -42,7 +42,7 @@ function rewriteJavaScript(js) {
   js = replaceExactlyOnce(
     js,
     'async function loadAppVariantConfig() {',
-    "async function loadAppVariantConfig() {\n  if (STATIC_JUNIOR_PREVIEW) {\n    await window.UpJuniorStudent?.ready;\n    return applyAppVariantConfig({variant: 'junior-static-preview', title: '中学生英単語アプリ（試験版）', subtitle: '4モード・静的配信の動作確認'});\n  }",
+    "async function loadAppVariantConfig() {\n  if (STATIC_JUNIOR_PREVIEW) {\n    await window.UpJuniorStudent?.ready;\n    return applyAppVariantConfig({variant: 'junior-static-preview', title: 'Up英語トレーニング', subtitle: '全年齢共通｜レベル・教材から選択'});\n  }",
     'local-only app config',
   );
   js = replaceExactlyOnce(
@@ -55,8 +55,19 @@ function rewriteJavaScript(js) {
     js,
     'function getCurrentQuestionAudioUrl() {',
     "function getCurrentQuestionAudioUrl() {\n  if (STATIC_JUNIOR_PREVIEW) return null;",
-    'disable Render MP3 endpoint',
+    'keep legacy Render endpoint disabled; saved audio uses its own controller',
   );
+  js = replaceExactlyOnce(js, 'function getSelectedVoiceValue() {',
+    "function getSelectedVoiceValue() {\n  if (STATIC_JUNIOR_PREVIEW) return '';", 'device fallback voice');
+  js = replaceExactlyOnce(js, 'function populateVoiceSelect() {',
+    'function populateVoiceSelect() {\n  if (STATIC_JUNIOR_PREVIEW) return window.UpJuniorAudio.populate();', 'saved voice options');
+  js = replaceExactlyOnce(js, 'function setupVoiceSelect() {',
+    'function setupVoiceSelect() {\n  if (STATIC_JUNIOR_PREVIEW) return window.UpJuniorAudio.setup(stopQuestionPlayback);', 'saved voice settings');
+  js = replaceExactlyOnce(js, 'function stopQuestionPlayback() {',
+    'function stopQuestionPlayback() {\n  if (STATIC_JUNIOR_PREVIEW) window.UpJuniorAudio?.stop();', 'stop saved playback');
+  js = replaceExactlyOnce(js, 'async function speakCurrentQuestion(options = {}) {',
+    "async function speakCurrentQuestion(options = {}) {\n  if (STATIC_JUNIOR_PREVIEW) return window.UpJuniorAudio.speak({mode:state.mode, question:state.questions[state.index], manual:options.statusPrefix === '手動再生：', fallback:() => speakCurrentQuestionWithWebSpeech('保存音声は未準備のため、端末音声を使用します。', {synchronous:true,exactStatus:true})});",
+    'saved playback before iOS legacy branch');
   js = replaceExactlyOnce(
     js,
     'function updateHostingStatus() {',
@@ -93,11 +104,23 @@ function rewriteJavaScript(js) {
     "const hostingMessage = STATIC_JUNIOR_PREVIEW ? 'Cloudflareの共有教材を優先します。未公開なら各3問のデモを表示します。' : IS_GITHUB_PAGES ?",
     'mode-level hosting notice',
   );
+  js = replaceExactlyOnce(js, '  return state.questionPool.filter(isQuestionInSelectedLevelRange);',
+    '  return state.questionPool.filter(question => isQuestionInSelectedLevelRange(question) && isQuestionInSelectedCatalog(question));', 'shared catalog filtering');
+  js = replaceExactlyOnce(js, '      questionKey: pickField(normalizedRow, COMMON_ALIASES.questionKey),',
+    "      questionKey: pickField(normalizedRow, COMMON_ALIASES.questionKey),\n      target1800: normalizedRow.target1800 === '1',", 'keep curriculum flag');
+  js = replaceExactlyOnce(js, '    if (filteredCount > 0) beginConfiguredSession();',
+    '    if (filteredCount > 0) beginConfiguredSession(); else clearEmptyCatalogSelection();', 'clear empty level selection');
+  js = replacePatternOnce(js, /  if \(filteredCount === 0\) \{\n    state\.questions = \[\];[\s\S]*?\n    return;\n  \}/,
+    '  if (filteredCount === 0) {\n    clearEmptyCatalogSelection();\n    return;\n  }', 'clear empty loaded catalog');
+  js = replaceExactlyOnce(js, 'async function initApp() {',
+    fs.readFileSync(path.join(SOURCE, 'junior-catalog.js'), 'utf8') + '\nasync function initApp() {', 'shared catalog helpers');
+  js = replaceExactlyOnce(js, '  setupLevelRangeSetting();',
+    '  setupLevelRangeSetting();\n  setupSharedCatalog();', 'shared catalog setup');
   // Student tracking is opt-in during the pilot. Rendering and scoring are
   // unchanged; the answer hook sends only question ID, correctness and bounded time.
   js = replaceExactlyOnce(js,
     '  state.currentQuestion = current || null;',
-    '  state.currentQuestion = current || null;\n  if (STATIC_JUNIOR_PREVIEW) window.UpJuniorStudent?.questionShown();',
+    '  state.currentQuestion = current || null;\n  if (STATIC_JUNIOR_PREVIEW) { window.UpJuniorStudent?.questionShown(); void window.UpJuniorAudio.showQuestion(state.mode, current); }',
     'question displayed hook');
   js = replaceExactlyOnce(js,
     '  updateLearningStat(current, isCorrect);',
@@ -112,12 +135,15 @@ function rewriteJavaScript(js) {
 }
 
 function rewriteHtml(html) {
+  html = replaceExactlyOnce(html, '<main class="app-shell">',
+    '<main class="app-shell">\n    <nav class="uptra-navigation" aria-label="アプトレへの移動"><a class="uptra-menu-link" href="https://uptra-v2.savorymorel.chatgpt.site/home">← アプトレのメニューに戻る</a></nav>',
+    'UpTra menu return link');
   html = replaceExactlyOnce(html, '<title>英語学習アプリ</title>',
-    '<title>中学生英単語アプリ（静的試験版）</title>\n  <meta name="robots" content="noindex,nofollow">', 'page title and indexing');
+    '<title>Up英語トレーニング</title>\n  <meta name="robots" content="noindex,nofollow">', 'page title and indexing');
   html = replaceExactlyOnce(html, '<h1 id="appTitle">英語学習アプリ</h1>',
-    '<h1 id="appTitle">中学生英単語アプリ（試験版）</h1>', 'visible title');
+    '<h1 id="appTitle">Up英語トレーニング</h1>', 'visible title');
   html = replaceExactlyOnce(html, '<header class="hero">',
-    '<header class="hero">\n      <p class="static-preview-notice">試験公開｜共有教材が未公開の場合、各モード3問の内蔵デモを表示します。実際の塾生データは含みません。</p>',
+    '<header class="hero">\n      <p class="static-preview-notice">全年齢共通｜レベル・教材条件で出題範囲を選べます。共有教材が未公開の場合は各モード3問のデモを表示します。</p>',
     'preview banner');
   html = replacePatternOnce(html, /<p id="uploadStatus" class="upload-status">.*<\/p>/m,
     '<p id="uploadStatus" class="upload-status">この画面で選んだCSV・Excelは一時確認用です。サーバーに保存されず、ほかの端末にも共有されません。教材の共通更新は管理者用のアップロード画面から行います。</p>',
@@ -126,6 +152,12 @@ function rewriteHtml(html) {
     '<link rel="stylesheet" href="./style.css">', 'stylesheet URL');
   html = replacePatternOnce(html, /<script src="\.\/script\.js[^"]*"><\/script>/m,
     '<script src="./script.js"></script>', 'script URL');
+  html = replacePatternOnce(html, /<select id="voiceSelect">[\s\S]*?<\/select>/,
+    '<select id="voiceSelect"><option value="nova" selected>Nova</option><option value="ash">Ash</option><option value="random">ランダム（Nova／Ash）</option></select>', 'saved voice options');
+  html = replaceExactlyOnce(html,
+    '音声候補は指定した10種類のうち、このブラウザで利用できるものだけを表示します。',
+    'AI生成音声を使用します。ランダムは問題ごとに声を選び、聞き直すときは同じ声です。未準備の問題は端末音声を使います。', 'saved voice disclosure');
+  html = replaceExactlyOnce(html, '現在の音声：ブラウザ自動選択', '音声：Nova', 'initial saved voice');
   html = replaceExactlyOnce(html,'    </header>', '    </header>\n'+
     '    <section class="junior-student-login" id="juniorStudentPanel" aria-label="学習記録用の生徒ログイン">\n'+
     '      <h2>生徒ログイン（学習履歴の共有・試験中）</h2>\n'+
@@ -148,8 +180,10 @@ function rewriteHtml(html) {
     '    </section>', 'student login section');
   html = replaceExactlyOnce(html,
     '  <script src="./script.js"></script>',
-    '  <script src="./junior-student-queue.js"></script>\n  <script src="./junior-student-sync.js"></script>\n  <script src="./script.js"></script>',
+    '  <script src="./junior-student-queue.js"></script>\n  <script src="./junior-student-sync.js"></script>\n  <script src="./junior-saved-audio.js"></script>\n  <script src="./script.js"></script>',
     'student session UI script');
+  html = replaceExactlyOnce(html, '          <label class="setting-field" for="levelStart">',
+    fs.readFileSync(path.join(SOURCE, 'junior-catalog.html'), 'utf8') + '\n          <label class="setting-field" for="levelStart">', 'shared catalog controls');
   return html;
 }
 
@@ -164,8 +198,10 @@ function build() {
   const html = rewriteHtml(fs.readFileSync(path.join(SOURCE, 'index.html'), 'utf8'));
   const js = rewriteJavaScript(fs.readFileSync(path.join(SOURCE, 'script.js'), 'utf8'));
   const css = fs.readFileSync(path.join(SOURCE, 'style.css'), 'utf8')
+    + '\n.uptra-navigation {margin-bottom:12px} .uptra-menu-link {display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;max-width:100%;padding:10px 16px;border:1px solid #799dd4;border-radius:10px;background:#203458;color:#fff;text-decoration:none;font-weight:700;line-height:1.5} .uptra-menu-link:hover {background:#2b4673} .uptra-menu-link:focus-visible {outline:3px solid #60ccff;outline-offset:3px}\n'
     + '\n.static-preview-notice { color: #fff; background: #573e10; padding: 8px 12px; border-radius: 9px; font-weight: 700; }\n'
     + '.junior-student-login {background:#203458;color:#fff;border:1px solid #4c6ea4;border-radius:14px;padding:18px;margin:12px 0}\n'
+    + '.setting-grid > * {min-width:0} #catalogHint {grid-column:1 / -1;margin:0;font-size:.85rem;color:var(--muted)} #catalogScope {max-width:100%}\n'
     + '.junior-student-login h2 {font-size:1.2rem;margin:0 0 10px}\n'
     + '.junior-student-login label {display:block;margin:8px 0;font-size:1rem}\n'
     + '.junior-student-login input {display:block;width:100%;box-sizing:border-box;padding:10px;font-size:1rem;border-radius:8px}\n'
@@ -177,6 +213,7 @@ function build() {
   fs.writeFileSync(path.join(OUTPUT, 'script.js'), js);
   fs.copyFileSync(path.join(SOURCE, 'junior-student-queue.js'), path.join(OUTPUT, 'junior-student-queue.js'));
   fs.copyFileSync(path.join(SOURCE, 'junior-student-sync.js'), path.join(OUTPUT, 'junior-student-sync.js'));
+  fs.copyFileSync(path.join(SOURCE, 'junior-saved-audio.js'), path.join(OUTPUT, 'junior-saved-audio.js'));
   fs.writeFileSync(path.join(OUTPUT, 'style.css'), css);
   fs.writeFileSync(path.join(OUTPUT, '_headers'), '/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  X-Frame-Options: DENY\n');
   fs.writeFileSync(path.join(OUTPUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');

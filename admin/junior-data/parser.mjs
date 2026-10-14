@@ -29,6 +29,7 @@ export function convertSheet(rows, mode, filter) {
   }
   // N column is reserved for a manual inclusion flag on the word sheet.
   const flagIndex = headers.indexOf('target1800');
+  if (flagIndex >= 0 && flagIndex !== 13) throw new Error(spec.sheet + '：target1800の見出しはN列に置いてください。');
   if (filter === 'target1800' && mode === 'word' && flagIndex !== 13) {
     throw new Error('★英単語シートのN1に target1800 と入力し、対象語のN列に1を設定してください。');
   }
@@ -41,6 +42,13 @@ export function convertSheet(rows, mode, filter) {
     if (raw.slice(0, 13).every((v) => cleanString(v) === '')) continue;
     const row = Object.fromEntries(FIELDS.map((column, i) => [column, cleanString(raw[i])]));
     row.level = row.level.toUpperCase();
+    if (flagIndex === 13) {
+      const flag = cleanString(raw[13]).toLowerCase();
+      if (!chosenFlag(flag) && !['', '0', 'false', 'no', 'n'].includes(flag)) {
+        throw new Error(spec.sheet + ' ' + (index + 1) + '行：target1800は1（対象）または0・空欄（対象外）にしてください。');
+      }
+      row.target1800 = chosenFlag(flag) ? '1' : '0';
+    }
 
     const include = filter === 'all'
       || (filter === 'target1800' && mode === 'word' && chosenFlag(raw[13]))
